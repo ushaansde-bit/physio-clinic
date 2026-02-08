@@ -85,6 +85,20 @@ window.Store = (function() {
     saveAll(KEYS.activity, log);
   }
 
+  // --- Helper: next patient display ID ---
+  function getNextDisplayId() {
+    var patients = getAll(KEYS.patients);
+    var maxNum = 0;
+    for (var i = 0; i < patients.length; i++) {
+      if (patients[i].displayId) {
+        var num = parseInt(patients[i].displayId.replace('PT-', ''), 10);
+        if (num > maxNum) maxNum = num;
+      }
+    }
+    var next = maxNum + 1;
+    return 'PT-' + ('0000' + next).slice(-4);
+  }
+
   // --- Public API wrappers ---
   var api = {
     // Users
@@ -107,19 +121,8 @@ window.Store = (function() {
       }
       return null;
     },
-    getNextDisplayId: function() {
-      var patients = getAll(KEYS.patients);
-      var maxNum = 0;
-      for (var i = 0; i < patients.length; i++) {
-        if (patients[i].displayId) {
-          var num = parseInt(patients[i].displayId.replace('PT-', ''), 10);
-          if (num > maxNum) maxNum = num;
-        }
-      }
-      var next = maxNum + 1;
-      return 'PT-' + ('0000' + next).slice(-4);
-    },
-    createPatient: function(p) { p.displayId = this.getNextDisplayId(); var r = create(KEYS.patients, p); logActivity('New patient added: ' + p.name + ' (' + p.displayId + ')'); return r; },
+    getNextDisplayId: getNextDisplayId,
+    createPatient: function(p) { p.displayId = getNextDisplayId(); var r = create(KEYS.patients, p); logActivity('New patient added: ' + p.name + ' (' + p.displayId + ')'); return r; },
     updatePatient: function(id, u) { var r = update(KEYS.patients, id, u); if(r) logActivity('Patient updated: ' + r.name); return r; },
     deletePatient: function(id) {
       var p = getById(KEYS.patients, id);

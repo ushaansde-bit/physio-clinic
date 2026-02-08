@@ -95,7 +95,7 @@ window.PatientDetailView = (function() {
     // Patient info
     html += '<div class="card mb-2"><div class="card-header"><h3>Patient Information</h3></div><div class="card-body">';
     html += '<div class="info-grid">';
-    html += infoItem('Patient ID', '<span style="font-family:monospace;font-weight:600;color:var(--primary);">' + Utils.escapeHtml(patient.displayId || '-') + '</span>');
+    html += '<div class="info-item"><label>Patient ID</label><span style="font-family:monospace;font-weight:600;color:var(--primary);">' + Utils.escapeHtml(patient.displayId || '-') + '</span></div>';
     html += infoItem('Full Name', patient.name);
     html += infoItem('Date of Birth', Utils.formatDate(patient.dob) + ' (Age ' + Utils.calculateAge(patient.dob) + ')');
     html += infoItem('Gender', patient.gender ? patient.gender.charAt(0).toUpperCase() + patient.gender.slice(1) : '-');
