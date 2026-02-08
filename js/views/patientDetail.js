@@ -462,6 +462,337 @@ window.PatientDetailView = (function() {
     return html;
   }
 
+  // ==================== PRINT OPTIONS ====================
+  function showPrintOptions(patient) {
+    var bills = Store.getBillingByPatient(patient.id);
+    bills.sort(function(a, b) { return a.date > b.date ? -1 : 1; });
+
+    var body = '<div style="margin-bottom:1rem;">';
+    body += '<h4 style="margin-bottom:0.75rem;">Report Type</h4>';
+    body += '<div style="display:flex;gap:0.5rem;flex-wrap:wrap;">';
+    body += '<button class="btn btn-primary print-type-btn active" data-type="patient" id="pt-type-patient">Patient Report</button>';
+    body += '<button class="btn btn-secondary print-type-btn" data-type="billing" id="pt-type-billing">Billing Report</button>';
+    body += '<button class="btn btn-secondary print-type-btn" data-type="combined" id="pt-type-combined">Combined Report</button>';
+    body += '</div></div>';
+
+    // Patient report sections
+    body += '<div id="print-patient-opts">';
+    body += '<h4 style="margin-bottom:0.5rem;">Select Sections</h4>';
+    body += '<div class="tag-checkboxes">';
+    body += '<label class="tag-checkbox-item checked"><input type="checkbox" class="print-section" value="info" checked> Patient Info</label>';
+    body += '<label class="tag-checkbox-item checked"><input type="checkbox" class="print-section" value="diagnosis" checked> Diagnosis & Plan</label>';
+    body += '<label class="tag-checkbox-item checked"><input type="checkbox" class="print-section" value="body" checked> Body Diagram</label>';
+    body += '<label class="tag-checkbox-item checked"><input type="checkbox" class="print-section" value="sessions" checked> Sessions</label>';
+    body += '<label class="tag-checkbox-item checked"><input type="checkbox" class="print-section" value="exercises" checked> Exercises</label>';
+    body += '<label class="tag-checkbox-item checked"><input type="checkbox" class="print-section" value="prescriptions" checked> Prescriptions</label>';
+    body += '</div></div>';
+
+    // Billing report options
+    body += '<div id="print-billing-opts" style="display:none;">';
+    body += '<h4 style="margin-bottom:0.5rem;">Billing Type</h4>';
+    body += '<div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem;">';
+    body += '<label class="tag-checkbox-item checked"><input type="radio" name="bill-type" value="statement" checked> Full Statement</label>';
+    body += '<label class="tag-checkbox-item"><input type="radio" name="bill-type" value="single"> Single Invoice</label>';
+    body += '</div>';
+    // Invoice picker (hidden by default)
+    body += '<div id="print-invoice-picker" style="display:none;">';
+    body += '<label style="font-size:0.82rem;font-weight:600;margin-bottom:0.3rem;display:block;">Select Invoice</label>';
+    body += '<select id="print-invoice-select" class="filter-select" style="width:100%;">';
+    for (var i = 0; i < bills.length; i++) {
+      body += '<option value="' + bills[i].id + '">' + Utils.formatDate(bills[i].date) + ' - ' + Utils.escapeHtml(bills[i].description) + ' - ' + Utils.formatCurrency(bills[i].amount) + '</option>';
+    }
+    body += '</select></div>';
+    body += '</div>';
+
+    var footer = '<button class="btn btn-secondary" id="print-cancel">Cancel</button>';
+    footer += '<button class="btn btn-primary" id="print-go">';
+    footer += '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>';
+    footer += ' Print</button>';
+
+    Utils.showModal('Print Report', body, footer);
+
+    var currentType = 'patient';
+
+    // Type toggle
+    var typeBtns = document.querySelectorAll('.print-type-btn');
+    for (var t = 0; t < typeBtns.length; t++) {
+      typeBtns[t].addEventListener('click', function() {
+        for (var x = 0; x < typeBtns.length; x++) { typeBtns[x].className = 'btn btn-secondary print-type-btn'; }
+        this.className = 'btn btn-primary print-type-btn active';
+        currentType = this.getAttribute('data-type');
+        document.getElementById('print-patient-opts').style.display = currentType === 'patient' || currentType === 'combined' ? '' : 'none';
+        document.getElementById('print-billing-opts').style.display = currentType === 'billing' || currentType === 'combined' ? '' : 'none';
+      });
+    }
+
+    // Billing type radio toggle
+    var radios = document.querySelectorAll('[name="bill-type"]');
+    for (var r = 0; r < radios.length; r++) {
+      radios[r].addEventListener('change', function() {
+        document.getElementById('print-invoice-picker').style.display = this.value === 'single' ? '' : 'none';
+      });
+    }
+
+    // Checkbox visual toggle
+    var checks = document.querySelectorAll('.print-section');
+    for (var c = 0; c < checks.length; c++) {
+      checks[c].addEventListener('change', function() {
+        this.parentElement.classList.toggle('checked', this.checked);
+      });
+    }
+
+    document.getElementById('print-cancel').onclick = Utils.closeModal;
+    document.getElementById('print-go').onclick = function() {
+      Utils.closeModal();
+      executePrint(patient, currentType);
+    };
+
+    // Store state for print execution
+    window._printOpts = {
+      getType: function() { return currentType; },
+      getSections: function() {
+        var secs = [];
+        var chks = document.querySelectorAll('.print-section');
+        for (var i = 0; i < chks.length; i++) {
+          if (chks[i].checked) secs.push(chks[i].value);
+        }
+        return secs;
+      },
+      getBillType: function() {
+        var sel = document.querySelector('[name="bill-type"]:checked');
+        return sel ? sel.value : 'statement';
+      },
+      getInvoiceId: function() {
+        var sel = document.getElementById('print-invoice-select');
+        return sel ? sel.value : '';
+      }
+    };
+
+    // Override print-go to capture state before modal closes
+    document.getElementById('print-go').onclick = function() {
+      var type = currentType;
+      var sections = window._printOpts.getSections();
+      var billType = window._printOpts.getBillType();
+      var invoiceId = window._printOpts.getInvoiceId();
+      Utils.closeModal();
+      executePrint(patient, type, sections, billType, invoiceId);
+    };
+  }
+
+  function executePrint(patient, type, sections, billType, invoiceId) {
+    var html = '';
+
+    // Clinic header
+    html += '<div class="print-report-header">';
+    html += '<h1>PhysioClinic</h1>';
+    html += '<p>Clinic Management System</p>';
+    html += '</div>';
+
+    // Patient header (always shown)
+    html += '<div class="print-patient-bar">';
+    html += '<strong>' + Utils.escapeHtml(patient.name) + '</strong>';
+    html += ' <span style="font-family:monospace;color:#555;">' + Utils.escapeHtml(patient.displayId || '') + '</span>';
+    html += ' &nbsp;|&nbsp; Phone: ' + Utils.escapeHtml(patient.phone || '-');
+    html += ' &nbsp;|&nbsp; DOB: ' + Utils.formatDate(patient.dob) + ' (Age ' + Utils.calculateAge(patient.dob) + ')';
+    html += ' &nbsp;|&nbsp; Gender: ' + Utils.escapeHtml(patient.gender || '-');
+    html += '</div>';
+
+    if (type === 'patient' || type === 'combined') {
+      html += buildPatientReport(patient, sections);
+    }
+
+    if (type === 'billing' || type === 'combined') {
+      html += buildBillingReport(patient, billType, invoiceId);
+    }
+
+    // Footer
+    html += '<div class="print-report-footer">';
+    html += '<p>Generated on ' + Utils.formatDate(Utils.today()) + ' &nbsp;|&nbsp; PhysioClinic</p>';
+    html += '</div>';
+
+    // Inject into print container
+    var printDiv = document.getElementById('print-report-area');
+    if (!printDiv) {
+      printDiv = document.createElement('div');
+      printDiv.id = 'print-report-area';
+      printDiv.className = 'print-report-area';
+      document.body.appendChild(printDiv);
+    }
+    printDiv.innerHTML = html;
+    document.body.classList.add('printing-report');
+    setTimeout(function() {
+      window.print();
+      // Clean up after print so regular prints work normally
+      setTimeout(function() {
+        printDiv.innerHTML = '';
+        document.body.classList.remove('printing-report');
+      }, 500);
+    }, 150);
+  }
+
+  function buildPatientReport(patient, sections) {
+    var html = '<h2 class="print-section-title">Patient Report</h2>';
+
+    if (sections.indexOf('info') !== -1) {
+      html += '<div class="print-section-block">';
+      html += '<h3>Patient Information</h3>';
+      html += '<table class="print-info-table">';
+      html += '<tr><td class="lbl">Patient ID</td><td>' + Utils.escapeHtml(patient.displayId || '-') + '</td>';
+      html += '<td class="lbl">Full Name</td><td>' + Utils.escapeHtml(patient.name) + '</td></tr>';
+      html += '<tr><td class="lbl">Phone</td><td>' + Utils.escapeHtml(patient.phone || '-') + '</td>';
+      html += '<td class="lbl">Email</td><td>' + Utils.escapeHtml(patient.email || '-') + '</td></tr>';
+      html += '<tr><td class="lbl">Address</td><td colspan="3">' + Utils.escapeHtml(patient.address || '-') + '</td></tr>';
+      html += '<tr><td class="lbl">Insurance</td><td>' + Utils.escapeHtml(patient.insurance || '-') + '</td>';
+      html += '<td class="lbl">Status</td><td>' + Utils.escapeHtml(patient.status || 'active') + '</td></tr>';
+      html += '<tr><td class="lbl">Emergency</td><td>' + Utils.escapeHtml(patient.emergencyContact || '-') + '</td>';
+      html += '<td class="lbl">Emergency Ph.</td><td>' + Utils.escapeHtml(patient.emergencyPhone || '-') + '</td></tr>';
+      html += '</table></div>';
+    }
+
+    if (sections.indexOf('diagnosis') !== -1) {
+      html += '<div class="print-section-block">';
+      html += '<h3>Diagnosis & Treatment Plan</h3>';
+      html += '<p><strong>Diagnosis:</strong> ' + Utils.escapeHtml(patient.diagnosis || '-') + '</p>';
+      html += '<p><strong>Treatment Plan:</strong> ' + Utils.escapeHtml(patient.treatmentPlan || '-') + '</p>';
+      if (patient.notes) html += '<p><strong>Notes:</strong> ' + Utils.escapeHtml(patient.notes) + '</p>';
+      html += '</div>';
+    }
+
+    if (sections.indexOf('body') !== -1 && patient.bodyRegions && patient.bodyRegions.length > 0) {
+      html += '<div class="print-section-block">';
+      html += '<h3>Affected Body Areas</h3>';
+      html += '<p>' + BodyDiagram.renderBadges(patient.bodyRegions) + '</p>';
+      html += '</div>';
+    }
+
+    if (sections.indexOf('sessions') !== -1) {
+      var sessions = Store.getSessionsByPatient(patient.id);
+      sessions.sort(function(a, b) { return a.date > b.date ? -1 : 1; });
+      if (sessions.length > 0) {
+        html += '<div class="print-section-block">';
+        html += '<h3>Session Notes (' + sessions.length + ')</h3>';
+        html += '<table class="print-data-table"><thead><tr><th>Date</th><th>Subjective</th><th>Objective</th><th>Assessment</th><th>Plan</th><th>Pain</th></tr></thead><tbody>';
+        for (var s = 0; s < sessions.length; s++) {
+          var sn = sessions[s];
+          html += '<tr>';
+          html += '<td style="white-space:nowrap;">' + Utils.formatDate(sn.date) + '</td>';
+          html += '<td>' + Utils.escapeHtml(sn.subjective || '-') + '</td>';
+          html += '<td>' + Utils.escapeHtml(sn.objective || '-') + '</td>';
+          html += '<td>' + Utils.escapeHtml(sn.assessment || '-') + '</td>';
+          html += '<td>' + Utils.escapeHtml(sn.plan || '-') + '</td>';
+          html += '<td>' + (sn.painLevel != null ? sn.painLevel + '/10' : '-') + '</td>';
+          html += '</tr>';
+        }
+        html += '</tbody></table></div>';
+      }
+    }
+
+    if (sections.indexOf('exercises') !== -1) {
+      var exercises = Store.getExercisesByPatient(patient.id);
+      if (exercises.length > 0) {
+        html += '<div class="print-section-block">';
+        html += '<h3>Exercise Program (' + exercises.length + ')</h3>';
+        html += '<table class="print-data-table"><thead><tr><th>Exercise</th><th>Sets x Reps</th><th>Frequency</th><th>Instructions</th></tr></thead><tbody>';
+        for (var e = 0; e < exercises.length; e++) {
+          var ex = exercises[e];
+          html += '<tr>';
+          html += '<td style="font-weight:600;">' + Utils.escapeHtml(ex.name) + '</td>';
+          html += '<td>' + (ex.sets || '-') + ' x ' + (ex.reps || '-') + '</td>';
+          html += '<td>' + Utils.escapeHtml(ex.frequency || '-') + '</td>';
+          html += '<td>' + Utils.escapeHtml(ex.instructions || '-') + '</td>';
+          html += '</tr>';
+        }
+        html += '</tbody></table></div>';
+      }
+    }
+
+    if (sections.indexOf('prescriptions') !== -1) {
+      var rxs = Store.getPrescriptionsByPatient(patient.id);
+      var activeRx = rxs.filter(function(r) { return r.status === 'active'; });
+      if (activeRx.length > 0) {
+        html += '<div class="print-section-block">';
+        html += '<h3>Active Prescriptions (' + activeRx.length + ')</h3>';
+        html += '<table class="print-data-table"><thead><tr><th>Medication</th><th>Dosage</th><th>Route</th><th>Frequency</th><th>Duration</th><th>Instructions</th></tr></thead><tbody>';
+        for (var p = 0; p < activeRx.length; p++) {
+          var rx = activeRx[p];
+          html += '<tr>';
+          html += '<td style="font-weight:600;">' + Utils.escapeHtml(rx.medication) + '</td>';
+          html += '<td>' + Utils.escapeHtml(rx.dosage || '-') + '</td>';
+          html += '<td>' + Utils.escapeHtml(rx.route || '-') + '</td>';
+          html += '<td>' + Utils.escapeHtml(rx.frequency || '-') + '</td>';
+          html += '<td>' + Utils.escapeHtml(rx.duration || '-') + '</td>';
+          html += '<td>' + Utils.escapeHtml(rx.instructions || '-') + '</td>';
+          html += '</tr>';
+        }
+        html += '</tbody></table></div>';
+      }
+    }
+
+    return html;
+  }
+
+  function buildBillingReport(patient, billType, invoiceId) {
+    var bills = Store.getBillingByPatient(patient.id);
+    bills.sort(function(a, b) { return a.date > b.date ? -1 : 1; });
+    var html = '<h2 class="print-section-title">Billing Report</h2>';
+
+    if (billType === 'single' && invoiceId) {
+      // Single invoice
+      var bill = null;
+      for (var i = 0; i < bills.length; i++) {
+        if (bills[i].id === invoiceId) { bill = bills[i]; break; }
+      }
+      if (bill) {
+        html += '<div class="print-invoice">';
+        html += '<h3>Invoice</h3>';
+        html += '<table class="print-info-table">';
+        html += '<tr><td class="lbl">Invoice Date</td><td>' + Utils.formatDate(bill.date) + '</td>';
+        html += '<td class="lbl">Status</td><td style="font-weight:600;">' + (bill.status === 'paid' ? 'PAID' : 'PENDING') + '</td></tr>';
+        html += '<tr><td class="lbl">Description</td><td colspan="3">' + Utils.escapeHtml(bill.description) + '</td></tr>';
+        html += '<tr><td class="lbl">Amount</td><td colspan="3" style="font-size:1.2em;font-weight:700;">' + Utils.formatCurrency(bill.amount) + '</td></tr>';
+        if (bill.paidDate) {
+          html += '<tr><td class="lbl">Paid Date</td><td colspan="3">' + Utils.formatDate(bill.paidDate) + '</td></tr>';
+        }
+        html += '</table></div>';
+      }
+    } else {
+      // Full statement
+      var total = 0, paidAmt = 0, pendingAmt = 0;
+      for (var j = 0; j < bills.length; j++) {
+        var amt = parseFloat(bills[j].amount) || 0;
+        total += amt;
+        if (bills[j].status === 'paid') paidAmt += amt;
+        else pendingAmt += amt;
+      }
+
+      html += '<div class="print-section-block">';
+      html += '<table class="print-info-table">';
+      html += '<tr><td class="lbl">Total Billed</td><td style="font-weight:700;">' + Utils.formatCurrency(total) + '</td>';
+      html += '<td class="lbl">Paid</td><td style="font-weight:700;color:#16a34a;">' + Utils.formatCurrency(paidAmt) + '</td></tr>';
+      html += '<tr><td class="lbl">Pending</td><td style="font-weight:700;color:#dc2626;">' + Utils.formatCurrency(pendingAmt) + '</td>';
+      html += '<td class="lbl">Total Invoices</td><td>' + bills.length + '</td></tr>';
+      html += '</table></div>';
+
+      if (bills.length > 0) {
+        html += '<table class="print-data-table"><thead><tr><th>Date</th><th>Description</th><th style="text-align:right;">Amount</th><th>Status</th></tr></thead><tbody>';
+        for (var k = 0; k < bills.length; k++) {
+          var b = bills[k];
+          html += '<tr>';
+          html += '<td style="white-space:nowrap;">' + Utils.formatDate(b.date) + '</td>';
+          html += '<td>' + Utils.escapeHtml(b.description) + '</td>';
+          html += '<td style="text-align:right;font-weight:600;font-variant-numeric:tabular-nums;">' + Utils.formatCurrency(b.amount) + '</td>';
+          html += '<td>' + (b.status === 'paid' ? 'Paid' : 'Pending') + '</td>';
+          html += '</tr>';
+        }
+        html += '<tr style="font-weight:700;border-top:2px solid #000;"><td colspan="2" style="text-align:right;">TOTAL</td>';
+        html += '<td style="text-align:right;font-variant-numeric:tabular-nums;">' + Utils.formatCurrency(total) + '</td><td></td></tr>';
+        html += '</tbody></table>';
+      }
+    }
+
+    return html;
+  }
+
   // ==================== EVENT BINDING ====================
   function bindEvents(container, patient) {
     if (_clickHandler) {
@@ -478,7 +809,7 @@ window.PatientDetailView = (function() {
 
       // Print
       if (e.target.closest('#print-patient-btn') || e.target.closest('#print-exercises-btn')) {
-        window.print();
+        showPrintOptions(patient);
         return;
       }
 
