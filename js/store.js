@@ -353,7 +353,7 @@ window.Store = (function() {
         emergencyContact: 'Dorothy Taylor', emergencyPhone: '555-0602', status: 'active', insurance: 'Medicare', notes: 'Stage 2 Hoehn & Yahr. Motivated.' },
       { id: 'p7', name: 'Anna Kowalski', dob: '1988-07-14', gender: 'female', phone: '555-0701', email: 'a.kowalski@email.com', address: '147 Walnut Street, Springfield',
         diagnosis: 'Plantar Fasciitis - Bilateral', treatmentPlan: 'Stretching program (calf, plantar fascia). Night splints. Custom orthotics fitting. Gradual return to running.',
-        emergencyContact: 'Peter Kowalski', emergencyPhone: '555-0702', status: 'discharged', insurance: 'Blue Cross', notes: 'Runner. Completed treatment successfully.' },
+        emergencyContact: 'Peter Kowalski', emergencyPhone: '555-0702', status: 'completed', insurance: 'Blue Cross', notes: 'Runner. Completed treatment successfully.' },
       { id: 'p8', name: 'David Park', dob: '1979-04-25', gender: 'male', phone: '555-0801', email: 'd.park@email.com', address: '258 Spruce Drive, Springfield',
         diagnosis: 'Cervical Radiculopathy - C5/C6', treatmentPlan: 'Cervical traction. Neural gliding exercises. Postural correction. Ergonomic workstation setup. Strengthening deep neck flexors.',
         emergencyContact: 'Sue Park', emergencyPhone: '555-0802', status: 'active', insurance: 'Aetna', notes: 'Software developer. Needs ergonomic education.' }
@@ -400,7 +400,7 @@ window.Store = (function() {
     // P6 William Taylor - Parkinsons, 2x/week
     addWeeklyAppts('p6', 'William Taylor', -84, 7, '09:30', '60', 'Treatment', []);
     addWeeklyAppts('p6', 'William Taylor', -82, 7, '09:30', '60', 'Treatment', []);
-    // P7 Anna Kowalski - Plantar fasciitis, discharged after 8 weeks
+    // P7 Anna Kowalski - Plantar fasciitis, completed after 8 weeks
     addWeeklyAppts('p7', 'Anna Kowalski', -84, -28, '16:00', '30', 'Treatment', []);
     // P8 David Park - Cervical, 1x/week
     addWeeklyAppts('p8', 'David Park', -56, 7, '10:30', '30', 'Treatment', [-35]);
@@ -714,7 +714,7 @@ window.Store = (function() {
     addBill('p6', -14, 'Therapeutic Exercise + Dual-task', '1000', 'pending', 0);
     addBill('p6', -7, 'Balance Training + Gait', '1000', 'pending', 0);
 
-    // Anna Kowalski (p7) - 8 sessions (discharged)
+    // Anna Kowalski (p7) - 8 sessions (completed)
     addBill('p7', -87, 'Initial Evaluation', '2000', 'paid', -84);
     addBill('p7', -84, 'Stretching Protocol + Night Splint Fit', '1200', 'paid', -81);
     addBill('p7', -77, 'Manual Therapy + Stretching', '1200', 'paid', -74);
@@ -814,7 +814,7 @@ window.Store = (function() {
       { text: 'Session note added for James Miller', time: new Date(td.getTime() - 86400000 * 3).toISOString() },
       { text: 'Appointment completed: Emily Watson', time: new Date(td.getTime() - 86400000 * 4).toISOString() },
       { text: 'Payment received: \u20B91,200 from Anna Kowalski', time: new Date(td.getTime() - 86400000 * 4).toISOString() },
-      { text: 'Patient discharged: Anna Kowalski', time: new Date(td.getTime() - 86400000 * 5).toISOString() },
+      { text: 'Treatment completed: Anna Kowalski', time: new Date(td.getTime() - 86400000 * 5).toISOString() },
       { text: 'New patient added: David Park', time: new Date(td.getTime() - 86400000 * 7).toISOString() },
       { text: 'Reassessment completed: William Taylor', time: new Date(td.getTime() - 86400000 * 7).toISOString() },
       { text: 'Payment received: \u20B91,500 from James Miller', time: new Date(td.getTime() - 86400000 * 10).toISOString() }

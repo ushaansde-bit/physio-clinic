@@ -11,6 +11,8 @@ window.AppointmentsView = (function() {
     dateTo: '',
     statusFilter: '',
     typeFilter: '',
+    page: 1,
+    perPage: 15,
     calMonth: new Date().getMonth(),
     calYear: new Date().getFullYear(),
     weekStart: Utils.getWeekStart(new Date())
@@ -21,6 +23,7 @@ window.AppointmentsView = (function() {
     state.dateTo = '';
     state.statusFilter = '';
     state.typeFilter = '';
+    state.page = 1;
     renderView(container);
   }
 
@@ -104,12 +107,19 @@ window.AppointmentsView = (function() {
     html += '<th>Date & Time</th><th>Patient</th><th>Type</th><th>Duration</th><th>Status</th><th>Actions</th>';
     html += '</tr></thead><tbody>';
 
-    if (filtered.length === 0) {
+    // Pagination
+    var totalItems = filtered.length;
+    var totalPages = Math.ceil(totalItems / state.perPage) || 1;
+    if (state.page > totalPages) state.page = totalPages;
+    var startIdx = (state.page - 1) * state.perPage;
+    var pageItems = filtered.slice(startIdx, startIdx + state.perPage);
+
+    if (totalItems === 0) {
       html += '<tr class="no-hover"><td colspan="6"><div class="empty-state"><p>No appointments found</p></div></td></tr>';
     } else {
       var todayStr = Utils.today();
-      for (var j = 0; j < filtered.length; j++) {
-        var appt = filtered[j];
+      for (var j = 0; j < pageItems.length; j++) {
+        var appt = pageItems[j];
         var statusCls = getStatusBadgeClass(appt.status);
         var isToday = appt.date === todayStr;
         html += '<tr class="no-hover">';
@@ -134,6 +144,20 @@ window.AppointmentsView = (function() {
       }
     }
     html += '</tbody></table></div></div>';
+
+    // Pagination controls
+    if (totalPages > 1) {
+      html += '<div class="pagination">';
+      html += '<span class="pagination-info">Showing ' + (startIdx + 1) + '-' + Math.min(startIdx + state.perPage, totalItems) + ' of ' + totalItems + '</span>';
+      html += '<div class="pagination-buttons">';
+      html += '<button class="btn btn-sm btn-secondary appt-page-btn" data-page="' + (state.page - 1) + '"' + (state.page <= 1 ? ' disabled' : '') + '>&laquo; Prev</button>';
+      for (var p = 1; p <= totalPages; p++) {
+        html += '<button class="btn btn-sm' + (p === state.page ? ' btn-primary' : ' btn-secondary') + ' appt-page-btn" data-page="' + p + '">' + p + '</button>';
+      }
+      html += '<button class="btn btn-sm btn-secondary appt-page-btn" data-page="' + (state.page + 1) + '"' + (state.page >= totalPages ? ' disabled' : '') + '>Next &raquo;</button>';
+      html += '</div></div>';
+    }
+
     return html;
   }
 
@@ -428,6 +452,14 @@ window.AppointmentsView = (function() {
         });
         return;
       }
+
+      // Pagination
+      var pageBtn = e.target.closest('.appt-page-btn');
+      if (pageBtn && !pageBtn.disabled) {
+        state.page = parseInt(pageBtn.getAttribute('data-page'), 10);
+        renderView(container);
+        return;
+      }
     };
 
     container.addEventListener('click', _clickHandler);
@@ -437,6 +469,7 @@ window.AppointmentsView = (function() {
     if (dateFrom) {
       dateFrom.addEventListener('change', function() {
         state.dateFrom = this.value;
+        state.page = 1;
         renderView(container);
       });
     }
@@ -444,6 +477,7 @@ window.AppointmentsView = (function() {
     if (dateTo) {
       dateTo.addEventListener('change', function() {
         state.dateTo = this.value;
+        state.page = 1;
         renderView(container);
       });
     }
@@ -451,6 +485,7 @@ window.AppointmentsView = (function() {
     if (statusFilter) {
       statusFilter.addEventListener('change', function() {
         state.statusFilter = this.value;
+        state.page = 1;
         renderView(container);
       });
     }
@@ -458,6 +493,7 @@ window.AppointmentsView = (function() {
     if (typeFilter) {
       typeFilter.addEventListener('change', function() {
         state.typeFilter = this.value;
+        state.page = 1;
         renderView(container);
       });
     }

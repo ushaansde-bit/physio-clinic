@@ -5,12 +5,12 @@
 
   // Initialize seed data
   // Reset to load fresh 3-month INR test data (remove this block after first load)
-  if (!localStorage.getItem('physio_body_v4')) {
+  if (!localStorage.getItem('physio_completed_v5')) {
     var physioKeys = ['physio_users','physio_patients','physio_appointments','physio_sessions',
       'physio_exercises','physio_billing','physio_activity_log','physio_tags',
       'physio_message_templates','physio_message_log','physio_prescriptions'];
     for (var ri = 0; ri < physioKeys.length; ri++) localStorage.removeItem(physioKeys[ri]);
-    localStorage.setItem('physio_body_v4', '1');
+    localStorage.setItem('physio_completed_v5', '1');
   }
   Store.seed();
   Store.migrate();

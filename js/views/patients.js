@@ -64,7 +64,7 @@ window.PatientsView = (function() {
     html += '<select class="filter-select" id="patient-status-filter">';
     html += '<option value="">All Status</option>';
     html += '<option value="active"' + (state.statusFilter === 'active' ? ' selected' : '') + '>Active</option>';
-    html += '<option value="discharged"' + (state.statusFilter === 'discharged' ? ' selected' : '') + '>Discharged</option>';
+    html += '<option value="completed"' + (state.statusFilter === 'completed' ? ' selected' : '') + '>Completed</option>';
     html += '</select>';
     html += '<select class="filter-select" id="patient-gender-filter">';
     html += '<option value="">All Gender</option>';
@@ -257,7 +257,7 @@ window.PatientsView = (function() {
     body += '<div class="form-group"><label>Status</label>';
     body += '<select name="status">';
     body += '<option value="active"' + (patient && patient.status === 'active' ? ' selected' : '') + '>Active</option>';
-    body += '<option value="discharged"' + (patient && patient.status === 'discharged' ? ' selected' : '') + '>Discharged</option>';
+    body += '<option value="completed"' + (patient && patient.status === 'completed' ? ' selected' : '') + '>Completed</option>';
     body += '</select></div>';
     body += '</div>';
     body += '<div class="form-row">';
