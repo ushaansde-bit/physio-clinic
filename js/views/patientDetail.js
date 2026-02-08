@@ -30,7 +30,7 @@ window.PatientDetailView = (function() {
     html += '<div class="patient-header">';
     html += '<div class="patient-avatar">' + Utils.getInitials(patient.name) + '</div>';
     html += '<div class="patient-header-info">';
-    html += '<h2>' + Utils.escapeHtml(patient.name) + '</h2>';
+    html += '<h2>' + Utils.escapeHtml(patient.name) + ' <span style="font-size:0.75rem;font-family:monospace;color:var(--primary);font-weight:500;vertical-align:middle;">' + Utils.escapeHtml(patient.displayId || '') + '</span></h2>';
     html += '<p>' + Utils.escapeHtml(patient.diagnosis || 'No diagnosis') + '</p>';
     if (patient.tags && patient.tags.length > 0) {
       html += '<div style="margin-top:0.35rem;">';
@@ -95,6 +95,7 @@ window.PatientDetailView = (function() {
     // Patient info
     html += '<div class="card mb-2"><div class="card-header"><h3>Patient Information</h3></div><div class="card-body">';
     html += '<div class="info-grid">';
+    html += infoItem('Patient ID', '<span style="font-family:monospace;font-weight:600;color:var(--primary);">' + Utils.escapeHtml(patient.displayId || '-') + '</span>');
     html += infoItem('Full Name', patient.name);
     html += infoItem('Date of Birth', Utils.formatDate(patient.dob) + ' (Age ' + Utils.calculateAge(patient.dob) + ')');
     html += infoItem('Gender', patient.gender ? patient.gender.charAt(0).toUpperCase() + patient.gender.slice(1) : '-');

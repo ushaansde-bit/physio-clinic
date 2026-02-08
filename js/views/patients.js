@@ -35,7 +35,8 @@ window.PatientsView = (function() {
         if (p.name.toLowerCase().indexOf(q) === -1 &&
             (p.phone || '').indexOf(q) === -1 &&
             (p.email || '').toLowerCase().indexOf(q) === -1 &&
-            (p.diagnosis || '').toLowerCase().indexOf(q) === -1) continue;
+            (p.diagnosis || '').toLowerCase().indexOf(q) === -1 &&
+            (p.displayId || '').toLowerCase().indexOf(q) === -1) continue;
       }
       if (state.statusFilter && p.status !== state.statusFilter) continue;
       if (state.genderFilter && p.gender !== state.genderFilter) continue;
@@ -59,7 +60,7 @@ window.PatientsView = (function() {
     html += '<div class="toolbar">';
     html += '<div class="search-input">';
     html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
-    html += '<input type="text" id="patient-search" placeholder="Search patients..." value="' + Utils.escapeHtml(state.search) + '">';
+    html += '<input type="text" id="patient-search" placeholder="Search by name, phone, or ID..." value="' + Utils.escapeHtml(state.search) + '">';
     html += '</div>';
     html += '<select class="filter-select" id="patient-status-filter">';
     html += '<option value="">All Status</option>';
@@ -86,16 +87,17 @@ window.PatientsView = (function() {
     // Table
     html += '<div class="card"><div class="table-wrapper">';
     html += '<table class="data-table"><thead><tr>';
-    html += '<th>Patient</th><th>Contact</th><th>Diagnosis</th><th>Tags</th><th>Status</th><th>Actions</th>';
+    html += '<th>ID</th><th>Patient</th><th>Contact</th><th>Diagnosis</th><th>Tags</th><th>Status</th><th>Actions</th>';
     html += '</tr></thead><tbody>';
 
     if (pageItems.length === 0) {
-      html += '<tr class="no-hover"><td colspan="6"><div class="empty-state"><p>No patients found</p></div></td></tr>';
+      html += '<tr class="no-hover"><td colspan="7"><div class="empty-state"><p>No patients found</p></div></td></tr>';
     } else {
       for (var j = 0; j < pageItems.length; j++) {
         var pt = pageItems[j];
         var statusCls = pt.status === 'active' ? 'badge-success' : 'badge-gray';
         html += '<tr data-patient-id="' + pt.id + '">';
+        html += '<td><span style="font-family:monospace;font-size:0.78rem;font-weight:600;color:var(--primary);">' + Utils.escapeHtml(pt.displayId || '-') + '</span></td>';
         html += '<td><div style="display:flex;align-items:center;gap:0.6rem;">';
         html += '<div class="patient-avatar" style="width:32px;height:32px;font-size:0.75rem;">' + Utils.getInitials(pt.name) + '</div>';
         html += '<div><div style="font-weight:600;color:var(--gray-800);">' + Utils.escapeHtml(pt.name) + '</div>';

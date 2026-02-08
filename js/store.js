@@ -100,7 +100,26 @@ window.Store = (function() {
     // Patients
     getPatients: function() { return getAll(KEYS.patients); },
     getPatient: function(id) { return getById(KEYS.patients, id); },
-    createPatient: function(p) { var r = create(KEYS.patients, p); logActivity('New patient added: ' + p.name); return r; },
+    getPatientByPhone: function(phone) {
+      var patients = getAll(KEYS.patients);
+      for (var i = 0; i < patients.length; i++) {
+        if (patients[i].phone && patients[i].phone.replace(/\D/g, '') === phone.replace(/\D/g, '')) return patients[i];
+      }
+      return null;
+    },
+    getNextDisplayId: function() {
+      var patients = getAll(KEYS.patients);
+      var maxNum = 0;
+      for (var i = 0; i < patients.length; i++) {
+        if (patients[i].displayId) {
+          var num = parseInt(patients[i].displayId.replace('PT-', ''), 10);
+          if (num > maxNum) maxNum = num;
+        }
+      }
+      var next = maxNum + 1;
+      return 'PT-' + ('0000' + next).slice(-4);
+    },
+    createPatient: function(p) { p.displayId = this.getNextDisplayId(); var r = create(KEYS.patients, p); logActivity('New patient added: ' + p.name + ' (' + p.displayId + ')'); return r; },
     updatePatient: function(id, u) { var r = update(KEYS.patients, id, u); if(r) logActivity('Patient updated: ' + r.name); return r; },
     deletePatient: function(id) {
       var p = getById(KEYS.patients, id);
@@ -333,28 +352,28 @@ window.Store = (function() {
 
     // Patients
     var patients = [
-      { id: 'p1', name: 'Sarah Johnson', dob: '1985-03-15', gender: 'female', phone: '555-0101', email: 'sarah.j@email.com', address: '123 Oak Street, Springfield',
+      { id: 'p1', displayId: 'PT-0001', name: 'Sarah Johnson', dob: '1985-03-15', gender: 'female', phone: '555-0101', email: 'sarah.j@email.com', address: '123 Oak Street, Springfield',
         diagnosis: 'ACL Reconstruction - Post-operative', treatmentPlan: 'Progressive ROM and strengthening protocol. Phase 2: weeks 4-8. Focus on quad activation, hamstring curls, and proprioception.',
         emergencyContact: 'Mark Johnson', emergencyPhone: '555-0102', status: 'active', insurance: 'Blue Cross', notes: 'Motivated patient. Athletic background.' },
-      { id: 'p2', name: 'Robert Chen', dob: '1972-08-22', gender: 'male', phone: '555-0201', email: 'r.chen@email.com', address: '456 Maple Ave, Springfield',
+      { id: 'p2', displayId: 'PT-0002', name: 'Robert Chen', dob: '1972-08-22', gender: 'male', phone: '555-0201', email: 'r.chen@email.com', address: '456 Maple Ave, Springfield',
         diagnosis: 'Chronic Lower Back Pain - L4/L5 disc herniation', treatmentPlan: 'McKenzie extension protocol. Core stabilization. Ergonomic assessment. Pain management with TENS and manual therapy.',
         emergencyContact: 'Lisa Chen', emergencyPhone: '555-0202', status: 'active', insurance: 'Aetna', notes: 'Desk worker. Reports sitting 8+ hours/day.' },
-      { id: 'p3', name: 'Emily Watson', dob: '1990-11-08', gender: 'female', phone: '555-0301', email: 'e.watson@email.com', address: '789 Pine Road, Springfield',
+      { id: 'p3', displayId: 'PT-0003', name: 'Emily Watson', dob: '1990-11-08', gender: 'female', phone: '555-0301', email: 'e.watson@email.com', address: '789 Pine Road, Springfield',
         diagnosis: 'Frozen Shoulder (Adhesive Capsulitis) - Right', treatmentPlan: 'Joint mobilization grades III-IV. Stretching protocol. Home exercise program with pulleys. NSAIDs as prescribed by MD.',
         emergencyContact: 'David Watson', emergencyPhone: '555-0302', status: 'active', insurance: 'United Health', notes: 'Gradually improving ROM.' },
-      { id: 'p4', name: 'James Miller', dob: '1968-05-30', gender: 'male', phone: '555-0401', email: 'j.miller@email.com', address: '321 Elm Blvd, Springfield',
+      { id: 'p4', displayId: 'PT-0004', name: 'James Miller', dob: '1968-05-30', gender: 'male', phone: '555-0401', email: 'j.miller@email.com', address: '321 Elm Blvd, Springfield',
         diagnosis: 'Total Knee Replacement - Left, Post-op Week 6', treatmentPlan: 'Achieve 0-120 degrees ROM. Progressive weight bearing. Gait training. Stair negotiation. Strengthening program.',
         emergencyContact: 'Nancy Miller', emergencyPhone: '555-0402', status: 'active', insurance: 'Medicare', notes: 'Using walker, transitioning to cane.' },
-      { id: 'p5', name: 'Maria Garcia', dob: '1995-01-20', gender: 'female', phone: '555-0501', email: 'm.garcia@email.com', address: '654 Birch Lane, Springfield',
+      { id: 'p5', displayId: 'PT-0005', name: 'Maria Garcia', dob: '1995-01-20', gender: 'female', phone: '555-0501', email: 'm.garcia@email.com', address: '654 Birch Lane, Springfield',
         diagnosis: 'Rotator Cuff Tendinopathy - Left Shoulder', treatmentPlan: 'Eccentric strengthening protocol. Scapular stabilization exercises. Activity modification. Gradual return to overhead activities.',
         emergencyContact: 'Carlos Garcia', emergencyPhone: '555-0502', status: 'active', insurance: 'Cigna', notes: 'Recreational volleyball player.' },
-      { id: 'p6', name: 'William Taylor', dob: '1958-12-03', gender: 'male', phone: '555-0601', email: 'w.taylor@email.com', address: '987 Cedar Court, Springfield',
+      { id: 'p6', displayId: 'PT-0006', name: 'William Taylor', dob: '1958-12-03', gender: 'male', phone: '555-0601', email: 'w.taylor@email.com', address: '987 Cedar Court, Springfield',
         diagnosis: 'Parkinson\'s Disease - Balance and gait training', treatmentPlan: 'LSVT BIG protocol. Balance training. Fall prevention. Dual-task activities. Caregiver education.',
         emergencyContact: 'Dorothy Taylor', emergencyPhone: '555-0602', status: 'active', insurance: 'Medicare', notes: 'Stage 2 Hoehn & Yahr. Motivated.' },
-      { id: 'p7', name: 'Anna Kowalski', dob: '1988-07-14', gender: 'female', phone: '555-0701', email: 'a.kowalski@email.com', address: '147 Walnut Street, Springfield',
+      { id: 'p7', displayId: 'PT-0007', name: 'Anna Kowalski', dob: '1988-07-14', gender: 'female', phone: '555-0701', email: 'a.kowalski@email.com', address: '147 Walnut Street, Springfield',
         diagnosis: 'Plantar Fasciitis - Bilateral', treatmentPlan: 'Stretching program (calf, plantar fascia). Night splints. Custom orthotics fitting. Gradual return to running.',
         emergencyContact: 'Peter Kowalski', emergencyPhone: '555-0702', status: 'completed', insurance: 'Blue Cross', notes: 'Runner. Completed treatment successfully.' },
-      { id: 'p8', name: 'David Park', dob: '1979-04-25', gender: 'male', phone: '555-0801', email: 'd.park@email.com', address: '258 Spruce Drive, Springfield',
+      { id: 'p8', displayId: 'PT-0008', name: 'David Park', dob: '1979-04-25', gender: 'male', phone: '555-0801', email: 'd.park@email.com', address: '258 Spruce Drive, Springfield',
         diagnosis: 'Cervical Radiculopathy - C5/C6', treatmentPlan: 'Cervical traction. Neural gliding exercises. Postural correction. Ergonomic workstation setup. Strengthening deep neck flexors.',
         emergencyContact: 'Sue Park', emergencyPhone: '555-0802', status: 'active', insurance: 'Aetna', notes: 'Software developer. Needs ergonomic education.' }
     ];
