@@ -148,15 +148,82 @@ window.Utils = (function() {
     return name.substring(0, 2).toUpperCase();
   }
 
+  // Currency options with phone code and digit length
+  var CURRENCIES = [
+    { code: 'INR', symbol: '\u20B9', name: 'Indian Rupee', phone: '+91', digits: 11 },
+    { code: 'USD', symbol: '$', name: 'US Dollar', phone: '+1', digits: 10 },
+    { code: 'GBP', symbol: '\u00A3', name: 'British Pound', phone: '+44', digits: 11 },
+    { code: 'EUR', symbol: '\u20AC', name: 'Euro', phone: '+49', digits: 11 },
+    { code: 'AUD', symbol: 'A$', name: 'Australian Dollar', phone: '+61', digits: 9 },
+    { code: 'AED', symbol: 'AED', name: 'UAE Dirham', phone: '+971', digits: 9 },
+    { code: 'SAR', symbol: 'SAR', name: 'Saudi Riyal', phone: '+966', digits: 9 },
+    { code: 'QAR', symbol: 'QAR', name: 'Qatari Riyal', phone: '+974', digits: 8 },
+    { code: 'OMR', symbol: 'OMR', name: 'Omani Rial', phone: '+968', digits: 8 },
+    { code: 'BHD', symbol: 'BHD', name: 'Bahraini Dinar', phone: '+973', digits: 8 },
+    { code: 'SGD', symbol: 'S$', name: 'Singapore Dollar', phone: '+65', digits: 8 },
+    { code: 'MYR', symbol: 'RM', name: 'Malaysian Ringgit', phone: '+60', digits: 10 },
+    { code: 'NPR', symbol: 'Rs', name: 'Nepalese Rupee', phone: '+977', digits: 10 },
+    { code: 'LKR', symbol: 'Rs', name: 'Sri Lankan Rupee', phone: '+94', digits: 9 },
+    { code: 'BDT', symbol: '\u09F3', name: 'Bangladeshi Taka', phone: '+880', digits: 10 },
+    { code: 'PKR', symbol: 'Rs', name: 'Pakistani Rupee', phone: '+92', digits: 10 },
+    { code: 'ZAR', symbol: 'R', name: 'South African Rand', phone: '+27', digits: 9 },
+    { code: 'NGN', symbol: '\u20A6', name: 'Nigerian Naira', phone: '+234', digits: 10 },
+    { code: 'KES', symbol: 'KSh', name: 'Kenyan Shilling', phone: '+254', digits: 9 },
+    { code: 'BRL', symbol: 'R$', name: 'Brazilian Real', phone: '+55', digits: 11 },
+    { code: 'JPY', symbol: '\u00A5', name: 'Japanese Yen', phone: '+81', digits: 10 },
+    { code: 'KRW', symbol: '\u20A9', name: 'South Korean Won', phone: '+82', digits: 10 },
+    { code: 'CNY', symbol: '\u00A5', name: 'Chinese Yuan', phone: '+86', digits: 11 }
+  ];
+
+  function getCurrencySymbol() {
+    var code = localStorage.getItem('physio_currency') || 'INR';
+    for (var i = 0; i < CURRENCIES.length; i++) {
+      if (CURRENCIES[i].code === code) return CURRENCIES[i].symbol;
+    }
+    return '\u20B9';
+  }
+
+  function setCurrency(code) {
+    localStorage.setItem('physio_currency', code);
+    // Auto-sync phone code
+    for (var i = 0; i < CURRENCIES.length; i++) {
+      if (CURRENCIES[i].code === code) {
+        localStorage.setItem('physio_phone_code', CURRENCIES[i].phone);
+        localStorage.setItem('physio_phone_digits', CURRENCIES[i].digits.toString());
+        break;
+      }
+    }
+  }
+
+  function getPhoneCode() {
+    return localStorage.getItem('physio_phone_code') || '+91';
+  }
+
+  function getDigitsByPhoneCode(phoneCode) {
+    var code = (phoneCode || '').trim();
+    if (!code) return getPhoneDigits();
+    if (code.charAt(0) !== '+') code = '+' + code;
+    for (var i = 0; i < CURRENCIES.length; i++) {
+      if (CURRENCIES[i].phone === code) return CURRENCIES[i].digits;
+    }
+    return getPhoneDigits();
+  }
+
+  function getPhoneDigits() {
+    return parseInt(localStorage.getItem('physio_phone_digits'), 10) || 10;
+  }
+
   // Format currency
   function formatCurrency(amount) {
     var num = parseFloat(amount) || 0;
+    var sym = getCurrencySymbol();
     var parts = num.toFixed(2).split('.');
     var lastThree = parts[0].slice(-3);
     var rest = parts[0].slice(0, -3);
     if (rest) lastThree = ',' + lastThree;
     var formatted = rest.replace(/\B(?=(\d{2})+(?!\d))/g, ',') + lastThree;
-    return '\u20B9' + formatted + '.' + parts[1];
+    var space = sym.length > 1 ? ' ' : '';
+    return sym + space + formatted + '.' + parts[1];
   }
 
   // Days of week
@@ -261,6 +328,12 @@ window.Utils = (function() {
     calculateAge: calculateAge,
     getInitials: getInitials,
     formatCurrency: formatCurrency,
+    getCurrencySymbol: getCurrencySymbol,
+    setCurrency: setCurrency,
+    getPhoneCode: getPhoneCode,
+    getPhoneDigits: getPhoneDigits,
+    getDigitsByPhoneCode: getDigitsByPhoneCode,
+    CURRENCIES: CURRENCIES,
     DAYS_SHORT: DAYS_SHORT,
     DAYS_FULL: DAYS_FULL,
     MONTHS: MONTHS,

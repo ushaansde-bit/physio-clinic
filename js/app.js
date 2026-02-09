@@ -5,12 +5,12 @@
 
   // Initialize seed data
   // Reset to load fresh 3-month INR test data (remove this block after first load)
-  if (!localStorage.getItem('physio_ptid_v6')) {
+  if (!localStorage.getItem('physio_noid_v7')) {
     var physioKeys = ['physio_users','physio_patients','physio_appointments','physio_sessions',
       'physio_exercises','physio_billing','physio_activity_log','physio_tags',
       'physio_message_templates','physio_message_log','physio_prescriptions'];
     for (var ri = 0; ri < physioKeys.length; ri++) localStorage.removeItem(physioKeys[ri]);
-    localStorage.setItem('physio_ptid_v6', '1');
+    localStorage.setItem('physio_noid_v7', '1');
   }
   Store.seed();
   Store.migrate();
@@ -147,6 +147,110 @@
   document.getElementById('logout-btn').addEventListener('click', function() {
     logout();
   });
+
+  // Currency combo box (searchable dropdown)
+  var currInput = document.getElementById('currency-input');
+  var currDropdown = document.getElementById('currency-dropdown');
+  var currArrow = document.getElementById('currency-arrow');
+  var savedCurrency = localStorage.getItem('physio_currency') || 'INR';
+
+  function getCurrencyDisplay(code) {
+    for (var i = 0; i < Utils.CURRENCIES.length; i++) {
+      if (Utils.CURRENCIES[i].code === code) {
+        return Utils.CURRENCIES[i].symbol + ' ' + Utils.CURRENCIES[i].code;
+      }
+    }
+    return code;
+  }
+
+  function buildCurrencyList(filter) {
+    var q = (filter || '').toLowerCase();
+    var html = '';
+    var count = 0;
+    for (var i = 0; i < Utils.CURRENCIES.length; i++) {
+      var c = Utils.CURRENCIES[i];
+      var text = c.symbol + ' ' + c.code + ' - ' + c.name;
+      if (q && text.toLowerCase().indexOf(q) === -1 && c.code.toLowerCase().indexOf(q) === -1) continue;
+      html += '<div class="currency-combo-item" data-code="' + c.code + '">';
+      html += '<span class="curr-symbol">' + c.symbol + '</span>' + c.code + ' - ' + c.name;
+      html += '</div>';
+      count++;
+    }
+    if (count === 0) html = '<div class="currency-combo-empty">No match found</div>';
+    currDropdown.innerHTML = html;
+  }
+
+  function selectCurrency(code) {
+    Utils.setCurrency(code);
+    currInput.value = getCurrencyDisplay(code);
+    currDropdown.classList.remove('open');
+    var navSym = document.getElementById('billing-nav-symbol');
+    if (navSym) navSym.textContent = Utils.getCurrencySymbol();
+    if (isLoggedIn()) route();
+  }
+
+  // Set initial value
+  currInput.value = getCurrencyDisplay(savedCurrency);
+
+  // Toggle dropdown on arrow click
+  currArrow.addEventListener('click', function(e) {
+    e.stopPropagation();
+    if (currDropdown.classList.contains('open')) {
+      currDropdown.classList.remove('open');
+    } else {
+      buildCurrencyList('');
+      currDropdown.classList.add('open');
+      currInput.focus();
+    }
+  });
+
+  // Show dropdown and filter on typing
+  currInput.addEventListener('focus', function() {
+    this.select();
+    buildCurrencyList('');
+    currDropdown.classList.add('open');
+  });
+
+  currInput.addEventListener('input', function() {
+    buildCurrencyList(this.value);
+    currDropdown.classList.add('open');
+  });
+
+  // Select item on click
+  currDropdown.addEventListener('click', function(e) {
+    var item = e.target.closest('.currency-combo-item');
+    if (item) {
+      selectCurrency(item.getAttribute('data-code'));
+    }
+  });
+
+  // Close dropdown on click outside
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('#currency-combo')) {
+      currDropdown.classList.remove('open');
+      // Reset display if input doesn't match
+      currInput.value = getCurrencyDisplay(localStorage.getItem('physio_currency') || 'INR');
+    }
+  });
+
+  // Keyboard navigation
+  currInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      currDropdown.classList.remove('open');
+      currInput.value = getCurrencyDisplay(localStorage.getItem('physio_currency') || 'INR');
+      currInput.blur();
+    } else if (e.key === 'Enter') {
+      var activeItem = currDropdown.querySelector('.currency-combo-item');
+      if (activeItem) {
+        selectCurrency(activeItem.getAttribute('data-code'));
+      }
+      e.preventDefault();
+    }
+  });
+
+  // Set billing nav symbol on load
+  var navSymEl = document.getElementById('billing-nav-symbol');
+  if (navSymEl) navSymEl.textContent = Utils.getCurrencySymbol();
 
   // Mobile sidebar toggle
   menuToggle.addEventListener('click', function() {

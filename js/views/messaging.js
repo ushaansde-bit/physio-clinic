@@ -371,7 +371,8 @@ window.MessagingView = (function() {
       var pt = patients[0];
       var msg = resolveVariables(state.messageText, pt);
       var phone = cleanPhone(pt.phone);
-      var url = 'https://wa.me/91' + phone + '?text=' + encodeURIComponent(msg);
+      var pCode = (pt.phoneCode || Utils.getPhoneCode()).replace('+', '');
+      var url = 'https://wa.me/' + pCode + phone + '?text=' + encodeURIComponent(msg);
       window.open(url, '_blank');
 
       // Log
@@ -391,7 +392,8 @@ window.MessagingView = (function() {
         var p2 = patients[j];
         var msg2 = resolveVariables(state.messageText, p2);
         var phone2 = cleanPhone(p2.phone);
-        var url2 = 'https://wa.me/91' + phone2 + '?text=' + encodeURIComponent(msg2);
+        var pCode2 = (p2.phoneCode || Utils.getPhoneCode()).replace('+', '');
+        var url2 = 'https://wa.me/' + pCode2 + phone2 + '?text=' + encodeURIComponent(msg2);
         body += '<div style="display:flex;align-items:center;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid var(--gray-100);">';
         body += '<div><div style="font-weight:500;">' + Utils.escapeHtml(p2.name) + '</div>';
         body += '<div style="font-size:0.75rem;color:var(--gray-500);">' + Utils.escapeHtml(p2.phone || 'No phone') + '</div></div>';

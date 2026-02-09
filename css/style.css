@@ -133,6 +133,39 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
 }
 .form-group textarea { resize: vertical; min-height: 80px; }
 .form-group .form-hint { font-size: 0.75rem; color: var(--gray-400); margin-top: 0.25rem; }
+
+/* Phone Input with Country Code */
+.phone-input-wrap {
+  display: flex;
+  gap: 0;
+  align-items: stretch;
+}
+.phone-code-input {
+  width: 60px !important;
+  min-width: 60px;
+  max-width: 60px;
+  flex-shrink: 0;
+  padding: 0.6rem 0.4rem !important;
+  border: 1px solid var(--gray-300);
+  border-right: none;
+  border-radius: var(--radius) 0 0 var(--radius) !important;
+  background: var(--gray-50);
+  color: var(--gray-700);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: center;
+}
+.phone-code-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(13,148,136,0.1);
+  z-index: 1;
+}
+.phone-number-input {
+  flex: 1;
+  border-radius: 0 var(--radius) var(--radius) 0 !important;
+  letter-spacing: 0.03em;
+}
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -244,8 +277,106 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
   padding: 1rem;
   border-top: 1px solid rgba(255,255,255,0.1);
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
+  gap: 0.5rem;
+}
+.currency-selector {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+.currency-selector label {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  color: var(--gray-400);
+  white-space: nowrap;
+}
+.currency-combo {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+}
+.currency-combo input {
+  width: 100%;
+  padding: 0.3rem 1.6rem 0.3rem 0.4rem;
+  font-size: 0.75rem;
+  background: rgba(255,255,255,0.08);
+  color: var(--white);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: var(--radius-sm);
+  cursor: text;
+}
+.currency-combo input:focus {
+  outline: none;
+  border-color: var(--primary-light);
+  background: rgba(255,255,255,0.12);
+}
+.currency-combo input::placeholder {
+  color: var(--gray-500);
+}
+.currency-combo-arrow {
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--gray-400);
+  font-size: 0.7rem;
+  cursor: pointer;
+  padding: 0.2rem 0.3rem;
+  line-height: 1;
+}
+.currency-combo-arrow:hover {
+  color: var(--white);
+}
+.currency-combo-list {
+  display: none;
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  max-height: 200px;
+  overflow-y: auto;
+  background: var(--gray-800);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 -4px 12px rgba(0,0,0,0.3);
+  z-index: 100;
+  margin-bottom: 2px;
+}
+.currency-combo-list.open {
+  display: block;
+}
+.currency-combo-item {
+  padding: 0.35rem 0.5rem;
+  font-size: 0.75rem;
+  color: var(--gray-300);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.currency-combo-item:hover,
+.currency-combo-item.active {
+  background: var(--primary);
+  color: var(--white);
+}
+.currency-combo-item .curr-symbol {
+  font-weight: 700;
+  margin-right: 0.2rem;
+}
+.currency-combo-empty {
+  padding: 0.4rem 0.5rem;
+  font-size: 0.72rem;
+  color: var(--gray-500);
+  font-style: italic;
 }
 .user-info { display: flex; align-items: center; gap: 0.6rem; }
 .user-avatar {
@@ -346,7 +477,7 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
 .stat-icon.amber { background: #fef3c7; color: var(--warning); }
 .stat-icon.green { background: #dcfce7; color: var(--success); }
 .stat-info h4 { font-size: 0.78rem; color: var(--gray-500); font-weight: 500; text-transform: uppercase; letter-spacing: 0.03em; }
-.stat-info .stat-value { font-size: 1.75rem; font-weight: 700; color: var(--gray-900); line-height: 1.2; margin-top: 0.15rem; }
+.stat-info .stat-value { font-size: 1.75rem; font-weight: 700; color: var(--gray-900); line-height: 1.2; margin-top: 0.15rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
 
 /* --- Tables --- */
 .table-wrapper { overflow-x: auto; }
@@ -741,7 +872,7 @@ table.data-table { width: 100%; }
   text-align: center;
 }
 .billing-stat h4 { font-size: 0.75rem; color: var(--gray-500); text-transform: uppercase; font-weight: 600; letter-spacing: 0.03em; }
-.billing-stat .amount { font-size: 1.5rem; font-weight: 700; margin-top: 0.2rem; }
+.billing-stat .amount { font-size: 1.35rem; font-weight: 700; margin-top: 0.2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
 .billing-stat.total { background: var(--primary-50); }
 .billing-stat.total .amount { color: var(--primary); }
 .billing-stat.paid { background: var(--success-bg); }
@@ -1035,7 +1166,7 @@ table.data-table { width: 100%; }
   white-space: nowrap;
 }
 
-/* --- Tag Checkboxes in Patient Form --- */
+/* --- Tag Checkboxes in Patient Form (legacy) --- */
 .tag-checkboxes {
   display: flex;
   flex-wrap: wrap;
@@ -1057,7 +1188,8 @@ table.data-table { width: 100%; }
 .tag-checkbox-item:hover {
   border-color: var(--primary);
 }
-.tag-checkbox-item input[type="checkbox"] {
+.tag-checkbox-item input[type="checkbox"],
+.tag-checkbox-item input[type="radio"] {
   width: 14px;
   height: 14px;
   margin: 0;
@@ -1067,6 +1199,51 @@ table.data-table { width: 100%; }
   background: var(--primary-50);
   border-color: var(--primary);
   color: var(--primary-dark);
+}
+
+/* --- Tag Pill Buttons (Patient Form) --- */
+.tag-pill-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+}
+.tag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 1rem;
+  border: 2px solid var(--gray-300);
+  border-radius: 9999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--white);
+  color: var(--gray-600);
+  transition: all 0.2s ease;
+  user-select: none;
+  outline: none;
+}
+.tag-pill:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.tag-pill:active {
+  transform: translateY(0);
+}
+.tag-pill-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+.tag-pill.active .tag-pill-dot {
+  background: #fff !important;
+  transform: scale(1.2);
+}
+.tag-pill.active {
+  box-shadow: 0 2px 10px rgba(0,0,0,0.15);
 }
 
 /* --- Tag Filter Bar (Messaging) --- */
@@ -1235,32 +1412,45 @@ table.data-table { width: 100%; }
   align-self: stretch;
   margin: 1.5rem 0.25rem;
 }
+/* Body Diagram Section Label */
+.body-diagram-section-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--gray-600);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-align: center;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--gray-200);
+  margin-bottom: 0.5rem;
+}
+
 .body-diagram-svg {
   width: 100%;
-  max-width: 200px;
+  max-width: 220px;
   height: auto;
 }
 .body-diagram-svg .body-region {
-  transition: opacity 0.15s ease;
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 .body-diagram-svg .body-region:hover {
-  opacity: 0.8;
+  opacity: 0.85;
 }
 .body-diagram-svg .body-region:hover ellipse,
 .body-diagram-svg .body-region:hover rect {
-  stroke-width: 2;
-  stroke: var(--primary);
-  filter: brightness(1.05);
+  stroke-width: 1.5;
+  stroke: rgba(37,99,235,0.6);
+  fill-opacity: 0.12;
 }
-.body-diagram-svg .body-region.selected ellipse,
-.body-diagram-svg .body-region.selected rect {
-  filter: drop-shadow(0 0 3px rgba(0,0,0,0.15));
+.body-diagram-svg .body-region.selected:hover ellipse,
+.body-diagram-svg .body-region.selected:hover rect {
+  stroke-width: 2.5;
 }
 .body-diagram-card {
   text-align: center;
 }
 .body-diagram-card .body-diagram-svg {
-  width: 160px;
+  width: 180px;
 }
 .body-region-badges {
   display: flex;
@@ -1481,6 +1671,33 @@ table.data-table { width: 100%; }
   letter-spacing: 0.05em;
 }
 
+/* Print Signature Blocks */
+.print-signature-area {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 3rem;
+  padding-top: 0.5rem;
+  gap: 2rem;
+}
+.print-signature-box {
+  flex: 1;
+  text-align: center;
+  max-width: 220px;
+}
+.print-signature-area .print-signature-box:first-child:last-child {
+  margin-left: auto;
+}
+.print-signature-line {
+  border-top: 1px solid #333;
+  margin-bottom: 0.35rem;
+  min-width: 180px;
+}
+.print-signature-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #333;
+}
+
 .print-report-footer {
   margin-top: 1.5rem;
   border-top: 1px solid #999;
@@ -1488,4 +1705,64 @@ table.data-table { width: 100%; }
   text-align: center;
   font-size: 0.72rem;
   color: #777;
+}
+
+/* Screen vs Print body diagram swap */
+.body-diagram-print-only { display: none; }
+@media print {
+  .body-diagram-screen { display: none !important; }
+  .body-diagram-print-only { display: block !important; }
+}
+
+/* B&W Print Body Diagram */
+.print-body-diagram {
+  margin: 0.5rem 0;
+  break-inside: avoid;
+}
+.print-body-diagram-row {
+  display: flex !important;
+  justify-content: center;
+  gap: 1.5rem;
+}
+.print-body-diagram-col {
+  text-align: center;
+  flex: 0 0 auto;
+  display: block !important;
+}
+.print-body-diagram-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.3rem;
+  color: #000;
+}
+.body-diagram-print-svg {
+  width: 180px !important;
+  height: auto !important;
+  display: inline-block !important;
+  visibility: visible !important;
+  overflow: visible !important;
+}
+.print-body-list {
+  margin-top: 0.6rem;
+  font-size: 0.78rem;
+  color: #333;
+  text-align: center;
+  line-height: 1.5;
+}
+
+@media print {
+  .print-body-diagram { display: block !important; visibility: visible !important; }
+  .print-body-diagram-row { display: flex !important; }
+  .print-body-diagram-col { display: block !important; }
+  .body-diagram-print-svg {
+    width: 180px !important;
+    height: auto !important;
+    display: inline-block !important;
+    visibility: visible !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .print-body-list { display: block !important; }
 }

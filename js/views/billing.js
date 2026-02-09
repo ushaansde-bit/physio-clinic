@@ -110,7 +110,7 @@ window.BillingView = (function() {
     // Table
     html += '<div class="card"><div class="table-wrapper">';
     html += '<table class="data-table"><thead><tr>';
-    html += '<th>Date</th><th>Patient</th><th>Description</th><th>Amount</th><th>Status</th><th>Actions</th>';
+    html += '<th>Date</th><th>Patient</th><th>Description</th><th style="min-width:110px;">Amount</th><th>Status</th><th>Actions</th>';
     html += '</tr></thead><tbody>';
 
     if (pageItems.length === 0) {
@@ -124,7 +124,7 @@ window.BillingView = (function() {
         html += '<td>' + Utils.formatDate(item.date) + '</td>';
         html += '<td><a href="#/patients/' + item.patientId + '" style="font-weight:500;">' + Utils.escapeHtml(pName) + '</a></td>';
         html += '<td>' + Utils.escapeHtml(item.description) + '</td>';
-        html += '<td style="font-weight:600;">' + Utils.formatCurrency(item.amount) + '</td>';
+        html += '<td style="font-weight:600;white-space:nowrap;">' + Utils.formatCurrency(item.amount) + '</td>';
         html += '<td><span class="badge ' + statusCls + '">' + item.status + '</span></td>';
         html += '<td><div class="btn-group">';
         if (item.status === 'pending') {
@@ -254,7 +254,7 @@ window.BillingView = (function() {
     body += '<div class="form-row">';
     body += '<div class="form-group"><label>Date</label>';
     body += '<input type="date" name="date" value="' + Utils.today() + '" required></div>';
-    body += '<div class="form-group"><label>Amount (\u20B9)</label>';
+    body += '<div class="form-group"><label>Amount (' + Utils.getCurrencySymbol() + ')</label>';
     body += '<input type="number" name="amount" step="0.01" min="0" required placeholder="0.00"></div>';
     body += '</div>';
     body += '<div class="form-group"><label>Description ' + Utils.micHtml('inv-description') + '</label>';

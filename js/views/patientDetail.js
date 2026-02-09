@@ -30,7 +30,7 @@ window.PatientDetailView = (function() {
     html += '<div class="patient-header">';
     html += '<div class="patient-avatar">' + Utils.getInitials(patient.name) + '</div>';
     html += '<div class="patient-header-info">';
-    html += '<h2>' + Utils.escapeHtml(patient.name) + ' <span style="font-size:0.75rem;font-family:monospace;color:var(--primary);font-weight:500;vertical-align:middle;">' + Utils.escapeHtml(patient.displayId || '') + '</span></h2>';
+    html += '<h2>' + Utils.escapeHtml(patient.name) + '</h2>';
     html += '<p>' + Utils.escapeHtml(patient.diagnosis || 'No diagnosis') + '</p>';
     if (patient.tags && patient.tags.length > 0) {
       html += '<div style="margin-top:0.35rem;">';
@@ -95,11 +95,10 @@ window.PatientDetailView = (function() {
     // Patient info
     html += '<div class="card mb-2"><div class="card-header"><h3>Patient Information</h3></div><div class="card-body">';
     html += '<div class="info-grid">';
-    html += '<div class="info-item"><label>Patient ID</label><span style="font-family:monospace;font-weight:600;color:var(--primary);">' + Utils.escapeHtml(patient.displayId || '-') + '</span></div>';
     html += infoItem('Full Name', patient.name);
     html += infoItem('Date of Birth', Utils.formatDate(patient.dob) + ' (Age ' + Utils.calculateAge(patient.dob) + ')');
     html += infoItem('Gender', patient.gender ? patient.gender.charAt(0).toUpperCase() + patient.gender.slice(1) : '-');
-    html += infoItem('Phone', patient.phone);
+    html += infoItem('Phone', (patient.phoneCode || Utils.getPhoneCode()) + ' ' + (patient.phone || '-'));
     html += infoItem('Email', patient.email);
     html += infoItem('Address', patient.address);
     html += infoItem('Insurance', patient.insurance);
@@ -117,8 +116,15 @@ window.PatientDetailView = (function() {
     // Affected Body Areas (body diagram)
     html += '<div class="card mb-2"><div class="card-header"><h3>Affected Body Areas</h3></div><div class="card-body body-diagram-card">';
     if (patient.bodyRegions && patient.bodyRegions.length > 0) {
+      // Color version (screen only)
+      html += '<div class="body-diagram-screen">';
       html += BodyDiagram.renderHtml(patient.bodyRegions, { readOnly: true });
       html += '<div class="body-region-badges">' + BodyDiagram.renderBadges(patient.bodyRegions) + '</div>';
+      html += '</div>';
+      // B&W version (print only)
+      html += '<div class="body-diagram-print-only">';
+      html += BodyDiagram.renderPrintHtml(patient.bodyRegions);
+      html += '</div>';
     } else {
       html += '<p style="color:var(--gray-400);font-size:0.85rem;">No areas marked</p>';
     }
@@ -343,37 +349,6 @@ window.PatientDetailView = (function() {
       }
     }
 
-    // Print-only prescription pad
-    html += '<div class="print-only rx-print-pad" style="margin-top:2rem;">';
-    html += '<div style="text-align:center;border-bottom:2px solid #333;padding-bottom:0.5rem;margin-bottom:1rem;">';
-    html += '<h2 style="margin:0;">PhysioClinic</h2>';
-    html += '<p style="font-size:0.85rem;color:#666;margin:0.2rem 0;">Physiotherapy & Rehabilitation Centre</p>';
-    html += '</div>';
-    html += '<div style="display:flex;justify-content:space-between;margin-bottom:1rem;">';
-    html += '<div><strong>Patient:</strong> ' + Utils.escapeHtml(patient.name) + '</div>';
-    html += '<div><strong>Date:</strong> ' + Utils.formatDate(Utils.today()) + '</div>';
-    html += '</div>';
-    html += '<div style="display:flex;gap:2rem;margin-bottom:1rem;">';
-    html += '<div><strong>Age/Gender:</strong> ' + Utils.calculateAge(patient.dob) + ' yrs / ' + (patient.gender ? patient.gender.charAt(0).toUpperCase() + patient.gender.slice(1) : '-') + '</div>';
-    html += '<div><strong>Diagnosis:</strong> ' + Utils.escapeHtml(patient.diagnosis || '-') + '</div>';
-    html += '</div>';
-    html += '<div style="border-top:1px solid #ccc;padding-top:0.75rem;">';
-    html += '<h3 style="margin-bottom:0.75rem;">Rx</h3>';
-    for (var l = 0; l < active.length; l++) {
-      var rx = active[l];
-      html += '<div style="margin-bottom:0.75rem;page-break-inside:avoid;">';
-      html += '<div><strong>' + (l + 1) + '. ' + Utils.escapeHtml(rx.medication) + '</strong></div>';
-      html += '<div style="padding-left:1.2rem;font-size:0.9rem;">';
-      html += Utils.escapeHtml(rx.dosage) + ' | ' + Utils.escapeHtml(rx.route) + ' | ' + Utils.escapeHtml(rx.frequency);
-      html += ' | Duration: ' + Utils.escapeHtml(rx.duration);
-      if (rx.instructions) html += '<br><em>' + Utils.escapeHtml(rx.instructions) + '</em>';
-      html += '</div></div>';
-    }
-    html += '</div>';
-    html += '<div style="margin-top:3rem;text-align:right;">';
-    html += '<div style="border-top:1px solid #333;display:inline-block;padding-top:0.3rem;">Signature of Doctor</div>';
-    html += '</div></div>';
-
     return html;
   }
 
@@ -447,7 +422,7 @@ window.PatientDetailView = (function() {
         html += '<tr class="no-hover">';
         html += '<td>' + Utils.formatDate(b.date) + '</td>';
         html += '<td>' + Utils.escapeHtml(b.description) + '</td>';
-        html += '<td style="font-weight:600;">' + Utils.formatCurrency(b.amount) + '</td>';
+        html += '<td style="font-weight:600;white-space:nowrap;">' + Utils.formatCurrency(b.amount) + '</td>';
         html += '<td><span class="badge ' + statusCls + '">' + b.status + '</span></td>';
         html += '<td><div class="btn-group">';
         if (b.status === 'pending') {
@@ -485,6 +460,11 @@ window.PatientDetailView = (function() {
     body += '<label class="tag-checkbox-item checked"><input type="checkbox" class="print-section" value="sessions" checked> Sessions</label>';
     body += '<label class="tag-checkbox-item checked"><input type="checkbox" class="print-section" value="exercises" checked> Exercises</label>';
     body += '<label class="tag-checkbox-item checked"><input type="checkbox" class="print-section" value="prescriptions" checked> Prescriptions</label>';
+    body += '</div>';
+    body += '<h4 style="margin:0.75rem 0 0.5rem;">Signatures</h4>';
+    body += '<div class="tag-checkboxes">';
+    body += '<label class="tag-checkbox-item checked"><input type="checkbox" class="print-sig" value="doctor" checked> Doctor Signature</label>';
+    body += '<label class="tag-checkbox-item"><input type="checkbox" class="print-sig" value="patient"> Patient Signature</label>';
     body += '</div></div>';
 
     // Billing report options
@@ -495,9 +475,9 @@ window.PatientDetailView = (function() {
     body += '<label class="tag-checkbox-item"><input type="radio" name="bill-type" value="single"> Single Invoice</label>';
     body += '</div>';
     // Invoice picker (hidden by default)
-    body += '<div id="print-invoice-picker" style="display:none;">';
-    body += '<label style="font-size:0.82rem;font-weight:600;margin-bottom:0.3rem;display:block;">Select Invoice</label>';
-    body += '<select id="print-invoice-select" class="filter-select" style="width:100%;">';
+    body += '<div id="print-invoice-picker" style="display:none;margin-top:0.75rem;">';
+    body += '<label style="font-size:0.82rem;font-weight:600;margin-bottom:0.4rem;display:block;">Select Invoice</label>';
+    body += '<select id="print-invoice-select" style="width:100%;padding:0.55rem 0.75rem;border:1px solid #d1d5db;border-radius:8px;background:#fff;font-size:0.85rem;">';
     for (var i = 0; i < bills.length; i++) {
       body += '<option value="' + bills[i].id + '">' + Utils.formatDate(bills[i].date) + ' - ' + Utils.escapeHtml(bills[i].description) + ' - ' + Utils.formatCurrency(bills[i].amount) + '</option>';
     }
@@ -529,12 +509,20 @@ window.PatientDetailView = (function() {
     var radios = document.querySelectorAll('[name="bill-type"]');
     for (var r = 0; r < radios.length; r++) {
       radios[r].addEventListener('change', function() {
-        document.getElementById('print-invoice-picker').style.display = this.value === 'single' ? '' : 'none';
+        // Update visual state on all radio labels
+        for (var rr = 0; rr < radios.length; rr++) {
+          radios[rr].parentElement.classList.toggle('checked', radios[rr].checked);
+        }
+        // Show/hide invoice picker
+        var picker = document.getElementById('print-invoice-picker');
+        if (picker) {
+          picker.style.display = this.value === 'single' ? 'block' : 'none';
+        }
       });
     }
 
     // Checkbox visual toggle
-    var checks = document.querySelectorAll('.print-section');
+    var checks = document.querySelectorAll('.print-section, .print-sig');
     for (var c = 0; c < checks.length; c++) {
       checks[c].addEventListener('change', function() {
         this.parentElement.classList.toggle('checked', this.checked);
@@ -565,6 +553,14 @@ window.PatientDetailView = (function() {
       getInvoiceId: function() {
         var sel = document.getElementById('print-invoice-select');
         return sel ? sel.value : '';
+      },
+      getSignatures: function() {
+        var sigs = [];
+        var sigChks = document.querySelectorAll('.print-sig');
+        for (var i = 0; i < sigChks.length; i++) {
+          if (sigChks[i].checked) sigs.push(sigChks[i].value);
+        }
+        return sigs;
       }
     };
 
@@ -574,12 +570,136 @@ window.PatientDetailView = (function() {
       var sections = window._printOpts.getSections();
       var billType = window._printOpts.getBillType();
       var invoiceId = window._printOpts.getInvoiceId();
+      var signatures = window._printOpts.getSignatures();
       Utils.closeModal();
-      executePrint(patient, type, sections, billType, invoiceId);
+      executePrint(patient, type, sections, billType, invoiceId, signatures);
     };
   }
 
-  function executePrint(patient, type, sections, billType, invoiceId) {
+  // ==================== PRESCRIPTION PAD PRINT ====================
+  function showRxPrintOptions(patient) {
+    var body = '<h4 style="margin-bottom:0.5rem;">Signatures</h4>';
+    body += '<div class="tag-checkboxes">';
+    body += '<label class="tag-checkbox-item checked"><input type="checkbox" class="rx-sig" value="doctor" checked> Doctor Signature</label>';
+    body += '<label class="tag-checkbox-item"><input type="checkbox" class="rx-sig" value="patient"> Patient Signature</label>';
+    body += '</div>';
+
+    var footer = '<button class="btn btn-secondary" id="rx-print-cancel">Cancel</button>';
+    footer += '<button class="btn btn-primary" id="rx-print-go">';
+    footer += '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>';
+    footer += ' Print Prescription</button>';
+
+    Utils.showModal('Print Prescription', body, footer);
+
+    var sigChks = document.querySelectorAll('.rx-sig');
+    for (var c = 0; c < sigChks.length; c++) {
+      sigChks[c].addEventListener('change', function() {
+        this.parentElement.classList.toggle('checked', this.checked);
+      });
+    }
+
+    document.getElementById('rx-print-cancel').onclick = Utils.closeModal;
+    document.getElementById('rx-print-go').onclick = function() {
+      var sigs = [];
+      var chks = document.querySelectorAll('.rx-sig');
+      for (var i = 0; i < chks.length; i++) {
+        if (chks[i].checked) sigs.push(chks[i].value);
+      }
+      Utils.closeModal();
+      printPrescriptionPad(patient, sigs);
+    };
+  }
+
+  function printPrescriptionPad(patient, signatures) {
+    var prescriptions = Store.getPrescriptionsByPatient(patient.id);
+    var active = prescriptions.filter(function(rx) { return rx.status === 'active'; });
+    active.sort(function(a, b) { return a.date > b.date ? -1 : 1; });
+
+    var html = '<div class="print-report-header">';
+    html += '<h1>PhysioClinic</h1>';
+    html += '<p>Physiotherapy & Rehabilitation Centre</p>';
+    html += '</div>';
+
+    html += '<div class="print-patient-bar">';
+    html += '<strong>' + Utils.escapeHtml(patient.name) + '</strong>';
+    html += ' &nbsp;|&nbsp; Phone: ' + Utils.escapeHtml((patient.phoneCode || Utils.getPhoneCode()) + ' ' + (patient.phone || '-'));
+    html += ' &nbsp;|&nbsp; Age/Gender: ' + Utils.calculateAge(patient.dob) + ' yrs / ' + (patient.gender ? patient.gender.charAt(0).toUpperCase() + patient.gender.slice(1) : '-');
+    html += ' &nbsp;|&nbsp; Date: ' + Utils.formatDate(Utils.today());
+    html += '</div>';
+
+    if (patient.diagnosis) {
+      html += '<div style="margin:0.5rem 0;font-size:0.9rem;"><strong>Diagnosis:</strong> ' + Utils.escapeHtml(patient.diagnosis) + '</div>';
+    }
+
+    html += '<div style="border-top:1px solid #999;padding-top:0.75rem;margin-top:0.5rem;">';
+    html += '<h2 style="font-size:1.2rem;margin-bottom:0.75rem;">Rx</h2>';
+
+    if (active.length === 0) {
+      html += '<p style="color:#666;">No active prescriptions.</p>';
+    } else {
+      for (var i = 0; i < active.length; i++) {
+        var rx = active[i];
+        html += '<div style="margin-bottom:0.75rem;page-break-inside:avoid;">';
+        html += '<div style="font-weight:700;">' + (i + 1) + '. ' + Utils.escapeHtml(rx.medication) + '</div>';
+        html += '<div style="padding-left:1.2rem;font-size:0.9rem;">';
+        html += Utils.escapeHtml(rx.dosage) + ' &middot; ' + Utils.escapeHtml(rx.route) + ' &middot; ' + Utils.escapeHtml(rx.frequency);
+        html += ' &middot; Duration: ' + Utils.escapeHtml(rx.duration);
+        if (rx.instructions) html += '<br><em style="color:#555;">' + Utils.escapeHtml(rx.instructions) + '</em>';
+        html += '</div></div>';
+      }
+    }
+    html += '</div>';
+
+    // Signatures
+    html += buildSignatureBlock(signatures);
+
+    html += '<div class="print-report-footer">';
+    html += '<p>Generated on ' + Utils.formatDate(Utils.today()) + ' &nbsp;|&nbsp; PhysioClinic</p>';
+    html += '</div>';
+
+    // Inject and print
+    var printDiv = document.getElementById('print-report-area');
+    if (!printDiv) {
+      printDiv = document.createElement('div');
+      printDiv.id = 'print-report-area';
+      printDiv.className = 'print-report-area';
+      document.body.appendChild(printDiv);
+    }
+    printDiv.innerHTML = html;
+    printDiv.style.cssText = 'display:block !important;position:fixed;left:-9999px;top:0;width:210mm;';
+    document.body.classList.add('printing-report');
+    setTimeout(function() {
+      printDiv.style.cssText = '';
+      setTimeout(function() {
+        window.print();
+        setTimeout(function() {
+          printDiv.innerHTML = '';
+          document.body.classList.remove('printing-report');
+        }, 500);
+      }, 100);
+    }, 200);
+  }
+
+  function buildSignatureBlock(signatures) {
+    if (!signatures || signatures.length === 0) return '';
+    var html = '<div class="print-signature-area">';
+    if (signatures.indexOf('patient') !== -1) {
+      html += '<div class="print-signature-box">';
+      html += '<div class="print-signature-line"></div>';
+      html += '<div class="print-signature-label">Patient\'s Signature</div>';
+      html += '</div>';
+    }
+    if (signatures.indexOf('doctor') !== -1) {
+      html += '<div class="print-signature-box">';
+      html += '<div class="print-signature-line"></div>';
+      html += '<div class="print-signature-label">Doctor\'s Signature &amp; Stamp</div>';
+      html += '</div>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function executePrint(patient, type, sections, billType, invoiceId, signatures) {
     var html = '';
 
     // Clinic header
@@ -591,8 +711,7 @@ window.PatientDetailView = (function() {
     // Patient header (always shown)
     html += '<div class="print-patient-bar">';
     html += '<strong>' + Utils.escapeHtml(patient.name) + '</strong>';
-    html += ' <span style="font-family:monospace;color:#555;">' + Utils.escapeHtml(patient.displayId || '') + '</span>';
-    html += ' &nbsp;|&nbsp; Phone: ' + Utils.escapeHtml(patient.phone || '-');
+    html += ' &nbsp;|&nbsp; Phone: ' + Utils.escapeHtml((patient.phoneCode || Utils.getPhoneCode()) + ' ' + (patient.phone || '-'));
     html += ' &nbsp;|&nbsp; DOB: ' + Utils.formatDate(patient.dob) + ' (Age ' + Utils.calculateAge(patient.dob) + ')';
     html += ' &nbsp;|&nbsp; Gender: ' + Utils.escapeHtml(patient.gender || '-');
     html += '</div>';
@@ -604,6 +723,9 @@ window.PatientDetailView = (function() {
     if (type === 'billing' || type === 'combined') {
       html += buildBillingReport(patient, billType, invoiceId);
     }
+
+    // Signatures
+    html += buildSignatureBlock(signatures);
 
     // Footer
     html += '<div class="print-report-footer">';
@@ -619,15 +741,21 @@ window.PatientDetailView = (function() {
       document.body.appendChild(printDiv);
     }
     printDiv.innerHTML = html;
+    // Briefly make visible off-screen so SVGs render properly before print
+    printDiv.style.cssText = 'display:block !important;position:fixed;left:-9999px;top:0;width:210mm;';
     document.body.classList.add('printing-report');
     setTimeout(function() {
-      window.print();
-      // Clean up after print so regular prints work normally
+      // Reset to normal print-area styling (hidden on screen, shown in @media print)
+      printDiv.style.cssText = '';
       setTimeout(function() {
-        printDiv.innerHTML = '';
-        document.body.classList.remove('printing-report');
-      }, 500);
-    }, 150);
+        window.print();
+        // Clean up after print
+        setTimeout(function() {
+          printDiv.innerHTML = '';
+          document.body.classList.remove('printing-report');
+        }, 500);
+      }, 100);
+    }, 200);
   }
 
   function buildPatientReport(patient, sections) {
@@ -637,9 +765,8 @@ window.PatientDetailView = (function() {
       html += '<div class="print-section-block">';
       html += '<h3>Patient Information</h3>';
       html += '<table class="print-info-table">';
-      html += '<tr><td class="lbl">Patient ID</td><td>' + Utils.escapeHtml(patient.displayId || '-') + '</td>';
-      html += '<td class="lbl">Full Name</td><td>' + Utils.escapeHtml(patient.name) + '</td></tr>';
-      html += '<tr><td class="lbl">Phone</td><td>' + Utils.escapeHtml(patient.phone || '-') + '</td>';
+      html += '<tr><td class="lbl">Full Name</td><td>' + Utils.escapeHtml(patient.name) + '</td>';
+      html += '<tr><td class="lbl">Phone</td><td>' + Utils.escapeHtml((patient.phoneCode || Utils.getPhoneCode()) + ' ' + (patient.phone || '-')) + '</td>';
       html += '<td class="lbl">Email</td><td>' + Utils.escapeHtml(patient.email || '-') + '</td></tr>';
       html += '<tr><td class="lbl">Address</td><td colspan="3">' + Utils.escapeHtml(patient.address || '-') + '</td></tr>';
       html += '<tr><td class="lbl">Insurance</td><td>' + Utils.escapeHtml(patient.insurance || '-') + '</td>';
@@ -661,7 +788,7 @@ window.PatientDetailView = (function() {
     if (sections.indexOf('body') !== -1 && patient.bodyRegions && patient.bodyRegions.length > 0) {
       html += '<div class="print-section-block">';
       html += '<h3>Affected Body Areas</h3>';
-      html += '<p>' + BodyDiagram.renderBadges(patient.bodyRegions) + '</p>';
+      html += BodyDiagram.renderPrintHtml(patient.bodyRegions);
       html += '</div>';
     }
 
@@ -859,9 +986,7 @@ window.PatientDetailView = (function() {
         return;
       }
       if (e.target.closest('#print-rx-btn')) {
-        activeTab = 'prescriptions';
-        renderDetail(container, patient);
-        setTimeout(function() { window.print(); }, 100);
+        showRxPrintOptions(patient);
         return;
       }
       var editRxBtn = e.target.closest('.edit-rx-btn');
@@ -1025,7 +1150,7 @@ window.PatientDetailView = (function() {
     body += '<div class="form-row">';
     body += '<div class="form-group"><label>Date</label>';
     body += '<input type="date" name="date" value="' + Utils.today() + '" required></div>';
-    body += '<div class="form-group"><label>Amount (\u20B9)</label>';
+    body += '<div class="form-group"><label>Amount (' + Utils.getCurrencySymbol() + ')</label>';
     body += '<input type="number" name="amount" step="0.01" min="0" value="" required placeholder="0.00"></div>';
     body += '</div>';
     body += '<div class="form-group"><label>Description</label>';

@@ -65,7 +65,7 @@
           <span>Appointments</span>
         </a>
         <a href="#/billing" class="nav-link" data-route="billing">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><text x="12" y="17" text-anchor="middle" fill="currentColor" stroke="none" font-size="16" font-weight="700">&#x20B9;</text></svg>
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><text id="billing-nav-symbol" x="12" y="17" text-anchor="middle" fill="currentColor" stroke="none" font-size="16" font-weight="700">&#x20B9;</text></svg>
           <span>Billing</span>
         </a>
         <a href="#/messaging" class="nav-link" data-route="messaging">
@@ -74,6 +74,17 @@
         </a>
       </nav>
       <div class="sidebar-footer">
+        <div class="currency-selector">
+          <label for="currency-select">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="6" x2="12" y2="18"/><path d="M8 10h7a2 2 0 010 4H8"/></svg>
+            Currency
+          </label>
+          <div class="currency-combo" id="currency-combo">
+            <input type="text" id="currency-input" autocomplete="off" placeholder="Search currency...">
+            <button type="button" class="currency-combo-arrow" id="currency-arrow">&#9662;</button>
+            <div class="currency-combo-list" id="currency-dropdown"></div>
+          </div>
+        </div>
         <div class="user-info">
           <div class="user-avatar">A</div>
           <span class="user-name" id="sidebar-username">Admin</span>
