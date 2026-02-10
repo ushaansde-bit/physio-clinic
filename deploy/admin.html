@@ -515,33 +515,6 @@
           <span id="login-btn-text">Sign In</span>
           <span id="login-btn-spinner" class="spinner" style="display:none;"></span>
         </button>
-        <p style="text-align:center;margin-top:0.75rem;">
-          <a href="#" id="forgot-pw-link" style="color:#0d9488;font-size:0.85rem;">Forgot Password?</a>
-        </p>
-      </form>
-
-      <!-- Forgot Password Form -->
-      <form id="forgot-form" style="display:none;">
-        <p style="font-size:0.85rem;color:#6b7280;margin-bottom:1rem;">Enter your recovery key to reset your master password.</p>
-        <div class="form-group">
-          <label for="forgot-key">Recovery Key</label>
-          <input type="text" id="forgot-key" placeholder="Enter recovery key" required>
-        </div>
-        <div class="form-group">
-          <label for="forgot-new-pw">New Password</label>
-          <input type="password" id="forgot-new-pw" placeholder="New master password" required>
-        </div>
-        <div class="form-group">
-          <label for="forgot-confirm-pw">Confirm New Password</label>
-          <input type="password" id="forgot-confirm-pw" placeholder="Confirm new password" required>
-        </div>
-        <button type="submit" class="btn btn-primary btn-block" id="forgot-btn">
-          <span id="forgot-btn-text">Reset Password</span>
-          <span id="forgot-btn-spinner" class="spinner" style="display:none;"></span>
-        </button>
-        <p style="text-align:center;margin-top:0.75rem;">
-          <a href="#" id="back-to-login-link" style="color:#0d9488;font-size:0.85rem;">Back to Login</a>
-        </p>
       </form>
 
       <!-- Loading state while checking Firestore -->
@@ -557,7 +530,6 @@
       <h1>PhysioClinic Admin</h1>
       <div class="dash-header-actions">
         <button class="btn btn-ghost btn-sm" onclick="openCreateModal()">+ New Clinic</button>
-        <button class="btn btn-ghost btn-sm" onclick="showRecoveryKey()">Recovery Key</button>
         <button class="btn btn-ghost btn-sm" onclick="logout()">Logout</button>
       </div>
     </div>
@@ -811,24 +783,12 @@
       document.getElementById('setup-btn-text').textContent = 'Setting up...';
       document.getElementById('setup-btn-spinner').style.display = 'inline-block';
 
-      // Generate a recovery key
-      var recoveryKey = '';
-      var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-      for (var i = 0; i < 16; i++) {
-        if (i > 0 && i % 4 === 0) recoveryKey += '-';
-        recoveryKey += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
-
       db.collection('config').doc('super_admin').set({
         password: pw,
-        recoveryKey: recoveryKey,
         createdAt: new Date().toISOString()
       }).then(function() {
         sessionStorage.setItem('physio_super_admin', '1');
         isAuthenticated = true;
-
-        // Show recovery key in an alert so the user can save it
-        alert('IMPORTANT - Save your recovery key!\n\nRecovery Key: ' + recoveryKey + '\n\nYou will need this to reset your master password if you forget it. Store it somewhere safe.');
         showToast('Master password set!', 'success');
         showDashboard();
       }).catch(function(err) {
@@ -875,103 +835,6 @@
           document.getElementById('login-btn-spinner').style.display = 'none';
         });
     });
-
-    // --- Forgot Password ---
-    document.getElementById('forgot-pw-link').addEventListener('click', function(e) {
-      e.preventDefault();
-      document.getElementById('login-form').style.display = 'none';
-      document.getElementById('forgot-form').style.display = 'block';
-      document.getElementById('login-subtitle').textContent = 'Reset Password';
-    });
-
-    document.getElementById('back-to-login-link').addEventListener('click', function(e) {
-      e.preventDefault();
-      document.getElementById('forgot-form').style.display = 'none';
-      document.getElementById('login-form').style.display = 'block';
-      document.getElementById('login-subtitle').textContent = 'Super Admin Panel';
-    });
-
-    document.getElementById('forgot-form').addEventListener('submit', function(e) {
-      e.preventDefault();
-      var key = document.getElementById('forgot-key').value.trim();
-      var newPw = document.getElementById('forgot-new-pw').value;
-      var confirmPw = document.getElementById('forgot-confirm-pw').value;
-
-      if (!key) { showToast('Please enter your recovery key.', 'error'); return; }
-      if (newPw.length < 6) { showToast('Password must be at least 6 characters.', 'error'); return; }
-      if (newPw !== confirmPw) { showToast('Passwords do not match.', 'error'); return; }
-
-      var btn = document.getElementById('forgot-btn');
-      btn.disabled = true;
-      document.getElementById('forgot-btn-text').textContent = 'Resetting...';
-      document.getElementById('forgot-btn-spinner').style.display = 'inline-block';
-
-      db.collection('config').doc('super_admin').get()
-        .then(function(doc) {
-          if (!doc.exists) {
-            showToast('No master password configured.', 'error');
-            return;
-          }
-          var data = doc.data();
-          if (!data.recoveryKey) {
-            showToast('No recovery key was set. Contact your system administrator.', 'error');
-            return;
-          }
-          if (data.recoveryKey !== key) {
-            showToast('Invalid recovery key.', 'error');
-            return;
-          }
-          // Key matches - update password
-          return db.collection('config').doc('super_admin').update({
-            password: newPw
-          }).then(function() {
-            showToast('Password reset successfully! Please log in.', 'success');
-            document.getElementById('forgot-form').style.display = 'none';
-            document.getElementById('login-form').style.display = 'block';
-            document.getElementById('login-subtitle').textContent = 'Super Admin Panel';
-            document.getElementById('login-pw').value = '';
-          });
-        })
-        .catch(function(err) {
-          showToast('Failed: ' + (err.message || 'Unknown error'), 'error');
-        })
-        .finally(function() {
-          btn.disabled = false;
-          document.getElementById('forgot-btn-text').textContent = 'Reset Password';
-          document.getElementById('forgot-btn-spinner').style.display = 'none';
-        });
-    });
-
-    // --- Show / Generate Recovery Key ---
-    function showRecoveryKey() {
-      db.collection('config').doc('super_admin').get()
-        .then(function(doc) {
-          if (!doc.exists) { showToast('No config found.', 'error'); return; }
-          var data = doc.data();
-          if (data.recoveryKey) {
-            alert('Your Recovery Key:\n\n' + data.recoveryKey + '\n\nSave this somewhere safe. You need it to reset your master password.');
-          } else {
-            // No key exists yet — generate one
-            if (!confirm('No recovery key exists yet. Generate one now?')) return;
-            var key = '';
-            var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-            for (var i = 0; i < 16; i++) {
-              if (i > 0 && i % 4 === 0) key += '-';
-              key += chars.charAt(Math.floor(Math.random() * chars.length));
-            }
-            db.collection('config').doc('super_admin').update({ recoveryKey: key })
-              .then(function() {
-                alert('Recovery Key Generated!\n\n' + key + '\n\nSave this somewhere safe. You need it to reset your master password.');
-              })
-              .catch(function(err) {
-                showToast('Failed: ' + (err.message || 'Unknown error'), 'error');
-              });
-          }
-        })
-        .catch(function(err) {
-          showToast('Failed: ' + (err.message || 'Unknown error'), 'error');
-        });
-    }
 
     function logout() {
       sessionStorage.removeItem('physio_super_admin');
