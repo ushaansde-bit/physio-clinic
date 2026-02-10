@@ -19,7 +19,7 @@ window.AppointmentsView = (function() {
   };
 
   function render(container) {
-    state.dateFrom = '';
+    state.dateFrom = Utils.today();
     state.dateTo = '';
     state.statusFilter = '';
     state.typeFilter = '';
@@ -70,9 +70,9 @@ window.AppointmentsView = (function() {
       filtered.push(a);
     }
 
-    // Sort by date/time
+    // Sort by date/time (ascending - nearest first)
     filtered.sort(function(a, b) {
-      if (a.date !== b.date) return a.date > b.date ? -1 : 1;
+      if (a.date !== b.date) return a.date < b.date ? -1 : 1;
       return a.time < b.time ? -1 : 1;
     });
 

@@ -11,7 +11,7 @@ window.BillingView = (function() {
     dateFrom: '',
     dateTo: '',
     page: 1,
-    perPage: 15
+    perPage: 10
   };
 
   function hasBillingPerm(permKey) {
