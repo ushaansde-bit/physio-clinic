@@ -515,6 +515,33 @@
           <span id="login-btn-text">Sign In</span>
           <span id="login-btn-spinner" class="spinner" style="display:none;"></span>
         </button>
+        <p style="text-align:center;margin-top:0.75rem;">
+          <a href="#" id="forgot-pw-link" style="color:#0d9488;font-size:0.85rem;">Forgot Password?</a>
+        </p>
+      </form>
+
+      <!-- Forgot Password Form -->
+      <form id="forgot-form" style="display:none;">
+        <p style="font-size:0.85rem;color:#6b7280;margin-bottom:1rem;">Enter your recovery key to reset your master password.</p>
+        <div class="form-group">
+          <label for="forgot-key">Recovery Key</label>
+          <input type="text" id="forgot-key" placeholder="Enter recovery key" required>
+        </div>
+        <div class="form-group">
+          <label for="forgot-new-pw">New Password</label>
+          <input type="password" id="forgot-new-pw" placeholder="New master password" required>
+        </div>
+        <div class="form-group">
+          <label for="forgot-confirm-pw">Confirm New Password</label>
+          <input type="password" id="forgot-confirm-pw" placeholder="Confirm new password" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" id="forgot-btn">
+          <span id="forgot-btn-text">Reset Password</span>
+          <span id="forgot-btn-spinner" class="spinner" style="display:none;"></span>
+        </button>
+        <p style="text-align:center;margin-top:0.75rem;">
+          <a href="#" id="back-to-login-link" style="color:#0d9488;font-size:0.85rem;">Back to Login</a>
+        </p>
       </form>
 
       <!-- Loading state while checking Firestore -->
@@ -530,6 +557,7 @@
       <h1>PhysioClinic Admin</h1>
       <div class="dash-header-actions">
         <button class="btn btn-ghost btn-sm" onclick="openCreateModal()">+ New Clinic</button>
+        <button class="btn btn-ghost btn-sm" onclick="showRecoveryKey()">Recovery Key</button>
         <button class="btn btn-ghost btn-sm" onclick="logout()">Logout</button>
       </div>
     </div>
@@ -569,6 +597,14 @@
         <div class="loading-center">
           <span class="spinner spinner-dark"></span> Loading clinics...
         </div>
+      </div>
+
+      <!-- Deleted Clinics -->
+      <div id="deleted-section" style="display:none;margin-top:1.5rem;">
+        <div class="toolbar">
+          <h2 style="color:#6b7280;">Deleted Clinics <span id="deleted-count" style="background:#f3f4f6;color:#6b7280;font-size:0.75rem;padding:2px 8px;border-radius:10px;margin-left:6px;">0</span></h2>
+        </div>
+        <div id="deleted-list" class="clinic-grid"></div>
       </div>
     </div>
   </div>
@@ -630,15 +666,45 @@
       <p style="font-size:0.9rem;color:#374151;margin-bottom:0.75rem;">
         Are you sure you want to delete <strong id="delete-clinic-name"></strong>?
       </p>
-      <p style="font-size:0.82rem;color:#ef4444;margin-bottom:1rem;">
-        This will permanently remove the clinic, all its patients, appointments, users, and data. This cannot be undone.
+      <p style="font-size:0.82rem;color:#6b7280;margin-bottom:1rem;">
+        The clinic will be moved to the Deleted Clinics section. You can restore it or permanently delete it later.
       </p>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
         <button type="button" class="btn btn-sm" id="delete-confirm-btn" onclick="executeDeleteClinic()" style="background:#dc2626;color:#fff;border-color:#dc2626;">
-          <span id="delete-btn-text">Yes, Delete</span>
+          <span id="delete-btn-text">Move to Trash</span>
           <span id="delete-btn-spinner" class="spinner" style="display:none;"></span>
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== PERMANENT DELETE CONFIRMATION MODAL ====== -->
+  <div id="perm-delete-modal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-title" style="color:#dc2626;">Permanently Delete Clinic</div>
+      <p style="font-size:0.9rem;color:#374151;margin-bottom:0.75rem;">
+        Are you sure you want to permanently delete <strong id="perm-delete-clinic-name"></strong>?
+      </p>
+      <p style="font-size:0.82rem;color:#ef4444;margin-bottom:1rem;">
+        This will permanently remove the clinic, all its patients, appointments, users, and data. This cannot be undone.
+      </p>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closePermDeleteModal()">Cancel</button>
+        <button type="button" class="btn btn-sm" id="perm-delete-confirm-btn" onclick="executePermDeleteClinic()" style="background:#dc2626;color:#fff;border-color:#dc2626;">
+          <span id="perm-delete-btn-text">Yes, Delete Forever</span>
+          <span id="perm-delete-btn-spinner" class="spinner" style="display:none;"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== RESET PASSWORD MODAL ====== -->
+  <div id="reset-pw-modal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-title">Reset Clinic User Password</div>
+      <div id="reset-pw-body">
+        <div class="loading-center"><span class="spinner spinner-dark"></span> Loading users...</div>
       </div>
     </div>
   </div>
@@ -745,12 +811,24 @@
       document.getElementById('setup-btn-text').textContent = 'Setting up...';
       document.getElementById('setup-btn-spinner').style.display = 'inline-block';
 
+      // Generate a recovery key
+      var recoveryKey = '';
+      var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      for (var i = 0; i < 16; i++) {
+        if (i > 0 && i % 4 === 0) recoveryKey += '-';
+        recoveryKey += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+
       db.collection('config').doc('super_admin').set({
         password: pw,
+        recoveryKey: recoveryKey,
         createdAt: new Date().toISOString()
       }).then(function() {
         sessionStorage.setItem('physio_super_admin', '1');
         isAuthenticated = true;
+
+        // Show recovery key in an alert so the user can save it
+        alert('IMPORTANT - Save your recovery key!\n\nRecovery Key: ' + recoveryKey + '\n\nYou will need this to reset your master password if you forget it. Store it somewhere safe.');
         showToast('Master password set!', 'success');
         showDashboard();
       }).catch(function(err) {
@@ -798,6 +876,103 @@
         });
     });
 
+    // --- Forgot Password ---
+    document.getElementById('forgot-pw-link').addEventListener('click', function(e) {
+      e.preventDefault();
+      document.getElementById('login-form').style.display = 'none';
+      document.getElementById('forgot-form').style.display = 'block';
+      document.getElementById('login-subtitle').textContent = 'Reset Password';
+    });
+
+    document.getElementById('back-to-login-link').addEventListener('click', function(e) {
+      e.preventDefault();
+      document.getElementById('forgot-form').style.display = 'none';
+      document.getElementById('login-form').style.display = 'block';
+      document.getElementById('login-subtitle').textContent = 'Super Admin Panel';
+    });
+
+    document.getElementById('forgot-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      var key = document.getElementById('forgot-key').value.trim();
+      var newPw = document.getElementById('forgot-new-pw').value;
+      var confirmPw = document.getElementById('forgot-confirm-pw').value;
+
+      if (!key) { showToast('Please enter your recovery key.', 'error'); return; }
+      if (newPw.length < 6) { showToast('Password must be at least 6 characters.', 'error'); return; }
+      if (newPw !== confirmPw) { showToast('Passwords do not match.', 'error'); return; }
+
+      var btn = document.getElementById('forgot-btn');
+      btn.disabled = true;
+      document.getElementById('forgot-btn-text').textContent = 'Resetting...';
+      document.getElementById('forgot-btn-spinner').style.display = 'inline-block';
+
+      db.collection('config').doc('super_admin').get()
+        .then(function(doc) {
+          if (!doc.exists) {
+            showToast('No master password configured.', 'error');
+            return;
+          }
+          var data = doc.data();
+          if (!data.recoveryKey) {
+            showToast('No recovery key was set. Contact your system administrator.', 'error');
+            return;
+          }
+          if (data.recoveryKey !== key) {
+            showToast('Invalid recovery key.', 'error');
+            return;
+          }
+          // Key matches - update password
+          return db.collection('config').doc('super_admin').update({
+            password: newPw
+          }).then(function() {
+            showToast('Password reset successfully! Please log in.', 'success');
+            document.getElementById('forgot-form').style.display = 'none';
+            document.getElementById('login-form').style.display = 'block';
+            document.getElementById('login-subtitle').textContent = 'Super Admin Panel';
+            document.getElementById('login-pw').value = '';
+          });
+        })
+        .catch(function(err) {
+          showToast('Failed: ' + (err.message || 'Unknown error'), 'error');
+        })
+        .finally(function() {
+          btn.disabled = false;
+          document.getElementById('forgot-btn-text').textContent = 'Reset Password';
+          document.getElementById('forgot-btn-spinner').style.display = 'none';
+        });
+    });
+
+    // --- Show / Generate Recovery Key ---
+    function showRecoveryKey() {
+      db.collection('config').doc('super_admin').get()
+        .then(function(doc) {
+          if (!doc.exists) { showToast('No config found.', 'error'); return; }
+          var data = doc.data();
+          if (data.recoveryKey) {
+            alert('Your Recovery Key:\n\n' + data.recoveryKey + '\n\nSave this somewhere safe. You need it to reset your master password.');
+          } else {
+            // No key exists yet — generate one
+            if (!confirm('No recovery key exists yet. Generate one now?')) return;
+            var key = '';
+            var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            for (var i = 0; i < 16; i++) {
+              if (i > 0 && i % 4 === 0) key += '-';
+              key += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            db.collection('config').doc('super_admin').update({ recoveryKey: key })
+              .then(function() {
+                alert('Recovery Key Generated!\n\n' + key + '\n\nSave this somewhere safe. You need it to reset your master password.');
+              })
+              .catch(function(err) {
+                showToast('Failed: ' + (err.message || 'Unknown error'), 'error');
+              });
+          }
+        })
+        .catch(function(err) {
+          showToast('Failed: ' + (err.message || 'Unknown error'), 'error');
+        });
+    }
+
     function logout() {
       sessionStorage.removeItem('physio_super_admin');
       isAuthenticated = false;
@@ -833,15 +1008,16 @@
             return (b.createdAt || '').localeCompare(a.createdAt || '');
           });
 
-          // Count approved clinics (no status or status=approved)
+          // Count approved clinics (no status or status=approved, not deleted)
           var approvedCount = 0;
           for (var i = 0; i < clinicsData.length; i++) {
-            if (!clinicsData[i].status || clinicsData[i].status === 'approved') approvedCount++;
+            if (!clinicsData[i]._deleted && (!clinicsData[i].status || clinicsData[i].status === 'approved')) approvedCount++;
           }
           document.getElementById('stat-clinics').textContent = approvedCount;
 
           renderPendingCards();
           renderClinicCards();
+          renderDeletedClinics();
           loadClinicStats();
         })
         .catch(function(err) {
@@ -852,7 +1028,7 @@
 
     // --- Render Pending Approvals ---
     function renderPendingCards() {
-      var pending = clinicsData.filter(function(c) { return c.status === 'pending'; });
+      var pending = clinicsData.filter(function(c) { return c.status === 'pending' && !c._deleted; });
       var section = document.getElementById('pending-section');
       var list = document.getElementById('pending-list');
       var countEl = document.getElementById('pending-count');
@@ -922,9 +1098,9 @@
     function renderClinicCards() {
       var container = document.getElementById('clinic-list');
 
-      // Filter to only show approved/active clinics (no status = legacy approved)
+      // Filter to only show approved/active clinics (no status = legacy approved, not deleted)
       var activeClinics = clinicsData.filter(function(c) {
-        return !c.status || c.status === 'approved';
+        return !c._deleted && (!c.status || c.status === 'approved');
       });
 
       if (activeClinics.length === 0 && clinicsData.length === 0) {
@@ -1003,7 +1179,8 @@
         // Actions
         html += '<div class="clinic-card-actions">';
         html += '<button class="btn btn-primary btn-sm" onclick="enterClinic(\'' + escapeHtml(cid) + '\')">Enter Clinic</button>';
-        html += '<button class="btn btn-secondary btn-sm" onclick="toggleFeatureEditor(\'' + escapeHtml(cid) + '\')">Edit Features</button>';
+        html += '<button class="btn btn-secondary btn-sm" onclick="toggleFeatureEditor(\'' + escapeHtml(cid) + '\')">Features</button>';
+        html += '<button class="btn btn-secondary btn-sm" onclick="openResetPasswordModal(\'' + escapeHtml(cid) + '\')">Reset Password</button>';
         html += '<button class="btn btn-danger-ghost btn-sm" onclick="confirmDeleteClinic(\'' + escapeHtml(cid) + '\')">Delete</button>';
         html += '</div>';
 
@@ -1020,9 +1197,9 @@
       var totalUsers = 0;
       var loaded = 0;
 
-      // Only load stats for approved/active clinics
+      // Only load stats for approved/active clinics (not deleted)
       var activeClinics = clinicsData.filter(function(c) {
-        return !c.status || c.status === 'approved';
+        return !c._deleted && (!c.status || c.status === 'approved');
       });
       var total = activeClinics.length;
 
@@ -1223,45 +1400,138 @@
         });
     }
 
+    // Soft-delete: move clinic to trash
     function executeDeleteClinic() {
       if (!deleteTargetId) return;
       var clinicId = deleteTargetId;
 
       var btn = document.getElementById('delete-confirm-btn');
       btn.disabled = true;
-      document.getElementById('delete-btn-text').textContent = 'Deleting...';
+      document.getElementById('delete-btn-text').textContent = 'Moving to trash...';
       document.getElementById('delete-btn-spinner').style.display = 'inline-block';
 
-      // Find booking slug to clean up
+      db.collection('clinics').doc(clinicId).update({
+        _deleted: true,
+        _deletedAt: new Date().toISOString()
+      })
+        .then(function() {
+          showToast('Clinic moved to trash.', 'success');
+          closeDeleteModal();
+          loadClinics();
+        })
+        .catch(function(err) {
+          showToast('Failed: ' + (err.message || 'Unknown error'), 'error');
+        })
+        .finally(function() {
+          btn.disabled = false;
+          document.getElementById('delete-btn-text').textContent = 'Move to Trash';
+          document.getElementById('delete-btn-spinner').style.display = 'none';
+        });
+    }
+
+    // --- Render Deleted Clinics ---
+    function renderDeletedClinics() {
+      var deleted = clinicsData.filter(function(c) { return c._deleted; });
+      var section = document.getElementById('deleted-section');
+      var list = document.getElementById('deleted-list');
+      var countEl = document.getElementById('deleted-count');
+
+      if (deleted.length === 0) {
+        section.style.display = 'none';
+        return;
+      }
+
+      section.style.display = 'block';
+      countEl.textContent = deleted.length;
+
+      var html = '';
+      deleted.forEach(function(clinic) {
+        var cid = clinic._docId || clinic.id;
+        var deletedDate = clinic._deletedAt ? formatDate(clinic._deletedAt) : '-';
+
+        html += '<div class="clinic-card" style="opacity:0.75;border-left:4px solid #d1d5db;">';
+        html += '<div class="clinic-card-header">';
+        html += '<div class="clinic-name">' + escapeHtml(clinic.name || cid) + ' <span style="font-size:0.7rem;color:#6b7280;font-weight:400;">deleted</span></div>';
+        html += '<div class="clinic-meta">';
+        html += '<span>Owner: ' + escapeHtml(clinic.ownerName || '-') + '</span>';
+        html += '<span>Deleted: ' + deletedDate + '</span>';
+        html += '</div>';
+        html += '</div>';
+        html += '<div class="clinic-card-actions">';
+        html += '<button class="btn btn-primary btn-sm" onclick="restoreClinic(\'' + escapeHtml(cid) + '\')">Restore</button>';
+        html += '<button class="btn btn-danger-ghost btn-sm" onclick="confirmPermDeleteClinic(\'' + escapeHtml(cid) + '\')">Delete Forever</button>';
+        html += '</div>';
+        html += '</div>';
+      });
+
+      list.innerHTML = html;
+    }
+
+    // --- Restore Clinic ---
+    function restoreClinic(clinicId) {
+      db.collection('clinics').doc(clinicId).update({
+        _deleted: firebase.firestore.FieldValue.delete(),
+        _deletedAt: firebase.firestore.FieldValue.delete()
+      })
+        .then(function() {
+          showToast('Clinic restored!', 'success');
+          loadClinics();
+        })
+        .catch(function(err) {
+          showToast('Failed: ' + (err.message || 'Unknown error'), 'error');
+        });
+    }
+
+    // --- Permanent Delete ---
+    var permDeleteTargetId = null;
+
+    function confirmPermDeleteClinic(clinicId) {
+      permDeleteTargetId = clinicId;
+      var clinic = clinicsData.find(function(c) { return (c._docId || c.id) === clinicId; });
+      var name = clinic ? clinic.name : clinicId;
+      document.getElementById('perm-delete-clinic-name').textContent = name;
+      document.getElementById('perm-delete-modal').classList.add('open');
+    }
+
+    function closePermDeleteModal() {
+      document.getElementById('perm-delete-modal').classList.remove('open');
+      permDeleteTargetId = null;
+    }
+
+    document.getElementById('perm-delete-modal').addEventListener('click', function(e) {
+      if (e.target === this) closePermDeleteModal();
+    });
+
+    function executePermDeleteClinic() {
+      if (!permDeleteTargetId) return;
+      var clinicId = permDeleteTargetId;
+
+      var btn = document.getElementById('perm-delete-confirm-btn');
+      btn.disabled = true;
+      document.getElementById('perm-delete-btn-text').textContent = 'Deleting...';
+      document.getElementById('perm-delete-btn-spinner').style.display = 'inline-block';
+
       var clinic = clinicsData.find(function(c) { return (c._docId || c.id) === clinicId; });
       var slug = clinic ? clinic.bookingSlug : null;
 
-      // All known subcollections to wipe
       var subcollections = [
         'users', 'patients', 'appointments', 'sessions', 'exercises',
         'billing', 'tags', 'prescriptions', 'activity_log',
         'message_templates', 'message_log', 'online_bookings'
       ];
 
-      // Delete all subcollections in parallel
-      var deletions = subcollections.map(function(sub) {
+      Promise.all(subcollections.map(function(sub) {
         return deleteSubcollection(clinicId, sub);
-      });
-
-      Promise.all(deletions)
+      }))
         .then(function() {
-          // Delete the clinic doc itself
           return db.collection('clinics').doc(clinicId).delete();
         })
         .then(function() {
-          // Delete booking slug doc if exists
-          if (slug) {
-            return db.collection('booking_slugs').doc(slug).delete();
-          }
+          if (slug) return db.collection('booking_slugs').doc(slug).delete();
         })
         .then(function() {
-          showToast('Clinic deleted successfully.', 'success');
-          closeDeleteModal();
+          showToast('Clinic permanently deleted.', 'success');
+          closePermDeleteModal();
           loadClinics();
         })
         .catch(function(err) {
@@ -1269,10 +1539,85 @@
         })
         .finally(function() {
           btn.disabled = false;
-          document.getElementById('delete-btn-text').textContent = 'Yes, Delete';
-          document.getElementById('delete-btn-spinner').style.display = 'none';
+          document.getElementById('perm-delete-btn-text').textContent = 'Yes, Delete Forever';
+          document.getElementById('perm-delete-btn-spinner').style.display = 'none';
         });
     }
+
+    // =============================================
+    // RESET CLINIC USER PASSWORD
+    // =============================================
+    function openResetPasswordModal(clinicId) {
+      var modal = document.getElementById('reset-pw-modal');
+      var body = document.getElementById('reset-pw-body');
+      modal.classList.add('open');
+      body.innerHTML = '<div class="loading-center"><span class="spinner spinner-dark"></span> Loading users...</div>';
+
+      db.collection('clinics').doc(clinicId).collection('users').get()
+        .then(function(snap) {
+          if (snap.empty) {
+            body.innerHTML = '<p style="color:#6b7280;">No users found for this clinic.</p>' +
+              '<div class="modal-footer"><button class="btn btn-secondary" onclick="closeResetPwModal()">Close</button></div>';
+            return;
+          }
+
+          var html = '<div class="form-group">';
+          html += '<label>Select User</label>';
+          html += '<select id="reset-pw-user" style="width:100%;padding:0.6rem 0.75rem;border:1px solid #d1d5db;border-radius:8px;">';
+          snap.docs.forEach(function(doc) {
+            var u = doc.data();
+            html += '<option value="' + doc.id + '">' + escapeHtml(u.name || u.username || doc.id) + ' (' + escapeHtml(u.role || 'staff') + ')</option>';
+          });
+          html += '</select></div>';
+
+          html += '<div class="form-group">';
+          html += '<label>New Password</label>';
+          html += '<input type="password" id="reset-pw-new" placeholder="Enter new password" required style="width:100%;padding:0.6rem 0.75rem;border:1px solid #d1d5db;border-radius:8px;">';
+          html += '</div>';
+
+          html += '<div class="modal-footer">';
+          html += '<button class="btn btn-secondary" onclick="closeResetPwModal()">Cancel</button>';
+          html += '<button class="btn btn-primary" id="reset-pw-save-btn" data-clinic="' + escapeHtml(clinicId) + '">Reset Password</button>';
+          html += '</div>';
+
+          body.innerHTML = html;
+
+          document.getElementById('reset-pw-save-btn').addEventListener('click', function() {
+            var userId = document.getElementById('reset-pw-user').value;
+            var newPw = document.getElementById('reset-pw-new').value;
+            if (!newPw || newPw.length < 4) {
+              showToast('Password must be at least 4 characters.', 'error');
+              return;
+            }
+            var cid = this.getAttribute('data-clinic');
+            this.disabled = true;
+            this.textContent = 'Resetting...';
+
+            db.collection('clinics').doc(cid).collection('users').doc(userId).update({
+              password: newPw
+            })
+              .then(function() {
+                showToast('Password reset successfully!', 'success');
+                closeResetPwModal();
+              })
+              .catch(function(err) {
+                showToast('Failed: ' + (err.message || 'Unknown error'), 'error');
+              });
+          });
+        })
+        .catch(function(err) {
+          body.innerHTML = '<p style="color:#ef4444;">Failed to load users: ' + escapeHtml(err.message || 'Unknown error') + '</p>' +
+            '<div class="modal-footer"><button class="btn btn-secondary" onclick="closeResetPwModal()">Close</button></div>';
+        });
+    }
+
+    function closeResetPwModal() {
+      document.getElementById('reset-pw-modal').classList.remove('open');
+    }
+
+    document.getElementById('reset-pw-modal').addEventListener('click', function(e) {
+      if (e.target === this) closeResetPwModal();
+    });
 
     // =============================================
     // CREATE CLINIC

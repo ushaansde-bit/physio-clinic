@@ -176,6 +176,8 @@ window.SettingsView = (function() {
     html += '<button class="tab-btn' + (state.tab === 'roles' ? ' active' : '') + '" data-tab="roles">Roles</button>';
     html += '<button class="tab-btn' + (state.tab === 'features' ? ' active' : '') + '" data-tab="features">Feature Toggles</button>';
     html += '<button class="tab-btn' + (state.tab === 'clinic' ? ' active' : '') + '" data-tab="clinic">Clinic Info</button>';
+    html += '<button class="tab-btn' + (state.tab === 'trash' ? ' active' : '') + '" data-tab="trash">Trash</button>';
+    html += '<button class="tab-btn' + (state.tab === 'backup' ? ' active' : '') + '" data-tab="backup">Backup</button>';
     html += '</div>';
 
     if (state.tab === 'staff') {
@@ -186,6 +188,10 @@ window.SettingsView = (function() {
       html += renderFeatures();
     } else if (state.tab === 'clinic') {
       html += renderClinicInfo();
+    } else if (state.tab === 'trash') {
+      html += renderTrash();
+    } else if (state.tab === 'backup') {
+      html += renderBackup();
     }
 
     container.innerHTML = html;
@@ -633,6 +639,90 @@ window.SettingsView = (function() {
     return html;
   }
 
+  // ==================== TRASH ====================
+  function renderTrash() {
+    var trashed = Store.getAllTrash();
+    var html = '';
+
+    html += '<div class="card">';
+    html += '<div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">';
+    html += '<h3 style="margin:0;">Trash <span style="color:var(--text-muted);font-weight:400;font-size:0.85em;">(' + trashed.length + ' item' + (trashed.length !== 1 ? 's' : '') + ')</span></h3>';
+    if (trashed.length > 0) {
+      html += '<button class="btn btn-danger" id="empty-trash-btn">Empty Trash</button>';
+    }
+    html += '</div>';
+    html += '<div class="card-body">';
+
+    if (trashed.length === 0) {
+      html += '<div class="empty-state">';
+      html += '<p>Trash is empty. Deleted items will appear here for recovery.</p>';
+      html += '</div>';
+    } else {
+      html += '<div class="table-wrapper"><table class="data-table"><thead><tr>';
+      html += '<th>Type</th><th>Name / Description</th><th>Deleted</th><th>Actions</th>';
+      html += '</tr></thead><tbody>';
+
+      for (var i = 0; i < trashed.length; i++) {
+        var item = trashed[i];
+        var name = item.name || item.patientName || item.medication || item.description || item.text || item.id;
+        var deletedDate = item._deletedAt ? Utils.formatDate(item._deletedAt.split('T')[0]) : '-';
+        var isCascade = !!item._deletedBy;
+
+        html += '<tr class="no-hover">';
+        html += '<td><span class="badge badge-secondary">' + Utils.escapeHtml(item._type) + '</span></td>';
+        html += '<td>' + Utils.escapeHtml(name);
+        if (isCascade) {
+          html += ' <span style="font-size:0.8em;color:var(--text-muted);">(cascade)</span>';
+        }
+        html += '</td>';
+        html += '<td style="white-space:nowrap;">' + deletedDate + '</td>';
+        html += '<td style="white-space:nowrap;">';
+        if (!isCascade) {
+          html += '<button class="btn btn-sm btn-secondary restore-trash-btn" data-key="' + Utils.escapeHtml(item._storeKey) + '" data-id="' + item.id + '" data-type="' + Utils.escapeHtml(item._type) + '" style="margin-right:4px;">Restore</button>';
+        }
+        html += '<button class="btn btn-sm btn-danger delete-forever-btn" data-key="' + Utils.escapeHtml(item._storeKey) + '" data-id="' + item.id + '" data-name="' + Utils.escapeHtml(name) + '">Delete Forever</button>';
+        html += '</td>';
+        html += '</tr>';
+      }
+
+      html += '</tbody></table></div>';
+    }
+
+    html += '</div></div>';
+    return html;
+  }
+
+  // ==================== BACKUP ====================
+  function renderBackup() {
+    var html = '';
+
+    // Export section
+    html += '<div class="card">';
+    html += '<div class="card-header"><h3 style="margin:0;">Export Backup</h3></div>';
+    html += '<div class="card-body">';
+    html += '<p style="color:var(--text-muted);margin-bottom:16px;">Download all clinic data as a JSON file. This includes patients, appointments, sessions, exercises, billing, prescriptions, staff, tags, messages, and activity log.</p>';
+    html += '<button class="btn btn-primary" id="export-backup-btn">';
+    html += '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+    html += ' Export Backup</button>';
+    html += '</div></div>';
+
+    // Import section
+    html += '<div class="card" style="margin-top:16px;">';
+    html += '<div class="card-header"><h3 style="margin:0;">Import Backup</h3></div>';
+    html += '<div class="card-body">';
+    html += '<p style="color:var(--text-muted);margin-bottom:16px;">Restore data from a previously exported JSON backup file. New items are merged in — existing items (by ID) are not overwritten.</p>';
+    html += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">';
+    html += '<input type="file" id="import-file-input" accept=".json" style="flex:1;min-width:200px;">';
+    html += '<button class="btn btn-primary" id="import-backup-btn" disabled>';
+    html += '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>';
+    html += ' Import Backup</button>';
+    html += '</div>';
+    html += '<div id="import-preview" style="margin-top:12px;display:none;"></div>';
+    html += '</div></div>';
+
+    return html;
+  }
+
   // ==================== EVENT BINDING ====================
   function bindEvents(container) {
     // Tab switching
@@ -704,10 +794,10 @@ window.SettingsView = (function() {
       if (deleteBtn) {
         var staffId = deleteBtn.getAttribute('data-id');
         var staffName = deleteBtn.getAttribute('data-name');
-        Utils.confirm('Delete staff member "' + staffName + '"? This action cannot be undone.', function() {
-          Store.remove(Store.KEYS.users, staffId);
+        Utils.confirm('Delete staff member "' + staffName + '"? They can be restored from trash.', function() {
+          Store.moveToTrash(Store.KEYS.users, staffId);
           Store.logActivity('Staff member deleted: ' + staffName);
-          Utils.toast('Staff member deleted', 'success');
+          Utils.toast('Staff member moved to trash', 'success');
           renderView(container);
         });
         return;
@@ -732,8 +822,154 @@ window.SettingsView = (function() {
         deleteCustomRole(container, deleteRoleBtn.getAttribute('data-role'), deleteRoleBtn.getAttribute('data-label'));
         return;
       }
+
+      // Restore from trash
+      var restoreBtn = e.target.closest('.restore-trash-btn');
+      if (restoreBtn) {
+        var rKey = restoreBtn.getAttribute('data-key');
+        var rId = restoreBtn.getAttribute('data-id');
+        var rType = restoreBtn.getAttribute('data-type');
+        if (rType === 'Patient') {
+          Store.restorePatientFromTrash(rId);
+          Store.logActivity('Patient restored from trash');
+        } else {
+          Store.restoreFromTrash(rKey, rId);
+        }
+        Utils.toast(rType + ' restored', 'success');
+        renderView(container);
+        return;
+      }
+
+      // Delete forever from trash
+      var foreverBtn = e.target.closest('.delete-forever-btn');
+      if (foreverBtn) {
+        var fKey = foreverBtn.getAttribute('data-key');
+        var fId = foreverBtn.getAttribute('data-id');
+        var fName = foreverBtn.getAttribute('data-name');
+        Utils.confirm('Permanently delete "' + fName + '"? This cannot be undone.', function() {
+          Store.permanentDelete(fKey, fId);
+          Utils.toast('Permanently deleted', 'success');
+          renderView(container);
+        });
+        return;
+      }
+
+      // Empty trash
+      if (e.target.closest('#empty-trash-btn')) {
+        Utils.confirm('Permanently delete ALL items in trash? This cannot be undone.', function() {
+          var count = Store.emptyTrash();
+          Utils.toast(count + ' item' + (count !== 1 ? 's' : '') + ' permanently deleted', 'success');
+          renderView(container);
+        });
+        return;
+      }
+
+      // Export backup
+      if (e.target.closest('#export-backup-btn')) {
+        var backup = Store.exportBackup();
+        var json = JSON.stringify(backup, null, 2);
+        var blob = new Blob([json], { type: 'application/json' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        var dateStr = new Date().toISOString().split('T')[0];
+        a.href = url;
+        a.download = 'clinic-backup-' + dateStr + '.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        Utils.toast('Backup exported', 'success');
+        return;
+      }
+
+      // Import backup
+      if (e.target.closest('#import-backup-btn')) {
+        var fileInput = document.getElementById('import-file-input');
+        if (!fileInput || !fileInput.files || !fileInput.files[0]) {
+          Utils.toast('Please select a file first', 'error');
+          return;
+        }
+        var reader = new FileReader();
+        reader.onload = function(ev) {
+          try {
+            var data = JSON.parse(ev.target.result);
+            if (!data || !data.data || data.version !== 1) {
+              Utils.toast('Invalid backup file format', 'error');
+              return;
+            }
+            Utils.confirm('Import backup data? New items will be merged. Existing items will not be overwritten.', function() {
+              var counts = Store.importBackup(data);
+              if (counts.error) {
+                Utils.toast(counts.error, 'error');
+                return;
+              }
+              var parts = [];
+              for (var t in counts) {
+                if (counts[t] > 0) parts.push(counts[t] + ' ' + t);
+              }
+              var msg = parts.length > 0 ? 'Imported: ' + parts.join(', ') : 'No new items to import';
+              Utils.toast(msg, 'success');
+              renderView(container);
+            });
+          } catch(ex) {
+            Utils.toast('Error reading file: invalid JSON', 'error');
+          }
+        };
+        reader.readAsText(fileInput.files[0]);
+        return;
+      }
     };
     container.addEventListener('click', _clickHandler);
+
+    // File input change handler for import preview
+    var importInput = container.querySelector('#import-file-input');
+    if (importInput) {
+      importInput.addEventListener('change', function() {
+        var importBtn = document.getElementById('import-backup-btn');
+        var preview = document.getElementById('import-preview');
+        if (!importInput.files || !importInput.files[0]) {
+          if (importBtn) importBtn.disabled = true;
+          if (preview) preview.style.display = 'none';
+          return;
+        }
+        var reader = new FileReader();
+        reader.onload = function(ev) {
+          try {
+            var data = JSON.parse(ev.target.result);
+            if (!data || !data.data || data.version !== 1) {
+              if (preview) {
+                preview.style.display = '';
+                preview.innerHTML = '<div style="color:var(--danger);font-size:0.9em;">Invalid backup file format.</div>';
+              }
+              if (importBtn) importBtn.disabled = true;
+              return;
+            }
+            if (importBtn) importBtn.disabled = false;
+            if (preview) {
+              var html = '<div style="background:var(--bg-secondary);border-radius:8px;padding:12px;font-size:0.9em;">';
+              html += '<strong>Backup Preview</strong>';
+              html += '<div style="color:var(--text-muted);font-size:0.85em;margin-bottom:8px;">Exported: ' + (data.exportedAt ? Utils.formatDate(data.exportedAt.split('T')[0]) : 'Unknown') + '</div>';
+              var typeLabels = { patients: 'Patients', appointments: 'Appointments', sessions: 'Sessions', exercises: 'Exercises', billing: 'Invoices', prescriptions: 'Prescriptions', users: 'Staff', tags: 'Tags', messageTemplates: 'Templates', messageLog: 'Messages', activityLog: 'Activity' };
+              for (var key in data.data) {
+                if (data.data.hasOwnProperty(key) && data.data[key] && data.data[key].length > 0) {
+                  html += '<div>' + (typeLabels[key] || key) + ': <strong>' + data.data[key].length + '</strong></div>';
+                }
+              }
+              html += '</div>';
+              preview.style.display = '';
+              preview.innerHTML = html;
+            }
+          } catch(ex) {
+            if (preview) {
+              preview.style.display = '';
+              preview.innerHTML = '<div style="color:var(--danger);font-size:0.9em;">Error reading file: invalid JSON.</div>';
+            }
+            if (importBtn) importBtn.disabled = true;
+          }
+        };
+        reader.readAsText(importInput.files[0]);
+      });
+    }
   }
 
   // ==================== ROLE SELECT HTML ====================

@@ -77,8 +77,12 @@ window.Store = (function() {
   }
 
   // --- Generic CRUD ---
-  function getAll(key) {
-    try { return JSON.parse(localStorage.getItem(key)) || []; }
+  function getAll(key, includeDeleted) {
+    try {
+      var data = JSON.parse(localStorage.getItem(key)) || [];
+      if (includeDeleted) return data;
+      return data.filter(function(item) { return !item._deleted; });
+    }
     catch(e) { return []; }
   }
 
@@ -89,7 +93,7 @@ window.Store = (function() {
   }
 
   function getById(key, id) {
-    var items = getAll(key);
+    var items = getAll(key, true);
     for (var i = 0; i < items.length; i++) {
       if (items[i].id === id) return items[i];
     }
@@ -97,7 +101,7 @@ window.Store = (function() {
   }
 
   function create(key, item) {
-    var items = getAll(key);
+    var items = getAll(key, true);
     item.id = item.id || Utils.generateId();
     item.createdAt = item.createdAt || new Date().toISOString();
     items.push(item);
@@ -108,7 +112,7 @@ window.Store = (function() {
   }
 
   function update(key, id, updates) {
-    var items = getAll(key);
+    var items = getAll(key, true);
     for (var i = 0; i < items.length; i++) {
       if (items[i].id === id) {
         for (var k in updates) {
@@ -125,7 +129,7 @@ window.Store = (function() {
   }
 
   function remove(key, id) {
-    var items = getAll(key);
+    var items = getAll(key, true);
     var filtered = [];
     for (var i = 0; i < items.length; i++) {
       if (items[i].id !== id) filtered.push(items[i]);
@@ -142,6 +146,174 @@ window.Store = (function() {
       if (items[i][field] === value) result.push(items[i]);
     }
     return result;
+  }
+
+  // --- Trash / Soft Delete ---
+  function moveToTrash(key, id) {
+    return update(key, id, { _deleted: true, _deletedAt: new Date().toISOString() });
+  }
+
+  function getTrash(key) {
+    var data = getAll(key, true);
+    return data.filter(function(item) { return item._deleted; });
+  }
+
+  function getAllTrash() {
+    var types = [
+      { key: KEYS.patients, type: 'Patient' },
+      { key: KEYS.appointments, type: 'Appointment' },
+      { key: KEYS.sessions, type: 'Session' },
+      { key: KEYS.exercises, type: 'Exercise' },
+      { key: KEYS.billing, type: 'Invoice' },
+      { key: KEYS.prescriptions, type: 'Prescription' },
+      { key: KEYS.messageTemplates, type: 'Message Template' },
+      { key: KEYS.users, type: 'Staff' }
+    ];
+    var result = [];
+    for (var i = 0; i < types.length; i++) {
+      var trashed = getTrash(types[i].key);
+      for (var j = 0; j < trashed.length; j++) {
+        trashed[j]._type = types[i].type;
+        trashed[j]._storeKey = types[i].key;
+        result.push(trashed[j]);
+      }
+    }
+    result.sort(function(a, b) {
+      return (b._deletedAt || '').localeCompare(a._deletedAt || '');
+    });
+    return result;
+  }
+
+  function restoreFromTrash(key, id) {
+    var items = getAll(key, true);
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].id === id) {
+        delete items[i]._deleted;
+        delete items[i]._deletedAt;
+        delete items[i]._deletedBy;
+        items[i].updatedAt = new Date().toISOString();
+        localStorage.setItem(key, JSON.stringify(items));
+        if (window.FirebaseSync) FirebaseSync.saveDoc(key, items[i]);
+        return items[i];
+      }
+    }
+    return null;
+  }
+
+  function restorePatientFromTrash(id) {
+    var patient = restoreFromTrash(KEYS.patients, id);
+    if (!patient) return null;
+    // Restore cascade-deleted items
+    var cascadeKeys = [KEYS.appointments, KEYS.sessions, KEYS.exercises, KEYS.billing, KEYS.prescriptions];
+    for (var k = 0; k < cascadeKeys.length; k++) {
+      var items = getAll(cascadeKeys[k], true);
+      var changed = false;
+      for (var i = 0; i < items.length; i++) {
+        if (items[i]._deletedBy === id) {
+          delete items[i]._deleted;
+          delete items[i]._deletedAt;
+          delete items[i]._deletedBy;
+          items[i].updatedAt = new Date().toISOString();
+          if (window.FirebaseSync) FirebaseSync.saveDoc(cascadeKeys[k], items[i]);
+          changed = true;
+        }
+      }
+      if (changed) localStorage.setItem(cascadeKeys[k], JSON.stringify(items));
+    }
+    return patient;
+  }
+
+  function permanentDelete(key, id) {
+    remove(key, id);
+  }
+
+  function emptyTrash() {
+    var types = [KEYS.patients, KEYS.appointments, KEYS.sessions, KEYS.exercises, KEYS.billing, KEYS.prescriptions, KEYS.messageTemplates, KEYS.users];
+    var count = 0;
+    for (var i = 0; i < types.length; i++) {
+      var items = getAll(types[i], true);
+      var kept = [];
+      for (var j = 0; j < items.length; j++) {
+        if (items[j]._deleted) {
+          count++;
+          if (window.FirebaseSync) FirebaseSync.deleteDoc(types[i], items[j].id);
+        } else {
+          kept.push(items[j]);
+        }
+      }
+      localStorage.setItem(types[i], JSON.stringify(kept));
+    }
+    return count;
+  }
+
+  // --- Export / Import Backup ---
+  function exportBackup() {
+    return {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      clinicId: sessionStorage.getItem('physio_clinicId') || 'default',
+      data: {
+        patients: getAll(KEYS.patients, true),
+        appointments: getAll(KEYS.appointments, true),
+        sessions: getAll(KEYS.sessions, true),
+        exercises: getAll(KEYS.exercises, true),
+        billing: getAll(KEYS.billing, true),
+        prescriptions: getAll(KEYS.prescriptions, true),
+        users: getAll(KEYS.users, true),
+        tags: getAll(KEYS.tags, true),
+        messageTemplates: getAll(KEYS.messageTemplates, true),
+        messageLog: getAll(KEYS.messageLog, true),
+        activityLog: getAll(KEYS.activity, true)
+      }
+    };
+  }
+
+  function importBackup(backup) {
+    if (!backup || !backup.data || backup.version !== 1) {
+      return { error: 'Invalid backup format' };
+    }
+    var keyMap = {
+      patients: KEYS.patients,
+      appointments: KEYS.appointments,
+      sessions: KEYS.sessions,
+      exercises: KEYS.exercises,
+      billing: KEYS.billing,
+      prescriptions: KEYS.prescriptions,
+      users: KEYS.users,
+      tags: KEYS.tags,
+      messageTemplates: KEYS.messageTemplates,
+      messageLog: KEYS.messageLog,
+      activityLog: KEYS.activity
+    };
+    var counts = {};
+    for (var type in keyMap) {
+      if (!keyMap.hasOwnProperty(type) || !backup.data[type]) continue;
+      var key = keyMap[type];
+      var existing = getAll(key, true);
+      var existingIds = {};
+      for (var i = 0; i < existing.length; i++) {
+        if (existing[i].id) existingIds[existing[i].id] = true;
+      }
+      var added = 0;
+      for (var j = 0; j < backup.data[type].length; j++) {
+        var item = backup.data[type][j];
+        if (item.id && !existingIds[item.id]) {
+          existing.push(item);
+          added++;
+        }
+      }
+      if (added > 0) {
+        localStorage.setItem(key, JSON.stringify(existing));
+        if (window.FirebaseSync) FirebaseSync.saveCollection(key);
+      }
+      counts[type] = added;
+    }
+    var parts = [];
+    for (var t in counts) {
+      if (counts[t] > 0) parts.push(counts[t] + ' ' + t);
+    }
+    if (parts.length > 0) logActivity('Backup imported: ' + parts.join(', '));
+    return counts;
   }
 
   // --- Activity Log ---
@@ -178,18 +350,20 @@ window.Store = (function() {
     updatePatient: function(id, u) { var r = update(KEYS.patients, id, u); if(r) logActivity('Patient updated: ' + r.name); return r; },
     deletePatient: function(id) {
       var p = getById(KEYS.patients, id);
-      remove(KEYS.patients, id);
-      // Cascade delete related data
+      moveToTrash(KEYS.patients, id);
+      // Cascade soft-delete related data
+      var now = new Date().toISOString();
+      var cascadeFields = { _deleted: true, _deletedAt: now, _deletedBy: id };
       var appts = getByField(KEYS.appointments, 'patientId', id);
-      for (var i = 0; i < appts.length; i++) remove(KEYS.appointments, appts[i].id);
+      for (var i = 0; i < appts.length; i++) update(KEYS.appointments, appts[i].id, cascadeFields);
       var sess = getByField(KEYS.sessions, 'patientId', id);
-      for (var j = 0; j < sess.length; j++) remove(KEYS.sessions, sess[j].id);
+      for (var j = 0; j < sess.length; j++) update(KEYS.sessions, sess[j].id, cascadeFields);
       var exs = getByField(KEYS.exercises, 'patientId', id);
-      for (var k = 0; k < exs.length; k++) remove(KEYS.exercises, exs[k].id);
+      for (var k = 0; k < exs.length; k++) update(KEYS.exercises, exs[k].id, cascadeFields);
       var bills = getByField(KEYS.billing, 'patientId', id);
-      for (var l = 0; l < bills.length; l++) remove(KEYS.billing, bills[l].id);
+      for (var l = 0; l < bills.length; l++) update(KEYS.billing, bills[l].id, cascadeFields);
       var rxs = getByField(KEYS.prescriptions, 'patientId', id);
-      for (var m = 0; m < rxs.length; m++) remove(KEYS.prescriptions, rxs[m].id);
+      for (var m = 0; m < rxs.length; m++) update(KEYS.prescriptions, rxs[m].id, cascadeFields);
       if (p) logActivity('Patient deleted: ' + p.name);
     },
 
@@ -198,7 +372,7 @@ window.Store = (function() {
     getAppointment: function(id) { return getById(KEYS.appointments, id); },
     createAppointment: function(a) { var r = create(KEYS.appointments, a); logActivity('Appointment booked for ' + (a.patientName || 'patient')); return r; },
     updateAppointment: function(id, u) { var r = update(KEYS.appointments, id, u); return r; },
-    deleteAppointment: function(id) { remove(KEYS.appointments, id); },
+    deleteAppointment: function(id) { moveToTrash(KEYS.appointments, id); },
     getAppointmentsByPatient: function(pid) { return getByField(KEYS.appointments, 'patientId', pid); },
     getAppointmentsByDate: function(date) { return getByField(KEYS.appointments, 'date', date); },
 
@@ -224,21 +398,21 @@ window.Store = (function() {
     getSessionsByPatient: function(pid) { return getByField(KEYS.sessions, 'patientId', pid); },
     createSession: function(s) { var r = create(KEYS.sessions, s); logActivity('Session note added for patient'); return r; },
     updateSession: function(id, u) { return update(KEYS.sessions, id, u); },
-    deleteSession: function(id) { remove(KEYS.sessions, id); },
+    deleteSession: function(id) { moveToTrash(KEYS.sessions, id); },
 
     // Exercises
     getExercises: function() { return getAll(KEYS.exercises); },
     getExercisesByPatient: function(pid) { return getByField(KEYS.exercises, 'patientId', pid); },
     createExercise: function(e) { var r = create(KEYS.exercises, e); logActivity('Exercise prescribed'); return r; },
     updateExercise: function(id, u) { return update(KEYS.exercises, id, u); },
-    deleteExercise: function(id) { remove(KEYS.exercises, id); },
+    deleteExercise: function(id) { moveToTrash(KEYS.exercises, id); },
 
     // Billing
     getBilling: function() { return getAll(KEYS.billing); },
     getBillingByPatient: function(pid) { return getByField(KEYS.billing, 'patientId', pid); },
     createBilling: function(b) { var r = create(KEYS.billing, b); logActivity('Invoice created: ' + Utils.formatCurrency(b.amount)); return r; },
     updateBilling: function(id, u) { return update(KEYS.billing, id, u); },
-    deleteBilling: function(id) { remove(KEYS.billing, id); },
+    deleteBilling: function(id) { moveToTrash(KEYS.billing, id); },
 
     // Tags
     getTags: function() { return getAll(KEYS.tags); },
@@ -247,8 +421,8 @@ window.Store = (function() {
     updateTag: function(id, u) { return update(KEYS.tags, id, u); },
     deleteTag: function(id) {
       remove(KEYS.tags, id);
-      // Cascade: remove tag from all patients
-      var patients = getAll(KEYS.patients);
+      // Cascade: remove tag from all patients (include deleted to not lose them)
+      var patients = getAll(KEYS.patients, true);
       for (var i = 0; i < patients.length; i++) {
         if (patients[i].tags && patients[i].tags.length > 0) {
           var filtered = [];
@@ -266,7 +440,7 @@ window.Store = (function() {
     getMessageTemplate: function(id) { return getById(KEYS.messageTemplates, id); },
     createMessageTemplate: function(t) { return create(KEYS.messageTemplates, t); },
     updateMessageTemplate: function(id, u) { return update(KEYS.messageTemplates, id, u); },
-    deleteMessageTemplate: function(id) { remove(KEYS.messageTemplates, id); },
+    deleteMessageTemplate: function(id) { moveToTrash(KEYS.messageTemplates, id); },
 
     // Prescriptions
     getPrescriptions: function() { return getAll(KEYS.prescriptions); },
@@ -274,7 +448,7 @@ window.Store = (function() {
     getPrescription: function(id) { return getById(KEYS.prescriptions, id); },
     createPrescription: function(p) { var r = create(KEYS.prescriptions, p); logActivity('Prescription added for patient'); return r; },
     updatePrescription: function(id, u) { return update(KEYS.prescriptions, id, u); },
-    deletePrescription: function(id) { remove(KEYS.prescriptions, id); },
+    deletePrescription: function(id) { moveToTrash(KEYS.prescriptions, id); },
 
     // Message Log
     getMessageLog: function() { return getAll(KEYS.messageLog); },
@@ -287,6 +461,19 @@ window.Store = (function() {
     // Seed & Migrate
     seed: seed,
     migrate: migrate,
+
+    // Trash
+    moveToTrash: moveToTrash,
+    getTrash: getTrash,
+    getAllTrash: getAllTrash,
+    restoreFromTrash: restoreFromTrash,
+    restorePatientFromTrash: restorePatientFromTrash,
+    permanentDelete: permanentDelete,
+    emptyTrash: emptyTrash,
+
+    // Backup
+    exportBackup: exportBackup,
+    importBackup: importBackup,
 
     // Generic CRUD (used by settings for users)
     create: create,
@@ -309,7 +496,7 @@ window.Store = (function() {
   // --- Migration for existing installs ---
   function migrate() {
     // Ensure all patients have tags and bodyRegions arrays
-    var patients = getAll(KEYS.patients);
+    var patients = getAll(KEYS.patients, true);
     var patientsDirty = false;
     for (var i = 0; i < patients.length; i++) {
       if (!patients[i].tags) {
@@ -341,7 +528,7 @@ window.Store = (function() {
       saveAll(KEYS.tags, tags);
 
       // Assign demo tags to seed patients
-      patients = getAll(KEYS.patients);
+      patients = getAll(KEYS.patients, true);
       var tagMap = {
         'p1': ['tag1', 'tag4'],       // Sarah Johnson: Knee, Post-Surgery
         'p2': ['tag2', 'tag7'],        // Robert Chen: Back Pain, Chronic Pain
