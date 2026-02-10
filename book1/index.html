@@ -477,8 +477,17 @@ body {
 
 <!-- Header -->
 <div class="header">
-  <h1>PhysioClinic</h1>
+  <h1 id="header-clinic-name">PhysioClinic</h1>
   <p>Book an Appointment</p>
+</div>
+
+<!-- Loading / Error States -->
+<div id="loading-state" class="card" style="max-width:480px;margin:2rem auto;text-align:center;padding:2rem;display:none;">
+  <p style="color:var(--gray-500);">Loading clinic information...</p>
+</div>
+<div id="error-state" class="card" style="max-width:480px;margin:2rem auto;text-align:center;padding:2rem;display:none;">
+  <h2 style="color:var(--danger);margin-bottom:0.5rem;">Clinic Not Found</h2>
+  <p id="error-message" style="color:var(--gray-600);">Please check the booking link and try again.</p>
 </div>
 
 <!-- Side-by-Side Layout -->
@@ -641,41 +650,59 @@ body {
     console.warn('[Book1] Firebase init failed, using local only:', e);
   }
 
-  var FB_COLLECTIONS = {
-    'physio_patients': 'patients',
-    'physio_appointments': 'appointments',
-    'physio_activity_log': 'activity_log',
-    'physio_online_bookings': 'online_bookings'
-  };
+  // ============ CLINIC SCOPING ============
+  var clinicId = null;
+  var clinicSlug = null;
 
-  function fbSaveDoc(localKey, item) {
-    if (!fbDb || !FB_COLLECTIONS[localKey] || !item) return;
+  // Parse ?c=slug from URL
+  var urlParams = new URLSearchParams(window.location.search);
+  clinicSlug = urlParams.get('c');
+
+  var SCOPED_COLLECTIONS = ['patients', 'appointments', 'activity_log', 'online_bookings'];
+
+  // Get scoped localStorage key
+  function scopedKey(collName) {
+    var cid = clinicId || 'default';
+    return 'physio_' + cid + '_' + collName;
+  }
+
+  // Get Firestore collection reference scoped to clinic
+  function getCollRef(collName) {
+    if (!fbDb || !clinicId) return null;
+    return fbDb.collection('clinics').doc(clinicId).collection(collName);
+  }
+
+  function fbSaveDoc(collName, item) {
+    var ref = getCollRef(collName);
+    if (!ref || !item) return;
     var docId = item.id || ('doc_' + Date.now());
-    fbDb.collection(FB_COLLECTIONS[localKey]).doc(docId).set(JSON.parse(JSON.stringify(item)))
-      .then(function() { console.log('[Book1] Synced ' + docId + ' to ' + FB_COLLECTIONS[localKey]); })
+    ref.doc(docId).set(JSON.parse(JSON.stringify(item)))
+      .then(function() { console.log('[Book1] Synced ' + docId + ' to clinics/' + clinicId + '/' + collName); })
       .catch(function(e) { console.error('[Book1] Sync failed:', e); });
   }
 
-  function fbSaveCollection(localKey) {
-    if (!fbDb || !FB_COLLECTIONS[localKey]) return;
+  function fbSaveCollection(collName) {
+    var ref = getCollRef(collName);
+    if (!ref) return;
     var items = [];
-    try { items = JSON.parse(localStorage.getItem(localKey)) || []; } catch(e) { return; }
+    try { items = JSON.parse(localStorage.getItem(scopedKey(collName))) || []; } catch(e) { return; }
     var batch = fbDb.batch();
     for (var i = 0; i < items.length; i++) {
       var docId = items[i].id || ('doc_' + i);
-      batch.set(fbDb.collection(FB_COLLECTIONS[localKey]).doc(docId), JSON.parse(JSON.stringify(items[i])));
+      batch.set(ref.doc(docId), JSON.parse(JSON.stringify(items[i])));
     }
     batch.commit().catch(function(e) { console.error('[Book1] Batch sync failed:', e); });
   }
 
-  function fbPullCollection(localKey) {
-    if (!fbDb || !FB_COLLECTIONS[localKey]) return Promise.resolve();
-    return fbDb.collection(FB_COLLECTIONS[localKey]).get().then(function(snapshot) {
+  function fbPullCollection(collName) {
+    var ref = getCollRef(collName);
+    if (!ref) return Promise.resolve();
+    return ref.get().then(function(snapshot) {
       if (snapshot.empty) return;
       var items = [];
       snapshot.forEach(function(doc) { items.push(doc.data()); });
-      localStorage.setItem(localKey, JSON.stringify(items));
-      console.log('[Book1] Pulled ' + items.length + ' docs from ' + FB_COLLECTIONS[localKey]);
+      localStorage.setItem(scopedKey(collName), JSON.stringify(items));
+      console.log('[Book1] Pulled ' + items.length + ' docs from clinics/' + clinicId + '/' + collName);
     }).catch(function(e) { console.warn('[Book1] Pull failed:', e); });
   }
 
@@ -766,18 +793,18 @@ body {
     return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
   }
 
-  // ============ STORE (simplified) ============
-  function getAll(key) {
-    try { return JSON.parse(localStorage.getItem(key)) || []; }
+  // ============ STORE (simplified, scoped by clinic) ============
+  function getAll(collName) {
+    try { return JSON.parse(localStorage.getItem(scopedKey(collName))) || []; }
     catch(e) { return []; }
   }
 
-  function saveAll(key, data) {
-    localStorage.setItem(key, JSON.stringify(data));
+  function saveAll(collName, data) {
+    localStorage.setItem(scopedKey(collName), JSON.stringify(data));
   }
 
   function getPatientByPhone(phone) {
-    var patients = getAll('physio_patients');
+    var patients = getAll('patients');
     var clean = phone.replace(/\D/g, '');
     for (var i = 0; i < patients.length; i++) {
       if (patients[i].phone && patients[i].phone.replace(/\D/g, '') === clean) return patients[i];
@@ -786,7 +813,7 @@ body {
   }
 
   function hasConflict(date, time) {
-    var appts = getAll('physio_appointments');
+    var appts = getAll('appointments');
     var newStart = timeToMinutes(time);
     var newEnd = newStart + 30;
     for (var i = 0; i < appts.length; i++) {
@@ -801,42 +828,42 @@ body {
   }
 
   function createPatient(data) {
-    var patients = getAll('physio_patients');
+    var patients = getAll('patients');
     data.id = data.id || 'obp_' + generateId();
     data.createdAt = new Date().toISOString();
     patients.push(data);
-    saveAll('physio_patients', patients);
-    fbSaveDoc('physio_patients', data);
+    saveAll('patients', patients);
+    fbSaveDoc('patients', data);
     logActivity('New patient added: ' + data.name + ' (online booking)');
     return data;
   }
 
   function createAppointment(data) {
-    var appts = getAll('physio_appointments');
+    var appts = getAll('appointments');
     data.id = data.id || 'ob_' + generateId();
     data.createdAt = new Date().toISOString();
     appts.push(data);
-    saveAll('physio_appointments', appts);
-    fbSaveDoc('physio_appointments', data);
+    saveAll('appointments', appts);
+    fbSaveDoc('appointments', data);
     logActivity('Appointment booked for ' + (data.patientName || 'patient') + ' (online)');
     return data;
   }
 
   function logActivity(text) {
-    var log = getAll('physio_activity_log');
+    var log = getAll('activity_log');
     var entry = { text: text, time: new Date().toISOString() };
     log.unshift(entry);
     if (log.length > 50) log = log.slice(0, 50);
-    saveAll('physio_activity_log', log);
-    fbSaveCollection('physio_activity_log');
+    saveAll('activity_log', log);
+    fbSaveCollection('activity_log');
   }
 
   function addOnlineBookingIndex(appointmentId, patientId) {
-    var index = getAll('physio_online_bookings');
+    var index = getAll('online_bookings');
     var entry = { id: 'obi_' + generateId(), appointmentId: appointmentId, patientId: patientId, bookedAt: new Date().toISOString() };
     index.push(entry);
-    saveAll('physio_online_bookings', index);
-    fbSaveDoc('physio_online_bookings', entry);
+    saveAll('online_bookings', index);
+    fbSaveDoc('online_bookings', entry);
   }
 
   // ============ TOAST ============
@@ -1279,23 +1306,91 @@ body {
   enforceDigits(document.getElementById('inp-ex-phone'), document.getElementById('inp-ex-code'));
 
   // ============ INIT ============
-  loadDefaultPhoneCode();
-  state.selectedDate = todayStr();
-  renderCalendar();
-  renderTimeSlots();
+  var $mainGrid = document.querySelector('.main-grid');
+  var $loadingState = document.getElementById('loading-state');
+  var $errorState = document.getElementById('error-state');
+  var $errorMessage = document.getElementById('error-message');
+  var $headerName = document.getElementById('header-clinic-name');
 
-  // Pull latest data from Firestore (for conflict checking & existing patient lookup)
-  if (fbDb) {
-    Promise.all([
-      fbPullCollection('physio_patients'),
-      fbPullCollection('physio_appointments')
-    ]).then(function() {
-      console.log('[Book1] Cloud data loaded');
-      renderCalendar();
-      renderTimeSlots();
-    }).catch(function() {
-      console.warn('[Book1] Cloud pull failed, using local data');
+  function showError(msg) {
+    $mainGrid.style.display = 'none';
+    $loadingState.style.display = 'none';
+    $errorState.style.display = 'block';
+    $errorMessage.textContent = msg;
+  }
+
+  function startApp() {
+    $loadingState.style.display = 'none';
+    $errorState.style.display = 'none';
+    $mainGrid.style.display = '';
+
+    loadDefaultPhoneCode();
+    state.selectedDate = todayStr();
+    renderCalendar();
+    renderTimeSlots();
+
+    // Pull latest data from Firestore
+    if (fbDb && clinicId) {
+      Promise.all([
+        fbPullCollection('patients'),
+        fbPullCollection('appointments')
+      ]).then(function() {
+        console.log('[Book1] Cloud data loaded for clinic ' + clinicId);
+        renderCalendar();
+        renderTimeSlots();
+      }).catch(function() {
+        console.warn('[Book1] Cloud pull failed, using local data');
+      });
+    }
+  }
+
+  // Resolve clinic from ?c= parameter
+  if (!clinicSlug) {
+    // No clinic param - try default
+    clinicId = 'default';
+    $headerName.textContent = 'PhysioClinic';
+    startApp();
+  } else if (fbDb) {
+    // Show loading while resolving
+    $mainGrid.style.display = 'none';
+    $loadingState.style.display = 'block';
+
+    fbDb.collection('booking_slugs').doc(clinicSlug).get().then(function(doc) {
+      if (!doc.exists) {
+        showError('No clinic found for "' + escapeHtml(clinicSlug) + '". Please check your booking link.');
+        return;
+      }
+      clinicId = doc.data().clinicId;
+
+      // Read clinic doc for name and feature check
+      return fbDb.collection('clinics').doc(clinicId).get().then(function(clinicDoc) {
+        if (clinicDoc.exists) {
+          var clinicData = clinicDoc.data();
+
+          // Check if online booking is enabled
+          if (clinicData.features && clinicData.features.onlineBooking === false) {
+            showError('Online booking is currently disabled for this clinic.');
+            return;
+          }
+
+          // Set clinic name in header
+          $headerName.textContent = clinicData.name || 'PhysioClinic';
+        }
+
+        startApp();
+      });
+    }).catch(function(err) {
+      console.error('[Book1] Clinic resolution failed:', err);
+      // Fallback: use slug as clinicId
+      clinicId = clinicSlug;
+      $headerName.textContent = 'PhysioClinic';
+      startApp();
     });
+  } else {
+    // No Firebase - use slug as clinicId directly
+    clinicId = clinicSlug;
+    $headerName.textContent = 'PhysioClinic';
+    startApp();
   }
 
 })();

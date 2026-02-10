@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PhysioClinic - Register New Clinic</title>
+  <style>
+    /* --- Reset & Base --- */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 14px; -webkit-font-smoothing: antialiased; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      color: #1f2937;
+      line-height: 1.5;
+      overflow-x: hidden;
+    }
+    a { color: #0d9488; text-decoration: none; }
+    a:hover { color: #0f766e; }
+    input, select, textarea, button { font-family: inherit; font-size: inherit; }
+
+    /* --- Registration Screen --- */
+    .register-screen {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #0d9488 0%, #0e7490 50%, #1e40af 100%);
+      padding: 1rem;
+    }
+
+    .register-card {
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 10px 15px rgba(0,0,0,0.1), 0 4px 6px rgba(0,0,0,0.05);
+      padding: 2.5rem;
+      width: 100%;
+      max-width: 480px;
+    }
+
+    .register-header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .register-logo { color: #0d9488; margin-bottom: 0.75rem; }
+
+    .register-header h1 { font-size: 1.75rem; color: #111827; }
+    .register-header p { color: #6b7280; font-size: 0.9rem; margin-top: 0.25rem; }
+
+    /* --- Form Elements --- */
+    .form-group { margin-bottom: 1rem; }
+    .form-group label {
+      display: block;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 0.35rem;
+      font-size: 0.85rem;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 0.6rem 0.75rem;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      background: #ffffff;
+      color: #1f2937;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .form-group input:focus {
+      outline: none;
+      border-color: #0d9488;
+      box-shadow: 0 0 0 3px rgba(13,148,136,0.1);
+    }
+    .form-group .form-hint {
+      font-size: 0.75rem;
+      color: #9ca3af;
+      margin-top: 0.25rem;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    /* --- Buttons --- */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.6rem 1rem;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-size: 0.85rem;
+      white-space: nowrap;
+      justify-content: center;
+      width: 100%;
+    }
+    .btn-primary { background: #0d9488; color: #ffffff; }
+    .btn-primary:hover { background: #0f766e; }
+    .btn-primary:disabled {
+      background: #99f6e4;
+      cursor: not-allowed;
+    }
+
+    /* --- Spinner --- */
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #ffffff;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* --- Toast Notifications --- */
+    .toast-container {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .toast {
+      background: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.06);
+      padding: 0.75rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      min-width: 280px;
+      max-width: 400px;
+      border-left: 4px solid #d1d5db;
+      animation: toastIn 0.3s ease;
+    }
+    .toast-success { border-left-color: #22c55e; }
+    .toast-error { border-left-color: #ef4444; }
+    .toast-message { flex: 1; font-size: 0.85rem; color: #374151; }
+    .toast.removing { animation: toastOut 0.3s ease forwards; }
+    @keyframes toastIn { from { opacity: 0; transform: translateX(100%); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes toastOut { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(100%); } }
+
+    /* --- Success State --- */
+    .success-container {
+      text-align: center;
+      padding: 1rem 0;
+    }
+    .success-icon {
+      width: 64px;
+      height: 64px;
+      background: #f0fdf4;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1.25rem;
+    }
+    .success-icon svg { color: #22c55e; }
+    .success-container h2 {
+      font-size: 1.35rem;
+      color: #111827;
+      margin-bottom: 0.5rem;
+    }
+    .success-container p {
+      color: #6b7280;
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+    }
+    .clinic-code-box {
+      background: #f0fdfa;
+      border: 1px solid #99f6e4;
+      border-radius: 8px;
+      padding: 1rem;
+      margin: 1.25rem 0;
+    }
+    .clinic-code-box .label {
+      font-size: 0.75rem;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.25rem;
+    }
+    .clinic-code-box .code {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #0d9488;
+      font-family: 'Courier New', monospace;
+      word-break: break-all;
+    }
+
+    .back-link {
+      display: block;
+      text-align: center;
+      margin-top: 1.25rem;
+      color: #6b7280;
+      font-size: 0.85rem;
+    }
+    .back-link a { color: #0d9488; font-weight: 500; }
+    .back-link a:hover { color: #0f766e; text-decoration: underline; }
+
+    /* --- Slug Preview --- */
+    .slug-preview {
+      font-size: 0.75rem;
+      color: #0d9488;
+      margin-top: 0.25rem;
+      word-break: break-all;
+    }
+
+    /* --- Responsive --- */
+    @media (max-width: 520px) {
+      .register-card { padding: 1.5rem; }
+      .form-row { grid-template-columns: 1fr; gap: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="register-screen">
+    <div class="register-card">
+      <!-- Header -->
+      <div class="register-header">
+        <div class="register-logo">
+          <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/>
+            <path d="M12 8v4M12 16v-2M8 12h8"/>
+            <path d="M9 9l1.5 1.5M15 9l-1.5 1.5M9 15l1.5-1.5M15 15l-1.5-1.5"/>
+          </svg>
+        </div>
+        <h1>PhysioClinic</h1>
+        <p>Register a New Clinic</p>
+      </div>
+
+      <!-- Registration Form -->
+      <form id="register-form">
+        <div class="form-group">
+          <label for="clinic-name">Clinic Name</label>
+          <input type="text" id="clinic-name" placeholder="e.g. Downtown Physiotherapy" required>
+        </div>
+
+        <div class="form-group">
+          <label for="doctor-name">Doctor Name</label>
+          <input type="text" id="doctor-name" placeholder="e.g. Dr. John Smith" required>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" placeholder="doctor@clinic.com" required>
+          </div>
+          <div class="form-group">
+            <label for="phone">Phone</label>
+            <input type="tel" id="phone" placeholder="9876543210" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="booking-slug">Booking Slug</label>
+          <input type="text" id="booking-slug" placeholder="e.g. dr-smith" required>
+          <div class="form-hint">Used for online booking URL, e.g. dr-smith</div>
+          <div class="slug-preview" id="slug-preview"></div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="username">Username</label>
+            <input type="text" id="username" placeholder="Choose a username" required autocomplete="off">
+          </div>
+          <div class="form-group" style="position:relative;">
+            <label for="password">Password</label>
+            <input type="password" id="password" placeholder="Choose a password" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="confirm-password">Confirm Password</label>
+          <input type="password" id="confirm-password" placeholder="Re-enter password" required>
+        </div>
+
+        <button type="submit" id="register-btn" class="btn btn-primary">
+          <span id="btn-text">Register Clinic</span>
+          <span id="btn-spinner" class="spinner" style="display:none;"></span>
+        </button>
+      </form>
+
+      <!-- Success State (hidden initially) -->
+      <div id="success-state" style="display:none;">
+        <div class="success-container">
+          <div class="success-icon">
+            <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 6L9 17l-5-5"/>
+            </svg>
+          </div>
+          <h2>Registration Submitted!</h2>
+          <p>Your clinic registration has been submitted and is <strong>pending admin approval</strong>. You will be able to log in once approved.</p>
+          <div class="clinic-code-box">
+            <div class="label">Your Clinic Code (save this for login)</div>
+            <div class="code" id="success-clinic-slug"></div>
+          </div>
+          <p style="font-size:0.8rem;color:#6b7280;margin-bottom:1rem;">Remember this code — you'll need it every time you log in after approval.</p>
+          <a href="index.html" class="btn btn-primary">Back to Login</a>
+        </div>
+      </div>
+
+      <div class="back-link">
+        Already have an account? <a href="index.html">Back to Login</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+
+  <script>
+    // --- Firebase Init ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyBcaymsJYlDpQ-EPF2Wtd-nYX2P6u7HQoE",
+      authDomain: "physio-clinic-4ae53.firebaseapp.com",
+      projectId: "physio-clinic-4ae53",
+      storageBucket: "physio-clinic-4ae53.firebasestorage.app",
+      messagingSenderId: "791291492733",
+      appId: "1:791291492733:web:9edaccf13df450b5513414"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // --- Toast System ---
+    function showToast(message, type) {
+      type = type || 'error';
+      var container = document.getElementById('toast-container');
+      var toast = document.createElement('div');
+      toast.className = 'toast toast-' + type;
+      toast.innerHTML = '<span class="toast-message">' + escapeHtml(message) + '</span>';
+      container.appendChild(toast);
+      setTimeout(function() {
+        toast.classList.add('removing');
+        setTimeout(function() {
+          if (toast.parentNode) toast.parentNode.removeChild(toast);
+        }, 300);
+      }, 4000);
+    }
+
+    function escapeHtml(text) {
+      var div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // --- Slug Auto-Format ---
+    var slugInput = document.getElementById('booking-slug');
+    var slugPreview = document.getElementById('slug-preview');
+
+    slugInput.addEventListener('input', function() {
+      var val = this.value
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9\-]/g, '')
+        .replace(/-{2,}/g, '-');
+      this.value = val;
+      if (val) {
+        slugPreview.textContent = 'Booking URL: .../' + val;
+      } else {
+        slugPreview.textContent = '';
+      }
+    });
+
+    // --- Form Submission ---
+    var form = document.getElementById('register-form');
+    var registerBtn = document.getElementById('register-btn');
+    var btnText = document.getElementById('btn-text');
+    var btnSpinner = document.getElementById('btn-spinner');
+
+    function setLoading(loading) {
+      registerBtn.disabled = loading;
+      btnText.textContent = loading ? 'Registering...' : 'Register Clinic';
+      btnSpinner.style.display = loading ? 'inline-block' : 'none';
+    }
+
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      var clinicName = document.getElementById('clinic-name').value.trim();
+      var doctorName = document.getElementById('doctor-name').value.trim();
+      var email = document.getElementById('email').value.trim();
+      var phone = document.getElementById('phone').value.trim();
+      var slug = document.getElementById('booking-slug').value.trim();
+      var username = document.getElementById('username').value.trim();
+      var password = document.getElementById('password').value;
+      var confirmPassword = document.getElementById('confirm-password').value;
+
+      // Validate required fields
+      if (!clinicName || !doctorName || !email || !phone || !slug || !username || !password || !confirmPassword) {
+        showToast('Please fill in all required fields.', 'error');
+        return;
+      }
+
+      // Validate email format
+      var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        showToast('Please enter a valid email address.', 'error');
+        return;
+      }
+
+      // Validate phone
+      if (!/^\d{7,15}$/.test(phone.replace(/[\s\-\+]/g, ''))) {
+        showToast('Please enter a valid phone number.', 'error');
+        return;
+      }
+
+      // Validate slug format
+      if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)) {
+        showToast('Slug must be lowercase letters, numbers, and hyphens only (e.g. dr-smith).', 'error');
+        return;
+      }
+
+      // Validate password match
+      if (password !== confirmPassword) {
+        showToast('Passwords do not match.', 'error');
+        return;
+      }
+
+      // Validate password length
+      if (password.length < 6) {
+        showToast('Password must be at least 6 characters.', 'error');
+        return;
+      }
+
+      setLoading(true);
+
+      // Check slug availability
+      db.collection('booking_slugs').doc(slug).get()
+        .then(function(doc) {
+          if (doc.exists) {
+            showToast('This booking slug is already taken. Please choose a different one.', 'error');
+            setLoading(false);
+            return Promise.reject('slug_taken');
+          }
+
+          // Generate IDs
+          var clinicId = 'c_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
+          var userId = 'u_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
+          var createdAt = new Date().toISOString();
+
+          // Build batch write
+          var batch = db.batch();
+
+          // 1. Clinic doc
+          var clinicRef = db.collection('clinics').doc(clinicId);
+          batch.set(clinicRef, {
+            id: clinicId,
+            name: clinicName,
+            ownerName: doctorName,
+            ownerEmail: email,
+            ownerPhone: phone,
+            bookingSlug: slug,
+            createdAt: createdAt,
+            status: 'pending',
+            features: {
+              billing: true,
+              messaging: true,
+              prescriptions: true,
+              exercises: true,
+              soapNotes: true,
+              bodyDiagram: true,
+              onlineBooking: true,
+              tags: true
+            }
+          });
+
+          // 2. User doc
+          var userRef = db.collection('clinics').doc(clinicId).collection('users').doc(userId);
+          batch.set(userRef, {
+            id: userId,
+            username: username,
+            password: password,
+            name: doctorName,
+            role: 'admin',
+            createdAt: createdAt
+          });
+
+          // 3. Booking slug doc
+          var slugRef = db.collection('booking_slugs').doc(slug);
+          batch.set(slugRef, {
+            clinicId: clinicId,
+            createdAt: createdAt
+          });
+
+          // 4. Default tags
+          var defaultTags = [
+            { id: 'tag1', name: 'Knee', color: '#3b82f6' },
+            { id: 'tag2', name: 'Back Pain', color: '#ef4444' },
+            { id: 'tag3', name: 'Shoulder', color: '#f59e0b' },
+            { id: 'tag4', name: 'Post-Surgery', color: '#8b5cf6' },
+            { id: 'tag5', name: 'Senior', color: '#6b7280' },
+            { id: 'tag6', name: 'Sports Injury', color: '#22c55e' },
+            { id: 'tag7', name: 'Chronic Pain', color: '#ec4899' },
+            { id: 'tag8', name: 'Neurological', color: '#06b6d4' }
+          ];
+          defaultTags.forEach(function(tag) {
+            var tagRef = db.collection('clinics').doc(clinicId).collection('tags').doc(tag.id);
+            batch.set(tagRef, tag);
+          });
+
+          // 5. Default message templates
+          var defaultTemplates = [
+            { id: 'mt1', name: 'Appointment Reminder', text: 'Hi {name}, this is a reminder about your appointment on {date} at {time}. Please arrive 10 minutes early. See you soon!' },
+            { id: 'mt2', name: 'Follow-up Reminder', text: 'Hi {name}, it\'s time for your follow-up visit. Please call us to schedule your next appointment.' },
+            { id: 'mt3', name: 'General Announcement', text: 'Hi {name}, we have an important update from PhysioClinic. Please contact us for more details.' },
+            { id: 'mt4', name: 'Exercise Reminder', text: 'Hi {name}, just a friendly reminder to keep up with your home exercise program. Consistency is key to your recovery!' }
+          ];
+          defaultTemplates.forEach(function(tpl) {
+            var tplRef = db.collection('clinics').doc(clinicId).collection('message_templates').doc(tpl.id);
+            batch.set(tplRef, tpl);
+          });
+
+          // Commit batch
+          return batch.commit().then(function() {
+            return clinicId;
+          });
+        })
+        .then(function(clinicId) {
+          if (!clinicId) return; // slug_taken case
+
+          setLoading(false);
+
+          // Show success state with the booking slug (what users type at login)
+          var usedSlug = document.getElementById('booking-slug').value.trim();
+          document.getElementById('register-form').style.display = 'none';
+          document.getElementById('success-state').style.display = 'block';
+          document.getElementById('success-clinic-slug').textContent = usedSlug;
+
+          showToast('Clinic registered successfully!', 'success');
+        })
+        .catch(function(err) {
+          if (err === 'slug_taken') return; // Already handled
+          setLoading(false);
+          console.error('Registration error:', err);
+          showToast('Registration failed: ' + (err.message || 'Unknown error. Please try again.'), 'error');
+        });
+    });
+  </script>
+</body>
+</html>

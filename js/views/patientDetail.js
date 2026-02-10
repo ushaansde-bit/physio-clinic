@@ -15,6 +15,11 @@ window.PatientDetailView = (function() {
 
     App.setPageTitle(patient.name);
     activeTab = activeTab || 'overview';
+    // Reset to overview if the active tab's feature is disabled
+    var tabFeatureMap = { exercises: 'exercises', prescriptions: 'prescriptions', billing: 'billing' };
+    if (tabFeatureMap[activeTab] && !Store.isFeatureEnabled(tabFeatureMap[activeTab])) {
+      activeTab = 'overview';
+    }
     renderDetail(container, patient);
   }
 
@@ -50,13 +55,13 @@ window.PatientDetailView = (function() {
     html += 'Print</button>';
     html += '</div></div>';
 
-    // Tabs
+    // Tabs (filtered by feature toggles)
     html += '<div class="tabs">';
     html += tabBtn('overview', 'Overview');
     html += tabBtn('sessions', 'Sessions');
-    html += tabBtn('exercises', 'Exercises');
-    html += tabBtn('prescriptions', 'Prescriptions');
-    html += tabBtn('billing', 'Billing');
+    if (Store.isFeatureEnabled('exercises')) html += tabBtn('exercises', 'Exercises');
+    if (Store.isFeatureEnabled('prescriptions')) html += tabBtn('prescriptions', 'Prescriptions');
+    if (Store.isFeatureEnabled('billing')) html += tabBtn('billing', 'Billing');
     html += '</div>';
 
     // Tab content
@@ -68,17 +73,23 @@ window.PatientDetailView = (function() {
     html += renderSessions(patient);
     html += '</div>';
 
-    html += '<div id="tab-exercises" class="tab-content' + (activeTab === 'exercises' ? ' active' : '') + '">';
-    html += renderExercises(patient);
-    html += '</div>';
+    if (Store.isFeatureEnabled('exercises')) {
+      html += '<div id="tab-exercises" class="tab-content' + (activeTab === 'exercises' ? ' active' : '') + '">';
+      html += renderExercises(patient);
+      html += '</div>';
+    }
 
-    html += '<div id="tab-prescriptions" class="tab-content' + (activeTab === 'prescriptions' ? ' active' : '') + '">';
-    html += renderPrescriptions(patient);
-    html += '</div>';
+    if (Store.isFeatureEnabled('prescriptions')) {
+      html += '<div id="tab-prescriptions" class="tab-content' + (activeTab === 'prescriptions' ? ' active' : '') + '">';
+      html += renderPrescriptions(patient);
+      html += '</div>';
+    }
 
-    html += '<div id="tab-billing" class="tab-content' + (activeTab === 'billing' ? ' active' : '') + '">';
-    html += renderBilling(patient);
-    html += '</div>';
+    if (Store.isFeatureEnabled('billing')) {
+      html += '<div id="tab-billing" class="tab-content' + (activeTab === 'billing' ? ' active' : '') + '">';
+      html += renderBilling(patient);
+      html += '</div>';
+    }
 
     container.innerHTML = html;
     bindEvents(container, patient);
@@ -113,7 +124,8 @@ window.PatientDetailView = (function() {
     html += infoItem('Notes', patient.notes);
     html += '</div></div></div>';
 
-    // Affected Body Areas (body diagram)
+    // Affected Body Areas (body diagram) - only if feature enabled
+    if (Store.isFeatureEnabled('bodyDiagram')) {
     html += '<div class="card mb-2"><div class="card-header"><h3>Affected Body Areas</h3></div><div class="card-body body-diagram-card">';
     if (patient.bodyRegions && patient.bodyRegions.length > 0) {
       // Color version (screen only)
@@ -129,6 +141,7 @@ window.PatientDetailView = (function() {
       html += '<p style="color:var(--gray-400);font-size:0.85rem;">No areas marked</p>';
     }
     html += '</div></div>';
+    } // end bodyDiagram feature check
 
     // Progress snapshot
     var sessions = Store.getSessionsByPatient(patient.id);
@@ -1053,20 +1066,22 @@ window.PatientDetailView = (function() {
     body += '<input type="number" name="functionScore" min="0" max="10" value="' + (session ? session.functionScore : '5') + '" required></div>';
     body += '</div>';
     body += '<div class="form-group"><label>Subjective ' + Utils.micHtml('sf-subjective') + '</label>';
-    body += '<textarea id="sf-subjective" name="subjective" rows="3" placeholder="Patient report, symptoms, functional status...">' + Utils.escapeHtml(session ? session.subjective || '' : '') + '</textarea></div>';
+    body += '<textarea id="sf-subjective" name="subjective" rows="3" data-ac="subjective" placeholder="Patient report, symptoms, functional status...">' + Utils.escapeHtml(session ? session.subjective || '' : '') + '</textarea></div>';
     body += '<div class="form-group"><label>Objective ' + Utils.micHtml('sf-objective') + '</label>';
-    body += '<textarea id="sf-objective" name="objective" rows="3" placeholder="Measurements, ROM, strength, observations...">' + Utils.escapeHtml(session ? session.objective || '' : '') + '</textarea></div>';
+    body += '<textarea id="sf-objective" name="objective" rows="3" data-ac="objective" placeholder="Measurements, ROM, strength, observations...">' + Utils.escapeHtml(session ? session.objective || '' : '') + '</textarea></div>';
     body += '<div class="form-group"><label>Assessment ' + Utils.micHtml('sf-assessment') + '</label>';
-    body += '<textarea id="sf-assessment" name="assessment" rows="3" placeholder="Clinical reasoning, progress, prognosis...">' + Utils.escapeHtml(session ? session.assessment || '' : '') + '</textarea></div>';
+    body += '<textarea id="sf-assessment" name="assessment" rows="3" data-ac="assessment" placeholder="Clinical reasoning, progress, prognosis...">' + Utils.escapeHtml(session ? session.assessment || '' : '') + '</textarea></div>';
     body += '<div class="form-group"><label>Plan ' + Utils.micHtml('sf-plan') + '</label>';
-    body += '<textarea id="sf-plan" name="plan" rows="3" placeholder="Treatment plan, goals, next steps...">' + Utils.escapeHtml(session ? session.plan || '' : '') + '</textarea></div>';
+    body += '<textarea id="sf-plan" name="plan" rows="3" data-ac="plan" placeholder="Treatment plan, goals, next steps...">' + Utils.escapeHtml(session ? session.plan || '' : '') + '</textarea></div>';
     body += '</form>';
 
     var footer = '<button class="btn btn-secondary" id="modal-cancel">Cancel</button>';
     footer += '<button class="btn btn-primary" id="modal-save">Save Session</button>';
 
     Utils.showModal(title, body, footer, { large: true });
-    Utils.bindMicButtons(document.getElementById('modal-body'));
+    var modalBody = document.getElementById('modal-body');
+    Utils.bindMicButtons(modalBody);
+    Utils.bindAllAutocomplete(modalBody);
 
     document.getElementById('modal-cancel').onclick = Utils.closeModal;
     document.getElementById('modal-save').onclick = function() {

@@ -519,6 +519,7 @@ table.data-table { width: 100%; }
 .badge-warning { background: #fef3c7; color: #b45309; }
 .badge-danger { background: #fee2e2; color: #dc2626; }
 .badge-info { background: #dbeafe; color: #2563eb; }
+.badge-primary { background: #f0fdfa; color: #0d9488; }
 .badge-gray { background: var(--gray-100); color: var(--gray-600); }
 .badge-teal { background: var(--primary-100); color: var(--primary-dark); }
 
@@ -1765,4 +1766,55 @@ table.data-table { width: 100%; }
     print-color-adjust: exact;
   }
   .print-body-list { display: block !important; }
+}
+
+/* ============================================
+   Toggle Switch (Settings Feature Toggles)
+   ============================================ */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 26px;
+  flex-shrink: 0;
+}
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #ccc;
+  border-radius: 26px;
+  transition: background-color 0.3s ease;
+}
+.toggle-switch input:checked + .toggle-slider {
+  background-color: var(--primary, #0d9488);
+}
+.toggle-knob {
+  position: absolute;
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  border-radius: 50%;
+  transition: left 0.3s ease;
+  pointer-events: none;
+}
+.toggle-switch input:checked ~ .toggle-knob {
+  left: 25px;
+}
+.settings-toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+.settings-toggle-row:last-child {
+  border-bottom: none;
 }

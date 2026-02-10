@@ -1,9 +1,17 @@
 /* ============================================
    Store - localStorage CRUD + Seed Data
+   Multi-tenant: keys scoped by clinicId
    ============================================ */
 window.Store = (function() {
 
-  var KEYS = {
+  // Dynamic key scoped to current clinic
+  function KEY(name) {
+    var cid = sessionStorage.getItem('physio_clinicId') || 'default';
+    return 'physio_' + cid + '_' + name;
+  }
+
+  // Legacy static keys (used during migration check only)
+  var LEGACY_KEYS = {
     users: 'physio_users',
     patients: 'physio_patients',
     appointments: 'physio_appointments',
@@ -16,6 +24,57 @@ window.Store = (function() {
     messageLog: 'physio_message_log',
     prescriptions: 'physio_prescriptions'
   };
+
+  // Property-style accessor that returns scoped keys
+  var KEYS = {
+    get users() { return KEY('users'); },
+    get patients() { return KEY('patients'); },
+    get appointments() { return KEY('appointments'); },
+    get sessions() { return KEY('sessions'); },
+    get exercises() { return KEY('exercises'); },
+    get billing() { return KEY('billing'); },
+    get activity() { return KEY('activity_log'); },
+    get tags() { return KEY('tags'); },
+    get messageTemplates() { return KEY('message_templates'); },
+    get messageLog() { return KEY('message_log'); },
+    get prescriptions() { return KEY('prescriptions'); }
+  };
+
+  // --- Clinic Settings ---
+  function getClinicSettings() {
+    var cid = sessionStorage.getItem('physio_clinicId') || 'default';
+    try {
+      return JSON.parse(localStorage.getItem('physio_clinic_' + cid)) || {};
+    } catch(e) { return {}; }
+  }
+
+  function saveClinicSettings(settings) {
+    var cid = sessionStorage.getItem('physio_clinicId') || 'default';
+    localStorage.setItem('physio_clinic_' + cid, JSON.stringify(settings));
+    // Sync to Firestore
+    if (window.FirebaseSync && FirebaseSync.saveClinicDoc) {
+      FirebaseSync.saveClinicDoc(settings);
+    }
+  }
+
+  function isFeatureEnabled(featureName) {
+    var settings = getClinicSettings();
+    if (!settings.features) return true; // all enabled by default
+    return settings.features[featureName] !== false;
+  }
+
+  function getDefaultFeatures() {
+    return {
+      billing: true,
+      messaging: true,
+      prescriptions: true,
+      exercises: true,
+      soapNotes: true,
+      bodyDiagram: true,
+      onlineBooking: true,
+      tags: true
+    };
+  }
 
   // --- Generic CRUD ---
   function getAll(key) {
@@ -227,7 +286,24 @@ window.Store = (function() {
 
     // Seed & Migrate
     seed: seed,
-    migrate: migrate
+    migrate: migrate,
+
+    // Generic CRUD (used by settings for users)
+    create: create,
+    update: update,
+    remove: remove,
+    getAll: getAll,
+
+    // Multi-tenant helpers
+    KEY: KEY,
+    KEYS: KEYS,
+    LEGACY_KEYS: LEGACY_KEYS,
+    getClinicSettings: getClinicSettings,
+    saveClinicSettings: saveClinicSettings,
+    isFeatureEnabled: isFeatureEnabled,
+    getDefaultFeatures: getDefaultFeatures,
+    getClinicId: function() { return sessionStorage.getItem('physio_clinicId') || 'default'; },
+    setClinicId: function(id) { sessionStorage.setItem('physio_clinicId', id); }
   };
 
   // --- Migration for existing installs ---
