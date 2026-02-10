@@ -312,6 +312,260 @@ window.Utils = (function() {
     }
   }
 
+  // ==================== AUTOCOMPLETE ====================
+  // Lightweight autocomplete for textareas/inputs
+  // Usage: Utils.bindAutocomplete(element, 'subjective')
+  function bindAutocomplete(el, context) {
+    if (!el || !window.PhysioTerms) return;
+    var terms = PhysioTerms.getTerms(context);
+    if (!terms || terms.length === 0) return;
+
+    var dropdown = null;
+    var selectedIdx = -1;
+    var visible = false;
+    var items = [];
+
+    function createDropdown() {
+      dropdown = document.createElement('div');
+      dropdown.className = 'ac-dropdown';
+      dropdown.style.cssText = 'position:absolute;z-index:9999;background:#fff;border:1px solid #d1d5db;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.12);max-height:200px;overflow-y:auto;display:none;width:100%;font-size:0.85rem;';
+      // Position relative to parent
+      var wrapper = el.parentNode;
+      if (wrapper) {
+        wrapper.style.position = 'relative';
+        wrapper.appendChild(dropdown);
+      }
+      return dropdown;
+    }
+
+    function show(matches) {
+      if (!dropdown) createDropdown();
+      if (matches.length === 0) { hide(); return; }
+      items = matches.slice(0, 8);
+      selectedIdx = -1;
+      var html = '';
+      for (var i = 0; i < items.length; i++) {
+        html += '<div class="ac-item" data-idx="' + i + '" style="padding:6px 10px;cursor:pointer;border-bottom:1px solid #f3f4f6;transition:background 0.1s;">' + escapeHtml(items[i]) + '</div>';
+      }
+      dropdown.innerHTML = html;
+      dropdown.style.display = 'block';
+      visible = true;
+
+      // Bind click on items
+      var itemEls = dropdown.querySelectorAll('.ac-item');
+      for (var j = 0; j < itemEls.length; j++) {
+        (function(itemEl) {
+          itemEl.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            selectItem(parseInt(itemEl.getAttribute('data-idx')));
+          });
+          itemEl.addEventListener('mouseenter', function() {
+            clearHighlight();
+            itemEl.style.background = '#f0fdfa';
+          });
+          itemEl.addEventListener('mouseleave', function() {
+            itemEl.style.background = '';
+          });
+        })(itemEls[j]);
+      }
+    }
+
+    function hide() {
+      if (dropdown) dropdown.style.display = 'none';
+      visible = false;
+      selectedIdx = -1;
+      items = [];
+    }
+
+    function clearHighlight() {
+      if (!dropdown) return;
+      var all = dropdown.querySelectorAll('.ac-item');
+      for (var i = 0; i < all.length; i++) all[i].style.background = '';
+    }
+
+    function highlight(idx) {
+      clearHighlight();
+      if (idx < 0 || idx >= items.length) return;
+      var el = dropdown.querySelector('[data-idx="' + idx + '"]');
+      if (el) {
+        el.style.background = '#f0fdfa';
+        el.scrollIntoView({ block: 'nearest' });
+      }
+    }
+
+    function selectItem(idx) {
+      if (idx < 0 || idx >= items.length) return;
+      var text = items[idx];
+      // Get current cursor position and find the word being typed
+      var val = el.value;
+      var cursorPos = el.selectionStart || val.length;
+
+      // Find the start of the current line or after last newline
+      var lineStart = val.lastIndexOf('\n', cursorPos - 1) + 1;
+      var lineText = val.substring(lineStart, cursorPos);
+
+      // Find what the user was typing (last segment after comma, period, or newline)
+      var lastSep = Math.max(lineText.lastIndexOf(','), lineText.lastIndexOf('.'), lineText.lastIndexOf(';'));
+      var typingStart = lastSep >= 0 ? lineStart + lastSep + 1 : lineStart;
+
+      // Trim leading space from typing start
+      while (typingStart < cursorPos && val[typingStart] === ' ') typingStart++;
+
+      // Replace the typed portion with the selected term
+      var before = val.substring(0, typingStart);
+      var after = val.substring(cursorPos);
+      el.value = before + text + after;
+
+      // Position cursor after inserted text
+      var newPos = typingStart + text.length;
+      el.setSelectionRange(newPos, newPos);
+      el.focus();
+      el.dispatchEvent(new Event('input'));
+      hide();
+    }
+
+    function getTypingText() {
+      var val = el.value;
+      var cursorPos = el.selectionStart || val.length;
+      var lineStart = val.lastIndexOf('\n', cursorPos - 1) + 1;
+      var lineText = val.substring(lineStart, cursorPos);
+      var lastSep = Math.max(lineText.lastIndexOf(','), lineText.lastIndexOf('.'), lineText.lastIndexOf(';'));
+      var typing = lastSep >= 0 ? lineText.substring(lastSep + 1).trim() : lineText.trim();
+      return typing;
+    }
+
+    el.addEventListener('input', function() {
+      var typing = getTypingText();
+      if (typing.length < 2) { hide(); return; }
+
+      var q = typing.toLowerCase();
+      var matches = [];
+      for (var i = 0; i < terms.length; i++) {
+        if (terms[i].toLowerCase().indexOf(q) !== -1) {
+          matches.push(terms[i]);
+        }
+        if (matches.length >= 8) break;
+      }
+      show(matches);
+    });
+
+    el.addEventListener('keydown', function(e) {
+      if (!visible) return;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        selectedIdx = Math.min(selectedIdx + 1, items.length - 1);
+        highlight(selectedIdx);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        selectedIdx = Math.max(selectedIdx - 1, 0);
+        highlight(selectedIdx);
+      } else if (e.key === 'Enter' && selectedIdx >= 0) {
+        e.preventDefault();
+        selectItem(selectedIdx);
+      } else if (e.key === 'Escape') {
+        hide();
+      } else if (e.key === 'Tab' && selectedIdx >= 0) {
+        e.preventDefault();
+        selectItem(selectedIdx);
+      }
+    });
+
+    el.addEventListener('blur', function() {
+      setTimeout(hide, 150);
+    });
+  }
+
+  // Bind autocomplete to all elements with data-ac attribute within a parent
+  function bindAllAutocomplete(parentEl) {
+    if (!window.PhysioTerms) return;
+    var els = (parentEl || document).querySelectorAll('[data-ac]');
+    for (var i = 0; i < els.length; i++) {
+      var context = els[i].getAttribute('data-ac');
+      bindAutocomplete(els[i], context);
+    }
+  }
+
+  // ==================== DOB PICKER ====================
+  // Generates Day/Month/Year dropdown HTML
+  function dobPickerHtml(selectedDate) {
+    var day = '', month = '', year = '';
+    if (selectedDate) {
+      var parts = selectedDate.split('-');
+      if (parts.length === 3) {
+        year = parts[0];
+        month = parts[1];
+        day = parts[2];
+      }
+    }
+
+    var html = '<div class="dob-picker" style="display:grid;grid-template-columns:1fr 1.4fr 1fr;gap:6px;">';
+
+    // Day
+    html += '<select name="dob_day" class="dob-sel" style="width:100%;">';
+    html += '<option value="">Day</option>';
+    for (var d = 1; d <= 31; d++) {
+      var dStr = d < 10 ? '0' + d : '' + d;
+      html += '<option value="' + dStr + '"' + (day === dStr ? ' selected' : '') + '>' + d + '</option>';
+    }
+    html += '</select>';
+
+    // Month
+    var monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    html += '<select name="dob_month" class="dob-sel" style="width:100%;">';
+    html += '<option value="">Month</option>';
+    for (var m = 0; m < 12; m++) {
+      var mStr = (m + 1) < 10 ? '0' + (m + 1) : '' + (m + 1);
+      html += '<option value="' + mStr + '"' + (month === mStr ? ' selected' : '') + '>' + monthNames[m] + '</option>';
+    }
+    html += '</select>';
+
+    // Year (current year down to 1920)
+    var currentYear = new Date().getFullYear();
+    html += '<select name="dob_year" class="dob-sel" style="width:100%;">';
+    html += '<option value="">Year</option>';
+    for (var y = currentYear; y >= 1920; y--) {
+      html += '<option value="' + y + '"' + (year === '' + y ? ' selected' : '') + '>' + y + '</option>';
+    }
+    html += '</select>';
+
+    html += '</div>';
+    // Hidden input for the actual date value
+    html += '<input type="hidden" name="dob" value="' + escapeHtml(selectedDate || '') + '">';
+
+    return html;
+  }
+
+  // Bind DOB picker change events to update the hidden input
+  function bindDobPicker(parentEl) {
+    var selects = (parentEl || document).querySelectorAll('.dob-sel');
+    for (var i = 0; i < selects.length; i++) {
+      selects[i].addEventListener('change', function() {
+        var container = this.closest('.form-group') || this.parentNode.parentNode;
+        var dayEl = container.querySelector('[name="dob_day"]');
+        var monthEl = container.querySelector('[name="dob_month"]');
+        var yearEl = container.querySelector('[name="dob_year"]');
+        var hiddenEl = container.querySelector('[name="dob"]');
+        if (dayEl && monthEl && yearEl && hiddenEl) {
+          var d = dayEl.value;
+          var m = monthEl.value;
+          var y = yearEl.value;
+          if (d && m && y) {
+            hiddenEl.value = y + '-' + m + '-' + d;
+          } else {
+            hiddenEl.value = '';
+          }
+          // Update age display if present
+          var ageEl = container.querySelector('.dob-age');
+          if (ageEl && hiddenEl.value) {
+            ageEl.textContent = 'Age: ' + calculateAge(hiddenEl.value);
+          } else if (ageEl) {
+            ageEl.textContent = '';
+          }
+        }
+      });
+    }
+  }
+
   return {
     generateId: generateId,
     formatDate: formatDate,
@@ -342,6 +596,10 @@ window.Utils = (function() {
     addDays: addDays,
     toDateString: toDateString,
     micHtml: micHtml,
-    bindMicButtons: bindMicButtons
+    bindMicButtons: bindMicButtons,
+    bindAutocomplete: bindAutocomplete,
+    bindAllAutocomplete: bindAllAutocomplete,
+    dobPickerHtml: dobPickerHtml,
+    bindDobPicker: bindDobPicker
   };
 })();

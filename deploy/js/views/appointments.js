@@ -12,7 +12,7 @@ window.AppointmentsView = (function() {
     statusFilter: '',
     typeFilter: '',
     page: 1,
-    perPage: 15,
+    perPage: 10,
     calMonth: new Date().getMonth(),
     calYear: new Date().getFullYear(),
     weekStart: Utils.getWeekStart(new Date())

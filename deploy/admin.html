@@ -1,0 +1,1445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PhysioClinic - Super Admin</title>
+  <style>
+    /* --- Reset & Base --- */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 14px; -webkit-font-smoothing: antialiased; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      color: #1f2937;
+      line-height: 1.5;
+      overflow-x: hidden;
+      background: #f3f4f6;
+    }
+    a { color: #0d9488; text-decoration: none; }
+    a:hover { color: #0f766e; }
+    input, select, textarea, button { font-family: inherit; font-size: inherit; }
+
+    /* --- Login Screen --- */
+    .login-screen {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #0d9488 0%, #0e7490 50%, #1e40af 100%);
+      padding: 1rem;
+    }
+    .login-card {
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 10px 15px rgba(0,0,0,0.1), 0 4px 6px rgba(0,0,0,0.05);
+      padding: 2.5rem;
+      width: 100%;
+      max-width: 420px;
+    }
+    .login-header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    .login-logo { color: #0d9488; margin-bottom: 0.75rem; }
+    .login-header h1 { font-size: 1.75rem; color: #111827; }
+    .login-header p { color: #6b7280; font-size: 0.9rem; margin-top: 0.25rem; }
+
+    /* --- Dashboard --- */
+    .dashboard { display: none; min-height: 100vh; }
+    .dash-header {
+      background: linear-gradient(135deg, #0d9488 0%, #0e7490 50%, #1e40af 100%);
+      color: #fff;
+      padding: 1.25rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .dash-header h1 { font-size: 1.35rem; font-weight: 600; }
+    .dash-header-actions { display: flex; gap: 0.5rem; align-items: center; }
+
+    .dash-body { padding: 1.5rem 2rem; max-width: 1200px; margin: 0 auto; }
+
+    /* --- Stats Bar --- */
+    .stats-bar {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .stat-card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 1.25rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #0d9488;
+      line-height: 1.2;
+    }
+    .stat-label {
+      font-size: 0.8rem;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-top: 0.25rem;
+    }
+
+    /* --- Toolbar --- */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+    .toolbar h2 { font-size: 1.1rem; color: #374151; }
+
+    /* --- Clinic Cards --- */
+    .clinic-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 1rem;
+    }
+    .clinic-card {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      overflow: hidden;
+      transition: box-shadow 0.2s;
+    }
+    .clinic-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .clinic-card-header {
+      padding: 1rem 1.25rem 0.75rem;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .clinic-name {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #111827;
+      margin-bottom: 0.15rem;
+    }
+    .clinic-meta {
+      font-size: 0.78rem;
+      color: #9ca3af;
+    }
+    .clinic-meta span { margin-right: 1rem; }
+    .clinic-card-body { padding: 0.75rem 1.25rem; }
+    .clinic-stats-row {
+      display: flex;
+      gap: 1.25rem;
+      margin-bottom: 0.5rem;
+    }
+    .clinic-stat {
+      font-size: 0.8rem;
+      color: #6b7280;
+    }
+    .clinic-stat strong {
+      color: #111827;
+      font-weight: 600;
+    }
+
+    /* --- Feature Badges --- */
+    .feature-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.3rem;
+      margin-bottom: 0.5rem;
+    }
+    .feature-badge {
+      font-size: 0.68rem;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      font-weight: 500;
+      text-transform: capitalize;
+    }
+    .feature-badge.on { background: #f0fdf4; color: #16a34a; }
+    .feature-badge.off { background: #fef2f2; color: #dc2626; text-decoration: line-through; }
+
+    /* --- Card Actions --- */
+    .clinic-card-actions {
+      padding: 0.75rem 1.25rem;
+      border-top: 1px solid #f3f4f6;
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    /* --- Feature Editor --- */
+    .feature-editor {
+      display: none;
+      padding: 0.75rem 1.25rem 1rem;
+      border-top: 1px solid #f3f4f6;
+      background: #f9fafb;
+    }
+    .feature-editor.open { display: block; }
+    .feature-toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.35rem 0;
+    }
+    .feature-toggle-row label {
+      font-size: 0.82rem;
+      color: #374151;
+      text-transform: capitalize;
+    }
+    /* Toggle Switch */
+    .toggle {
+      position: relative;
+      width: 36px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: #d1d5db;
+      border-radius: 20px;
+      transition: 0.2s;
+    }
+    .toggle-slider::before {
+      content: '';
+      position: absolute;
+      width: 16px; height: 16px;
+      left: 2px; bottom: 2px;
+      background: #fff;
+      border-radius: 50%;
+      transition: 0.2s;
+    }
+    .toggle input:checked + .toggle-slider { background: #0d9488; }
+    .toggle input:checked + .toggle-slider::before { transform: translateX(16px); }
+
+    /* --- Form Elements --- */
+    .form-group { margin-bottom: 1rem; }
+    .form-group label {
+      display: block;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 0.35rem;
+      font-size: 0.85rem;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 0.6rem 0.75rem;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      background: #ffffff;
+      color: #1f2937;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .form-group input:focus {
+      outline: none;
+      border-color: #0d9488;
+      box-shadow: 0 0 0 3px rgba(13,148,136,0.1);
+    }
+    .form-group .form-hint {
+      font-size: 0.75rem;
+      color: #9ca3af;
+      margin-top: 0.25rem;
+    }
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+    .slug-preview {
+      font-size: 0.75rem;
+      color: #0d9488;
+      margin-top: 0.25rem;
+      word-break: break-all;
+    }
+
+    /* --- Buttons --- */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.5rem 0.85rem;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-size: 0.8rem;
+      white-space: nowrap;
+      justify-content: center;
+    }
+    .btn-primary { background: #0d9488; color: #ffffff; }
+    .btn-primary:hover { background: #0f766e; }
+    .btn-primary:disabled { background: #99f6e4; cursor: not-allowed; }
+    .btn-secondary { background: #fff; color: #374151; border-color: #d1d5db; }
+    .btn-secondary:hover { background: #f9fafb; }
+    .btn-sm { padding: 0.35rem 0.65rem; font-size: 0.75rem; }
+    .btn-ghost { background: transparent; color: #fff; border-color: rgba(255,255,255,0.3); }
+    .btn-ghost:hover { background: rgba(255,255,255,0.1); }
+    .btn-danger-ghost { background: transparent; color: #ef4444; border-color: #fca5a5; }
+    .btn-danger-ghost:hover { background: #fef2f2; }
+    .btn-block { width: 100%; }
+
+    /* --- Spinner --- */
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #ffffff;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+    .spinner-dark {
+      border-color: rgba(0,0,0,0.1);
+      border-top-color: #0d9488;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* --- Modal --- */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+      width: 100%;
+      max-width: 480px;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 2rem;
+      animation: modalIn 0.2s ease;
+    }
+    @keyframes modalIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+    .modal-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #111827;
+      margin-bottom: 1.25rem;
+    }
+    .modal-footer {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: flex-end;
+      margin-top: 1.25rem;
+    }
+
+    /* --- Toast Notifications --- */
+    .toast-container {
+      position: fixed;
+      top: 1rem; right: 1rem;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .toast {
+      background: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.06);
+      padding: 0.75rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      min-width: 280px;
+      max-width: 400px;
+      border-left: 4px solid #d1d5db;
+      animation: toastIn 0.3s ease;
+    }
+    .toast-success { border-left-color: #22c55e; }
+    .toast-error { border-left-color: #ef4444; }
+    .toast-message { flex: 1; font-size: 0.85rem; color: #374151; }
+    .toast.removing { animation: toastOut 0.3s ease forwards; }
+    @keyframes toastIn { from { opacity: 0; transform: translateX(100%); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes toastOut { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(100%); } }
+
+    /* --- Loading --- */
+    .loading-center {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem;
+      color: #9ca3af;
+      font-size: 0.9rem;
+      gap: 0.5rem;
+    }
+
+    /* --- Empty State --- */
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: #9ca3af;
+    }
+    .empty-state p { margin-bottom: 1rem; }
+
+    /* --- Booking URL Row --- */
+    .booking-url-row {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin-bottom: 0.6rem;
+      background: #f0fdfa;
+      border: 1px solid #ccfbf1;
+      border-radius: 6px;
+      padding: 0.4rem 0.6rem;
+    }
+    .booking-url-row .url-text {
+      flex: 1;
+      font-size: 0.75rem;
+      color: #0d9488;
+      font-family: 'Courier New', monospace;
+      word-break: break-all;
+      min-width: 0;
+    }
+    .booking-url-row .btn-icon {
+      background: none;
+      border: 1px solid #99f6e4;
+      border-radius: 5px;
+      padding: 0.25rem 0.4rem;
+      cursor: pointer;
+      color: #0d9488;
+      font-size: 0.7rem;
+      white-space: nowrap;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+    .booking-url-row .btn-icon:hover { background: #ccfbf1; }
+
+    /* --- Pending Card --- */
+    .pending-card {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      border-left: 4px solid #f59e0b;
+      padding: 1rem 1.25rem;
+    }
+    .pending-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 0.5rem;
+    }
+    .pending-card .clinic-name { font-size: 1rem; font-weight: 600; color: #111827; }
+    .pending-card .clinic-meta { font-size: 0.78rem; color: #9ca3af; margin-top: 0.15rem; }
+    .pending-card-details {
+      font-size: 0.82rem;
+      color: #6b7280;
+      margin-bottom: 0.75rem;
+    }
+    .pending-card-details span { margin-right: 1rem; }
+    .pending-badge {
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      background: #fef3c7;
+      color: #b45309;
+    }
+    .pending-actions { display: flex; gap: 0.5rem; }
+    .btn-approve { background: #22c55e; color: #fff; border-color: #22c55e; }
+    .btn-approve:hover { background: #16a34a; }
+    .btn-reject { background: #fff; color: #ef4444; border-color: #fca5a5; }
+    .btn-reject:hover { background: #fef2f2; }
+
+    /* --- Status Badge for Cards --- */
+    .status-badge {
+      font-size: 0.68rem;
+      font-weight: 600;
+      padding: 0.12rem 0.4rem;
+      border-radius: 4px;
+      margin-left: 0.5rem;
+    }
+    .status-approved { background: #dcfce7; color: #15803d; }
+    .status-rejected { background: #fee2e2; color: #dc2626; }
+
+    /* --- Responsive --- */
+    @media (max-width: 640px) {
+      .dash-header { padding: 1rem; }
+      .dash-body { padding: 1rem; }
+      .stats-bar { grid-template-columns: 1fr; }
+      .clinic-grid { grid-template-columns: 1fr; }
+      .form-row { grid-template-columns: 1fr; gap: 0; }
+      .login-card { padding: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ====== LOGIN SCREEN ====== -->
+  <div id="login-screen" class="login-screen">
+    <div class="login-card">
+      <div class="login-header">
+        <div class="login-logo">
+          <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/>
+            <path d="M12 8v4M12 16v-2M8 12h8"/>
+            <path d="M9 9l1.5 1.5M15 9l-1.5 1.5M9 15l1.5-1.5M15 15l-1.5-1.5"/>
+          </svg>
+        </div>
+        <h1>PhysioClinic</h1>
+        <p id="login-subtitle">Super Admin Panel</p>
+      </div>
+
+      <!-- Set Password Form (first visit) -->
+      <form id="setup-form" style="display:none;">
+        <p style="font-size:0.85rem;color:#6b7280;margin-bottom:1rem;">No master password set yet. Create one to get started.</p>
+        <div class="form-group">
+          <label for="setup-pw">Master Password</label>
+          <input type="password" id="setup-pw" placeholder="Choose a master password" required>
+        </div>
+        <div class="form-group">
+          <label for="setup-pw-confirm">Confirm Password</label>
+          <input type="password" id="setup-pw-confirm" placeholder="Confirm password" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" id="setup-btn">
+          <span id="setup-btn-text">Set Master Password</span>
+          <span id="setup-btn-spinner" class="spinner" style="display:none;"></span>
+        </button>
+      </form>
+
+      <!-- Login Form -->
+      <form id="login-form" style="display:none;">
+        <div class="form-group">
+          <label for="login-pw">Master Password</label>
+          <input type="password" id="login-pw" placeholder="Enter master password" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" id="login-btn">
+          <span id="login-btn-text">Sign In</span>
+          <span id="login-btn-spinner" class="spinner" style="display:none;"></span>
+        </button>
+      </form>
+
+      <!-- Loading state while checking Firestore -->
+      <div id="login-loading" class="loading-center">
+        <span class="spinner spinner-dark"></span> Checking...
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== DASHBOARD ====== -->
+  <div id="dashboard" class="dashboard">
+    <div class="dash-header">
+      <h1>PhysioClinic Admin</h1>
+      <div class="dash-header-actions">
+        <button class="btn btn-ghost btn-sm" onclick="openCreateModal()">+ New Clinic</button>
+        <button class="btn btn-ghost btn-sm" onclick="logout()">Logout</button>
+      </div>
+    </div>
+    <div class="dash-body">
+      <!-- Stats -->
+      <div class="stats-bar">
+        <div class="stat-card">
+          <div class="stat-value" id="stat-clinics">-</div>
+          <div class="stat-label">Total Clinics</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-patients">-</div>
+          <div class="stat-label">Total Patients</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-users">-</div>
+          <div class="stat-label">Total Users</div>
+        </div>
+      </div>
+
+      <!-- Pending Approvals -->
+      <div id="pending-section" style="display:none;">
+        <div class="toolbar">
+          <h2 style="color:#b45309;">Pending Approvals <span id="pending-count" style="background:#fef3c7;color:#b45309;font-size:0.75rem;padding:2px 8px;border-radius:10px;margin-left:6px;">0</span></h2>
+        </div>
+        <div id="pending-list" class="clinic-grid" style="margin-bottom:1.5rem;"></div>
+      </div>
+
+      <!-- Toolbar -->
+      <div class="toolbar">
+        <h2>Active Clinics</h2>
+        <button class="btn btn-primary btn-sm" onclick="openCreateModal()">+ New Clinic</button>
+      </div>
+
+      <!-- Clinic List -->
+      <div id="clinic-list">
+        <div class="loading-center">
+          <span class="spinner spinner-dark"></span> Loading clinics...
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== CREATE CLINIC MODAL ====== -->
+  <div id="create-modal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-title">Create New Clinic</div>
+      <form id="create-form">
+        <div class="form-group">
+          <label for="c-clinic-name">Clinic Name</label>
+          <input type="text" id="c-clinic-name" placeholder="e.g. Downtown Physiotherapy" required>
+        </div>
+        <div class="form-group">
+          <label for="c-doctor-name">Doctor Name</label>
+          <input type="text" id="c-doctor-name" placeholder="e.g. Dr. John Smith" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="c-email">Email</label>
+            <input type="email" id="c-email" placeholder="doctor@clinic.com" required>
+          </div>
+          <div class="form-group">
+            <label for="c-phone">Phone</label>
+            <input type="tel" id="c-phone" placeholder="9876543210" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="c-slug">Booking Slug</label>
+          <input type="text" id="c-slug" placeholder="e.g. dr-smith" required>
+          <div class="form-hint">Used for online booking URL</div>
+          <div class="slug-preview" id="c-slug-preview"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="c-username">Username</label>
+            <input type="text" id="c-username" placeholder="Admin username" required autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label for="c-password">Password</label>
+            <input type="password" id="c-password" placeholder="Admin password" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeCreateModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="create-btn">
+            <span id="create-btn-text">Create Clinic</span>
+            <span id="create-btn-spinner" class="spinner" style="display:none;"></span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ====== DELETE CONFIRMATION MODAL ====== -->
+  <div id="delete-modal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-title" style="color:#dc2626;">Delete Clinic</div>
+      <p style="font-size:0.9rem;color:#374151;margin-bottom:0.75rem;">
+        Are you sure you want to delete <strong id="delete-clinic-name"></strong>?
+      </p>
+      <p style="font-size:0.82rem;color:#ef4444;margin-bottom:1rem;">
+        This will permanently remove the clinic, all its patients, appointments, users, and data. This cannot be undone.
+      </p>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+        <button type="button" class="btn btn-sm" id="delete-confirm-btn" onclick="executeDeleteClinic()" style="background:#dc2626;color:#fff;border-color:#dc2626;">
+          <span id="delete-btn-text">Yes, Delete</span>
+          <span id="delete-btn-spinner" class="spinner" style="display:none;"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+
+  <script>
+    // --- Firebase Init ---
+    var firebaseConfig = {
+      apiKey: "AIzaSyBcaymsJYlDpQ-EPF2Wtd-nYX2P6u7HQoE",
+      authDomain: "physio-clinic-4ae53.firebaseapp.com",
+      projectId: "physio-clinic-4ae53",
+      storageBucket: "physio-clinic-4ae53.firebasestorage.app",
+      messagingSenderId: "791291492733",
+      appId: "1:791291492733:web:9edaccf13df450b5513414"
+    };
+    firebase.initializeApp(firebaseConfig);
+    var db = firebase.firestore();
+
+    // --- Helpers ---
+    function escapeHtml(text) {
+      var div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function showToast(message, type) {
+      type = type || 'error';
+      var container = document.getElementById('toast-container');
+      var toast = document.createElement('div');
+      toast.className = 'toast toast-' + type;
+      toast.innerHTML = '<span class="toast-message">' + escapeHtml(message) + '</span>';
+      container.appendChild(toast);
+      setTimeout(function() {
+        toast.classList.add('removing');
+        setTimeout(function() {
+          if (toast.parentNode) toast.parentNode.removeChild(toast);
+        }, 300);
+      }, 4000);
+    }
+
+    function formatDate(iso) {
+      if (!iso) return '-';
+      var d = new Date(iso);
+      return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+
+    // Feature key labels
+    var FEATURE_KEYS = ['billing', 'messaging', 'prescriptions', 'exercises', 'soapNotes', 'bodyDiagram', 'onlineBooking', 'tags'];
+
+    // =============================================
+    // AUTH
+    // =============================================
+    var isAuthenticated = false;
+
+    function checkAuth() {
+      if (sessionStorage.getItem('physio_super_admin') === '1') {
+        isAuthenticated = true;
+        showDashboard();
+        return;
+      }
+
+      // Check if super_admin doc exists
+      db.collection('config').doc('super_admin').get()
+        .then(function(doc) {
+          document.getElementById('login-loading').style.display = 'none';
+          if (doc.exists) {
+            document.getElementById('login-form').style.display = 'block';
+            document.getElementById('login-subtitle').textContent = 'Super Admin Panel';
+          } else {
+            document.getElementById('setup-form').style.display = 'block';
+            document.getElementById('login-subtitle').textContent = 'First-Time Setup';
+          }
+        })
+        .catch(function(err) {
+          document.getElementById('login-loading').style.display = 'none';
+          document.getElementById('login-form').style.display = 'block';
+          console.error('Auth check error:', err);
+        });
+    }
+
+    // --- Set Master Password ---
+    document.getElementById('setup-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      var pw = document.getElementById('setup-pw').value;
+      var confirm = document.getElementById('setup-pw-confirm').value;
+
+      if (pw.length < 6) {
+        showToast('Password must be at least 6 characters.', 'error');
+        return;
+      }
+      if (pw !== confirm) {
+        showToast('Passwords do not match.', 'error');
+        return;
+      }
+
+      var btn = document.getElementById('setup-btn');
+      btn.disabled = true;
+      document.getElementById('setup-btn-text').textContent = 'Setting up...';
+      document.getElementById('setup-btn-spinner').style.display = 'inline-block';
+
+      db.collection('config').doc('super_admin').set({
+        password: pw,
+        createdAt: new Date().toISOString()
+      }).then(function() {
+        sessionStorage.setItem('physio_super_admin', '1');
+        isAuthenticated = true;
+        showToast('Master password set!', 'success');
+        showDashboard();
+      }).catch(function(err) {
+        btn.disabled = false;
+        document.getElementById('setup-btn-text').textContent = 'Set Master Password';
+        document.getElementById('setup-btn-spinner').style.display = 'none';
+        showToast('Failed: ' + (err.message || 'Unknown error'), 'error');
+      });
+    });
+
+    // --- Login ---
+    document.getElementById('login-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      var pw = document.getElementById('login-pw').value;
+
+      if (!pw) { showToast('Please enter the password.', 'error'); return; }
+
+      var btn = document.getElementById('login-btn');
+      btn.disabled = true;
+      document.getElementById('login-btn-text').textContent = 'Signing in...';
+      document.getElementById('login-btn-spinner').style.display = 'inline-block';
+
+      db.collection('config').doc('super_admin').get()
+        .then(function(doc) {
+          if (!doc.exists) {
+            showToast('No master password configured.', 'error');
+            return;
+          }
+          var data = doc.data();
+          if (data.password === pw) {
+            sessionStorage.setItem('physio_super_admin', '1');
+            isAuthenticated = true;
+            showDashboard();
+          } else {
+            showToast('Incorrect password.', 'error');
+          }
+        })
+        .catch(function(err) {
+          showToast('Login failed: ' + (err.message || 'Unknown error'), 'error');
+        })
+        .finally(function() {
+          btn.disabled = false;
+          document.getElementById('login-btn-text').textContent = 'Sign In';
+          document.getElementById('login-btn-spinner').style.display = 'none';
+        });
+    });
+
+    function logout() {
+      sessionStorage.removeItem('physio_super_admin');
+      isAuthenticated = false;
+      location.reload();
+    }
+
+    function showDashboard() {
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('dashboard').style.display = 'block';
+      loadClinics();
+    }
+
+    // =============================================
+    // CLINICS
+    // =============================================
+    var clinicsData = [];
+
+    function loadClinics() {
+      document.getElementById('clinic-list').innerHTML =
+        '<div class="loading-center"><span class="spinner spinner-dark"></span> Loading clinics...</div>';
+
+      db.collection('clinics').get()
+        .then(function(snapshot) {
+          clinicsData = [];
+          snapshot.forEach(function(doc) {
+            var data = doc.data();
+            data._docId = doc.id;
+            clinicsData.push(data);
+          });
+
+          // Sort by createdAt descending
+          clinicsData.sort(function(a, b) {
+            return (b.createdAt || '').localeCompare(a.createdAt || '');
+          });
+
+          // Count approved clinics (no status or status=approved)
+          var approvedCount = 0;
+          for (var i = 0; i < clinicsData.length; i++) {
+            if (!clinicsData[i].status || clinicsData[i].status === 'approved') approvedCount++;
+          }
+          document.getElementById('stat-clinics').textContent = approvedCount;
+
+          renderPendingCards();
+          renderClinicCards();
+          loadClinicStats();
+        })
+        .catch(function(err) {
+          document.getElementById('clinic-list').innerHTML =
+            '<div class="empty-state"><p>Failed to load clinics: ' + escapeHtml(err.message || 'Unknown error') + '</p></div>';
+        });
+    }
+
+    // --- Render Pending Approvals ---
+    function renderPendingCards() {
+      var pending = clinicsData.filter(function(c) { return c.status === 'pending'; });
+      var section = document.getElementById('pending-section');
+      var list = document.getElementById('pending-list');
+      var countEl = document.getElementById('pending-count');
+
+      if (pending.length === 0) {
+        section.style.display = 'none';
+        return;
+      }
+
+      section.style.display = 'block';
+      countEl.textContent = pending.length;
+
+      var html = '';
+      pending.forEach(function(clinic) {
+        var cid = clinic._docId || clinic.id;
+        html += '<div class="pending-card">';
+        html += '<div class="pending-card-header">';
+        html += '<div>';
+        html += '<div class="clinic-name">' + escapeHtml(clinic.name || cid) + ' <span class="pending-badge">Pending</span></div>';
+        html += '<div class="clinic-meta">Registered: ' + formatDate(clinic.createdAt) + '</div>';
+        html += '</div>';
+        html += '</div>';
+        html += '<div class="pending-card-details">';
+        html += '<span>Owner: <strong>' + escapeHtml(clinic.ownerName || '-') + '</strong></span>';
+        html += '<span>Email: ' + escapeHtml(clinic.ownerEmail || '-') + '</span>';
+        html += '<span>Phone: ' + escapeHtml(clinic.ownerPhone || '-') + '</span>';
+        html += '<span>Slug: <strong>' + escapeHtml(clinic.bookingSlug || '-') + '</strong></span>';
+        html += '</div>';
+        html += '<div class="pending-actions">';
+        html += '<button class="btn btn-sm btn-approve" onclick="approveClinic(\'' + escapeHtml(cid) + '\')">Approve</button>';
+        html += '<button class="btn btn-sm btn-reject" onclick="rejectClinic(\'' + escapeHtml(cid) + '\')">Reject</button>';
+        html += '</div>';
+        html += '</div>';
+      });
+
+      list.innerHTML = html;
+    }
+
+    // --- Approve Clinic ---
+    function approveClinic(clinicId) {
+      db.collection('clinics').doc(clinicId).update({ status: 'approved' })
+        .then(function() {
+          showToast('Clinic approved! They can now log in.', 'success');
+          loadClinics();
+        })
+        .catch(function(err) {
+          showToast('Failed: ' + (err.message || 'Unknown error'), 'error');
+        });
+    }
+
+    // --- Reject Clinic ---
+    function rejectClinic(clinicId) {
+      var clinic = clinicsData.find(function(c) { return (c._docId || c.id) === clinicId; });
+      var name = clinic ? clinic.name : clinicId;
+      if (!confirm('Reject registration for "' + name + '"? They will not be able to log in.')) return;
+
+      db.collection('clinics').doc(clinicId).update({ status: 'rejected' })
+        .then(function() {
+          showToast('Clinic registration rejected.', 'success');
+          loadClinics();
+        })
+        .catch(function(err) {
+          showToast('Failed: ' + (err.message || 'Unknown error'), 'error');
+        });
+    }
+
+    function renderClinicCards() {
+      var container = document.getElementById('clinic-list');
+
+      // Filter to only show approved/active clinics (no status = legacy approved)
+      var activeClinics = clinicsData.filter(function(c) {
+        return !c.status || c.status === 'approved';
+      });
+
+      if (activeClinics.length === 0 && clinicsData.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>No clinics registered yet.</p><button class="btn btn-primary btn-sm" onclick="openCreateModal()">Create Your First Clinic</button></div>';
+        return;
+      }
+      if (activeClinics.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>No active clinics. Pending registrations are shown above.</p></div>';
+        return;
+      }
+
+      var html = '<div class="clinic-grid">';
+      activeClinics.forEach(function(clinic, idx) {
+        var cid = clinic._docId || clinic.id;
+        var features = clinic.features || {};
+
+        html += '<div class="clinic-card" id="card-' + escapeHtml(cid) + '">';
+
+        // Header
+        html += '<div class="clinic-card-header">';
+        html += '<div class="clinic-name">' + escapeHtml(clinic.name || cid) + '</div>';
+        html += '<div class="clinic-meta">';
+        html += '<span>Owner: ' + escapeHtml(clinic.ownerName || '-') + '</span>';
+        html += '<span>Slug: <strong>' + escapeHtml(clinic.bookingSlug || '-') + '</strong></span>';
+        html += '</div>';
+        html += '</div>';
+
+        // Body
+        html += '<div class="clinic-card-body">';
+
+        // Stats row
+        html += '<div class="clinic-stats-row">';
+        html += '<div class="clinic-stat">Patients: <strong id="pcount-' + escapeHtml(cid) + '">...</strong></div>';
+        html += '<div class="clinic-stat">Users: <strong id="ucount-' + escapeHtml(cid) + '">...</strong></div>';
+        html += '<div class="clinic-stat">Bookings: <strong id="bcount-' + escapeHtml(cid) + '">...</strong></div>';
+        html += '</div>';
+        html += '<div class="clinic-stats-row">';
+        html += '<div class="clinic-stat">Created: ' + formatDate(clinic.createdAt) + '</div>';
+        html += '</div>';
+
+        // Booking URL row
+        var bookingSlug = clinic.bookingSlug || '';
+        if (bookingSlug) {
+          var bookingUrl = window.location.origin + window.location.pathname.replace('admin.html', '') + 'book1/?c=' + encodeURIComponent(bookingSlug);
+          html += '<div class="booking-url-row">';
+          html += '<span class="url-text" id="burl-' + escapeHtml(cid) + '">' + escapeHtml(bookingUrl) + '</span>';
+          html += '<button class="btn-icon" onclick="copyBookingUrl(\'' + escapeHtml(cid) + '\')" title="Copy link">Copy</button>';
+          html += '<button class="btn-icon" onclick="previewBooking(\'' + escapeHtml(bookingSlug) + '\')" title="Open booking page">Preview</button>';
+          html += '</div>';
+        }
+
+        // Feature badges
+        html += '<div class="feature-badges">';
+        FEATURE_KEYS.forEach(function(key) {
+          var on = features[key] !== false;
+          html += '<span class="feature-badge ' + (on ? 'on' : 'off') + '">' + key + '</span>';
+        });
+        html += '</div>';
+
+        html += '</div>'; // card-body
+
+        // Feature editor (collapsed)
+        html += '<div class="feature-editor" id="features-' + escapeHtml(cid) + '">';
+        FEATURE_KEYS.forEach(function(key) {
+          var on = features[key] !== false;
+          html += '<div class="feature-toggle-row">';
+          html += '<label>' + key + '</label>';
+          html += '<label class="toggle">';
+          html += '<input type="checkbox" data-clinic="' + escapeHtml(cid) + '" data-feature="' + key + '" ' + (on ? 'checked' : '') + ' onchange="toggleFeature(this)">';
+          html += '<span class="toggle-slider"></span>';
+          html += '</label>';
+          html += '</div>';
+        });
+        html += '</div>';
+
+        // Actions
+        html += '<div class="clinic-card-actions">';
+        html += '<button class="btn btn-primary btn-sm" onclick="enterClinic(\'' + escapeHtml(cid) + '\')">Enter Clinic</button>';
+        html += '<button class="btn btn-secondary btn-sm" onclick="toggleFeatureEditor(\'' + escapeHtml(cid) + '\')">Edit Features</button>';
+        html += '<button class="btn btn-danger-ghost btn-sm" onclick="confirmDeleteClinic(\'' + escapeHtml(cid) + '\')">Delete</button>';
+        html += '</div>';
+
+        html += '</div>'; // clinic-card
+      });
+      html += '</div>';
+
+      container.innerHTML = html;
+    }
+
+    // --- Load Stats (progressive) ---
+    function loadClinicStats() {
+      var totalPatients = 0;
+      var totalUsers = 0;
+      var loaded = 0;
+
+      // Only load stats for approved/active clinics
+      var activeClinics = clinicsData.filter(function(c) {
+        return !c.status || c.status === 'approved';
+      });
+      var total = activeClinics.length;
+
+      if (total === 0) {
+        document.getElementById('stat-patients').textContent = '0';
+        document.getElementById('stat-users').textContent = '0';
+        return;
+      }
+
+      activeClinics.forEach(function(clinic) {
+        var cid = clinic._docId || clinic.id;
+
+        // Patients count
+        db.collection('clinics').doc(cid).collection('patients').get()
+          .then(function(snap) {
+            var count = snap.size;
+            totalPatients += count;
+            var el = document.getElementById('pcount-' + cid);
+            if (el) el.textContent = count;
+          })
+          .catch(function() {
+            var el = document.getElementById('pcount-' + cid);
+            if (el) el.textContent = '?';
+          });
+
+        // Online bookings count
+        db.collection('clinics').doc(cid).collection('online_bookings').get()
+          .then(function(snap) {
+            var el = document.getElementById('bcount-' + cid);
+            if (el) el.textContent = snap.size;
+          })
+          .catch(function() {
+            var el = document.getElementById('bcount-' + cid);
+            if (el) el.textContent = '?';
+          });
+
+        // Users count
+        db.collection('clinics').doc(cid).collection('users').get()
+          .then(function(snap) {
+            var count = snap.size;
+            totalUsers += count;
+            var el = document.getElementById('ucount-' + cid);
+            if (el) el.textContent = count;
+            loaded++;
+            if (loaded >= total) {
+              document.getElementById('stat-patients').textContent = totalPatients;
+              document.getElementById('stat-users').textContent = totalUsers;
+            }
+          })
+          .catch(function() {
+            var el = document.getElementById('ucount-' + cid);
+            if (el) el.textContent = '?';
+            loaded++;
+            if (loaded >= total) {
+              document.getElementById('stat-patients').textContent = totalPatients;
+              document.getElementById('stat-users').textContent = totalUsers;
+            }
+          });
+      });
+    }
+
+    // --- Booking URL helpers ---
+    function copyBookingUrl(clinicId) {
+      var el = document.getElementById('burl-' + clinicId);
+      if (!el) return;
+      var url = el.textContent;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(url).then(function() {
+          showToast('Booking URL copied!', 'success');
+        });
+      } else {
+        // Fallback
+        var ta = document.createElement('textarea');
+        ta.value = url;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        showToast('Booking URL copied!', 'success');
+      }
+    }
+
+    function previewBooking(slug) {
+      var url = window.location.origin + window.location.pathname.replace('admin.html', '') + 'book1/?c=' + encodeURIComponent(slug);
+      window.open(url, '_blank');
+    }
+
+    // --- Enter Clinic ---
+    function enterClinic(clinicId) {
+      // Find first admin user in that clinic
+      db.collection('clinics').doc(clinicId).collection('users')
+        .where('role', '==', 'admin')
+        .limit(1)
+        .get()
+        .then(function(snap) {
+          if (snap.empty) {
+            // Fallback: any user
+            return db.collection('clinics').doc(clinicId).collection('users').limit(1).get();
+          }
+          return snap;
+        })
+        .then(function(snap) {
+          if (snap.empty) {
+            showToast('No users found for this clinic.', 'error');
+            return;
+          }
+          var user = snap.docs[0].data();
+
+          // Set session to impersonate this clinic
+          sessionStorage.setItem('physio_clinicId', clinicId);
+          sessionStorage.setItem('physio_session', JSON.stringify(user));
+          sessionStorage.setItem('physio_from_admin', '1');
+
+          window.location.href = 'index.html';
+        })
+        .catch(function(err) {
+          showToast('Failed to enter clinic: ' + (err.message || 'Unknown error'), 'error');
+        });
+    }
+
+    // --- Toggle Feature Editor ---
+    function toggleFeatureEditor(clinicId) {
+      var el = document.getElementById('features-' + clinicId);
+      if (el) el.classList.toggle('open');
+    }
+
+    // --- Toggle Feature ---
+    function toggleFeature(checkbox) {
+      var clinicId = checkbox.getAttribute('data-clinic');
+      var feature = checkbox.getAttribute('data-feature');
+      var on = checkbox.checked;
+
+      var update = {};
+      update['features.' + feature] = on;
+
+      db.collection('clinics').doc(clinicId).update(update)
+        .then(function() {
+          // Update local data
+          for (var i = 0; i < clinicsData.length; i++) {
+            if ((clinicsData[i]._docId || clinicsData[i].id) === clinicId) {
+              if (!clinicsData[i].features) clinicsData[i].features = {};
+              clinicsData[i].features[feature] = on;
+              break;
+            }
+          }
+
+          // Update badge
+          var card = document.getElementById('card-' + clinicId);
+          if (card) {
+            var badges = card.querySelectorAll('.feature-badge');
+            badges.forEach(function(badge) {
+              if (badge.textContent === feature) {
+                badge.className = 'feature-badge ' + (on ? 'on' : 'off');
+              }
+            });
+          }
+
+          showToast(feature + ' ' + (on ? 'enabled' : 'disabled'), 'success');
+        })
+        .catch(function(err) {
+          // Revert checkbox
+          checkbox.checked = !on;
+          showToast('Failed to update: ' + (err.message || 'Unknown error'), 'error');
+        });
+    }
+
+    // =============================================
+    // DELETE CLINIC
+    // =============================================
+    var deleteTargetId = null;
+
+    function confirmDeleteClinic(clinicId) {
+      deleteTargetId = clinicId;
+      var clinic = clinicsData.find(function(c) { return (c._docId || c.id) === clinicId; });
+      var name = clinic ? clinic.name : clinicId;
+      document.getElementById('delete-clinic-name').textContent = name;
+      document.getElementById('delete-modal').classList.add('open');
+    }
+
+    function closeDeleteModal() {
+      document.getElementById('delete-modal').classList.remove('open');
+      deleteTargetId = null;
+    }
+
+    // Close on outside click
+    document.getElementById('delete-modal').addEventListener('click', function(e) {
+      if (e.target === this) closeDeleteModal();
+    });
+
+    // Delete all docs in a subcollection (Firestore doesn't cascade)
+    function deleteSubcollection(clinicId, subName) {
+      return db.collection('clinics').doc(clinicId).collection(subName).get()
+        .then(function(snap) {
+          if (snap.empty) return Promise.resolve();
+          var batch = db.batch();
+          snap.docs.forEach(function(doc) { batch.delete(doc.ref); });
+          return batch.commit();
+        });
+    }
+
+    function executeDeleteClinic() {
+      if (!deleteTargetId) return;
+      var clinicId = deleteTargetId;
+
+      var btn = document.getElementById('delete-confirm-btn');
+      btn.disabled = true;
+      document.getElementById('delete-btn-text').textContent = 'Deleting...';
+      document.getElementById('delete-btn-spinner').style.display = 'inline-block';
+
+      // Find booking slug to clean up
+      var clinic = clinicsData.find(function(c) { return (c._docId || c.id) === clinicId; });
+      var slug = clinic ? clinic.bookingSlug : null;
+
+      // All known subcollections to wipe
+      var subcollections = [
+        'users', 'patients', 'appointments', 'sessions', 'exercises',
+        'billing', 'tags', 'prescriptions', 'activity_log',
+        'message_templates', 'message_log', 'online_bookings'
+      ];
+
+      // Delete all subcollections in parallel
+      var deletions = subcollections.map(function(sub) {
+        return deleteSubcollection(clinicId, sub);
+      });
+
+      Promise.all(deletions)
+        .then(function() {
+          // Delete the clinic doc itself
+          return db.collection('clinics').doc(clinicId).delete();
+        })
+        .then(function() {
+          // Delete booking slug doc if exists
+          if (slug) {
+            return db.collection('booking_slugs').doc(slug).delete();
+          }
+        })
+        .then(function() {
+          showToast('Clinic deleted successfully.', 'success');
+          closeDeleteModal();
+          loadClinics();
+        })
+        .catch(function(err) {
+          showToast('Delete failed: ' + (err.message || 'Unknown error'), 'error');
+        })
+        .finally(function() {
+          btn.disabled = false;
+          document.getElementById('delete-btn-text').textContent = 'Yes, Delete';
+          document.getElementById('delete-btn-spinner').style.display = 'none';
+        });
+    }
+
+    // =============================================
+    // CREATE CLINIC
+    // =============================================
+    function openCreateModal() {
+      document.getElementById('create-modal').classList.add('open');
+      document.getElementById('create-form').reset();
+      document.getElementById('c-slug-preview').textContent = '';
+    }
+
+    function closeCreateModal() {
+      document.getElementById('create-modal').classList.remove('open');
+    }
+
+    // Close modal on outside click
+    document.getElementById('create-modal').addEventListener('click', function(e) {
+      if (e.target === this) closeCreateModal();
+    });
+
+    // Slug auto-format
+    document.getElementById('c-slug').addEventListener('input', function() {
+      var val = this.value
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9\-]/g, '')
+        .replace(/-{2,}/g, '-');
+      this.value = val;
+      document.getElementById('c-slug-preview').textContent = val ? 'Booking URL: .../' + val : '';
+    });
+
+    // Submit create form
+    document.getElementById('create-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      var clinicName = document.getElementById('c-clinic-name').value.trim();
+      var doctorName = document.getElementById('c-doctor-name').value.trim();
+      var email = document.getElementById('c-email').value.trim();
+      var phone = document.getElementById('c-phone').value.trim();
+      var slug = document.getElementById('c-slug').value.trim();
+      var username = document.getElementById('c-username').value.trim();
+      var password = document.getElementById('c-password').value;
+
+      if (!clinicName || !doctorName || !email || !phone || !slug || !username || !password) {
+        showToast('Please fill in all fields.', 'error');
+        return;
+      }
+
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showToast('Please enter a valid email.', 'error');
+        return;
+      }
+
+      if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)) {
+        showToast('Slug must be lowercase letters, numbers, and hyphens only.', 'error');
+        return;
+      }
+
+      if (password.length < 6) {
+        showToast('Password must be at least 6 characters.', 'error');
+        return;
+      }
+
+      var btn = document.getElementById('create-btn');
+      btn.disabled = true;
+      document.getElementById('create-btn-text').textContent = 'Creating...';
+      document.getElementById('create-btn-spinner').style.display = 'inline-block';
+
+      // Check slug availability
+      db.collection('booking_slugs').doc(slug).get()
+        .then(function(doc) {
+          if (doc.exists) {
+            showToast('This slug is already taken.', 'error');
+            return Promise.reject('slug_taken');
+          }
+
+          var clinicId = 'c_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
+          var userId = 'u_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
+          var createdAt = new Date().toISOString();
+
+          var batch = db.batch();
+
+          // Clinic doc
+          batch.set(db.collection('clinics').doc(clinicId), {
+            id: clinicId,
+            name: clinicName,
+            ownerName: doctorName,
+            ownerEmail: email,
+            ownerPhone: phone,
+            bookingSlug: slug,
+            createdAt: createdAt,
+            features: {
+              billing: true,
+              messaging: true,
+              prescriptions: true,
+              exercises: true,
+              soapNotes: true,
+              bodyDiagram: true,
+              onlineBooking: true,
+              tags: true
+            }
+          });
+
+          // Admin user
+          batch.set(db.collection('clinics').doc(clinicId).collection('users').doc(userId), {
+            id: userId,
+            username: username,
+            password: password,
+            name: doctorName,
+            role: 'admin',
+            createdAt: createdAt
+          });
+
+          // Booking slug
+          batch.set(db.collection('booking_slugs').doc(slug), {
+            clinicId: clinicId,
+            createdAt: createdAt
+          });
+
+          // Default tags
+          var defaultTags = [
+            { id: 'tag1', name: 'Knee', color: '#3b82f6' },
+            { id: 'tag2', name: 'Back Pain', color: '#ef4444' },
+            { id: 'tag3', name: 'Shoulder', color: '#f59e0b' },
+            { id: 'tag4', name: 'Post-Surgery', color: '#8b5cf6' },
+            { id: 'tag5', name: 'Senior', color: '#6b7280' },
+            { id: 'tag6', name: 'Sports Injury', color: '#22c55e' },
+            { id: 'tag7', name: 'Chronic Pain', color: '#ec4899' },
+            { id: 'tag8', name: 'Neurological', color: '#06b6d4' }
+          ];
+          defaultTags.forEach(function(tag) {
+            batch.set(db.collection('clinics').doc(clinicId).collection('tags').doc(tag.id), tag);
+          });
+
+          // Default message templates
+          var defaultTemplates = [
+            { id: 'mt1', name: 'Appointment Reminder', text: 'Hi {name}, this is a reminder about your appointment on {date} at {time}. Please arrive 10 minutes early. See you soon!' },
+            { id: 'mt2', name: 'Follow-up Reminder', text: 'Hi {name}, it\'s time for your follow-up visit. Please call us to schedule your next appointment.' },
+            { id: 'mt3', name: 'General Announcement', text: 'Hi {name}, we have an important update from PhysioClinic. Please contact us for more details.' },
+            { id: 'mt4', name: 'Exercise Reminder', text: 'Hi {name}, just a friendly reminder to keep up with your home exercise program. Consistency is key to your recovery!' }
+          ];
+          defaultTemplates.forEach(function(tpl) {
+            batch.set(db.collection('clinics').doc(clinicId).collection('message_templates').doc(tpl.id), tpl);
+          });
+
+          return batch.commit();
+        })
+        .then(function() {
+          showToast('Clinic created successfully!', 'success');
+          closeCreateModal();
+          loadClinics();
+        })
+        .catch(function(err) {
+          if (err === 'slug_taken') return;
+          showToast('Failed: ' + (err.message || 'Unknown error'), 'error');
+        })
+        .finally(function() {
+          var btn = document.getElementById('create-btn');
+          btn.disabled = false;
+          document.getElementById('create-btn-text').textContent = 'Create Clinic';
+          document.getElementById('create-btn-spinner').style.display = 'none';
+        });
+    });
+
+    // =============================================
+    // INIT
+    // =============================================
+    checkAuth();
+  </script>
+</body>
+</html>

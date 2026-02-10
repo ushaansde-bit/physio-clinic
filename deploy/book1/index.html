@@ -1,0 +1,1399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PhysioClinic — Book Appointment</title>
+<style>
+/* --- CSS Custom Properties (matching main app) --- */
+:root {
+  --primary: #0d9488;
+  --primary-dark: #0f766e;
+  --primary-light: #14b8a6;
+  --primary-50: #f0fdfa;
+  --primary-100: #ccfbf1;
+  --primary-200: #99f6e4;
+  --success: #22c55e;
+  --success-bg: #f0fdf4;
+  --warning: #f59e0b;
+  --warning-bg: #fffbeb;
+  --danger: #ef4444;
+  --danger-bg: #fef2f2;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
+  --white: #ffffff;
+  --bg: #f0f4f8;
+  --card-bg: #ffffff;
+  --border: #e5e7eb;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.06);
+  --shadow-lg: 0 10px 15px rgba(0,0,0,0.1), 0 4px 6px rgba(0,0,0,0.05);
+  --radius: 8px;
+  --radius-sm: 4px;
+  --radius-lg: 12px;
+  --transition: 0.2s ease;
+}
+
+/* --- Reset & Base --- */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; -webkit-font-smoothing: antialiased; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  color: var(--gray-800);
+  background: var(--bg);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+/* --- Header --- */
+.header {
+  background: linear-gradient(135deg, #0d9488 0%, #0e7490 100%);
+  color: var(--white);
+  padding: 1rem 1.5rem;
+  text-align: center;
+  box-shadow: var(--shadow-md);
+}
+.header h1 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.header p {
+  font-size: 0.85rem;
+  opacity: 0.9;
+  margin-top: 0.15rem;
+}
+
+/* --- Main Grid (side-by-side) --- */
+.main-grid {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  align-items: stretch;
+}
+.left-panel, .right-panel {
+  display: flex;
+  flex-direction: column;
+}
+.right-panel > #panel-form,
+.right-panel > #panel-confirm {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+.right-panel > #panel-form > .card,
+.right-panel > #panel-confirm > .card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.right-panel > #panel-form > .card > #form-new,
+.right-panel > #panel-form > .card > #form-existing {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.right-panel > #panel-form > .card > #form-new > .form-group:last-child,
+.right-panel > #panel-form > .card > #form-existing > .form-group:last-child {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.right-panel > #panel-form > .card > #form-new > .form-group:last-child > textarea,
+.right-panel > #panel-form > .card > #form-existing > .form-group:last-child > textarea {
+  flex: 1;
+  min-height: 60px;
+}
+
+/* --- Card --- */
+.card {
+  background: var(--card-bg);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 1.25rem;
+}
+.card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--gray-800);
+  margin-bottom: 1rem;
+}
+
+/* --- Calendar --- */
+.cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+.cal-header h3 {
+  font-size: 1rem;
+  font-weight: 600;
+}
+.cal-nav {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  width: 32px; height: 32px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--gray-600);
+  transition: var(--transition);
+}
+.cal-nav:hover { background: var(--gray-100); color: var(--primary); }
+.cal-nav:disabled { opacity: 0.3; cursor: not-allowed; }
+.cal-nav:disabled:hover { background: none; color: var(--gray-600); }
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  text-align: center;
+}
+.cal-dow {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--gray-500);
+  padding: 0.35rem 0;
+  text-transform: uppercase;
+}
+.cal-day {
+  position: relative;
+  padding: 0.45rem 0;
+  font-size: 0.85rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition);
+  border: 2px solid transparent;
+}
+.cal-day:hover { background: var(--primary-50); }
+.cal-day.today { font-weight: 700; color: var(--primary); }
+.cal-day.selected {
+  background: var(--primary);
+  color: var(--white);
+  font-weight: 600;
+}
+.cal-day.selected:hover { background: var(--primary-dark); }
+.cal-day.disabled {
+  color: var(--gray-300);
+  cursor: not-allowed;
+  background: none;
+}
+.cal-day.disabled:hover { background: none; }
+.cal-day.empty { cursor: default; }
+.cal-day.empty:hover { background: none; }
+.cal-dot {
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: var(--success);
+}
+.cal-day.selected .cal-dot { background: var(--white); }
+.cal-day.disabled .cal-dot { background: var(--gray-300); }
+
+/* --- Time Slots --- */
+.time-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--gray-700);
+  margin-bottom: 0.5rem;
+}
+.time-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.4rem;
+}
+.time-slot {
+  padding: 0.5rem 0.25rem;
+  text-align: center;
+  font-size: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition);
+  background: var(--white);
+}
+.time-slot:hover { border-color: var(--primary); background: var(--primary-50); }
+.time-slot.selected {
+  background: var(--primary);
+  color: var(--white);
+  border-color: var(--primary);
+  font-weight: 600;
+}
+.time-slot.unavailable {
+  background: var(--gray-100);
+  color: var(--gray-400);
+  cursor: not-allowed;
+  border-color: var(--gray-200);
+  text-decoration: line-through;
+}
+.time-slot.unavailable:hover {
+  background: var(--gray-100);
+  border-color: var(--gray-200);
+}
+
+/* --- Selection Summary --- */
+.selection-summary {
+  background: var(--primary-50);
+  border: 1px solid var(--primary-200);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.85rem;
+  margin-top: 1rem;
+  font-size: 0.8rem;
+  color: var(--primary-dark);
+  display: none;
+}
+.selection-summary.show { display: block; }
+.selection-summary strong { font-weight: 600; }
+
+/* --- Time Placeholder --- */
+.time-placeholder {
+  text-align: center;
+  padding: 1.5rem 0.5rem;
+  color: var(--gray-400);
+  font-size: 0.85rem;
+}
+
+/* --- Buttons --- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1.25rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: var(--transition);
+  text-decoration: none;
+}
+.btn-primary {
+  background: var(--primary);
+  color: var(--white);
+}
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-primary:disabled {
+  background: var(--gray-300);
+  cursor: not-allowed;
+}
+.btn-secondary {
+  background: var(--white);
+  color: var(--gray-700);
+  border: 1px solid var(--border);
+}
+.btn-secondary:hover { background: var(--gray-50); }
+.btn-block { width: 100%; }
+
+/* --- Forms --- */
+.form-group { margin-bottom: 1rem; }
+.form-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--gray-700);
+  margin-bottom: 0.3rem;
+}
+.form-input, .form-select {
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  color: var(--gray-800);
+  background: var(--white);
+  transition: var(--transition);
+  font-family: inherit;
+}
+.form-input:focus, .form-select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+}
+.form-input.error {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+.form-error {
+  font-size: 0.75rem;
+  color: var(--danger);
+  margin-top: 0.2rem;
+  display: none;
+}
+.form-error.show { display: block; }
+.form-hint {
+  font-size: 0.75rem;
+  color: var(--gray-500);
+  margin-top: 0.2rem;
+}
+
+/* Phone row */
+.phone-row {
+  display: flex;
+  gap: 0.5rem;
+}
+.phone-code {
+  width: 72px;
+  flex-shrink: 0;
+  text-align: center;
+}
+.phone-number { flex: 1; }
+
+/* --- Toggle --- */
+.toggle-group {
+  display: flex;
+  background: var(--gray-100);
+  border-radius: var(--radius);
+  padding: 3px;
+  margin-bottom: 1rem;
+}
+.toggle-btn {
+  flex: 1;
+  padding: 0.5rem;
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background: none;
+  color: var(--gray-600);
+  transition: var(--transition);
+}
+.toggle-btn.active {
+  background: var(--white);
+  color: var(--primary);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
+/* --- Confirmation --- */
+.confirm-wrap {
+  text-align: center;
+  padding: 1.5rem 0 1rem;
+}
+.confirm-check {
+  width: 64px; height: 64px;
+  border-radius: 50%;
+  background: var(--success-bg);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 1rem;
+}
+.confirm-check svg {
+  width: 32px; height: 32px;
+  stroke: var(--success);
+}
+.confirm-wrap h2 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--gray-900);
+  margin-bottom: 0.5rem;
+}
+.confirm-wrap p {
+  color: var(--gray-600);
+  font-size: 0.85rem;
+  margin-bottom: 0.3rem;
+}
+.confirm-detail {
+  background: var(--gray-50);
+  border-radius: var(--radius);
+  padding: 1rem;
+  margin: 1rem 0;
+  text-align: left;
+}
+.confirm-detail .row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.35rem 0;
+  font-size: 0.85rem;
+}
+.confirm-detail .row .label {
+  color: var(--gray-500);
+}
+.confirm-detail .row .value {
+  font-weight: 600;
+  color: var(--gray-800);
+}
+
+/* --- Toast --- */
+.toast-container {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.toast {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  color: var(--white);
+  box-shadow: var(--shadow-lg);
+  animation: slideIn 0.3s ease;
+  max-width: 320px;
+}
+.toast-info { background: var(--primary); }
+.toast-error { background: var(--danger); }
+.toast-success { background: var(--success); }
+.toast.removing { animation: slideOut 0.3s ease forwards; }
+@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes slideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
+
+/* --- Hidden --- */
+.hidden { display: none !important; }
+
+/* --- Responsive: Mobile stacked --- */
+@media (max-width: 768px) {
+  .main-grid {
+    grid-template-columns: 1fr;
+    padding: 0.75rem;
+  }
+  .card { padding: 1rem; }
+}
+@media (max-width: 380px) {
+  .time-grid { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <h1 id="header-clinic-name">PhysioClinic</h1>
+  <p>Book an Appointment</p>
+</div>
+
+<!-- Loading / Error States -->
+<div id="loading-state" class="card" style="max-width:480px;margin:2rem auto;text-align:center;padding:2rem;display:none;">
+  <p style="color:var(--gray-500);">Loading clinic information...</p>
+</div>
+<div id="error-state" class="card" style="max-width:480px;margin:2rem auto;text-align:center;padding:2rem;display:none;">
+  <h2 style="color:var(--danger);margin-bottom:0.5rem;">Clinic Not Found</h2>
+  <p id="error-message" style="color:var(--gray-600);">Please check the booking link and try again.</p>
+</div>
+
+<!-- Side-by-Side Layout -->
+<div class="main-grid">
+
+  <!-- ===== LEFT PANEL: Calendar + Time Slots ===== -->
+  <div class="left-panel">
+    <div class="card">
+      <div class="cal-header">
+        <button class="cal-nav" id="cal-prev" title="Previous month">&#9664;</button>
+        <h3 id="cal-month-label"></h3>
+        <button class="cal-nav" id="cal-next" title="Next month">&#9654;</button>
+      </div>
+      <div class="cal-grid" id="cal-grid"></div>
+    </div>
+
+    <div class="card" style="margin-top:0.75rem; flex:1;">
+      <div class="time-label" id="time-label">Available Times</div>
+      <div class="time-placeholder" id="time-placeholder">Select a date to see available times</div>
+      <div class="time-grid" id="time-grid"></div>
+      <div class="selection-summary" id="selection-summary"></div>
+    </div>
+  </div>
+
+  <!-- ===== RIGHT PANEL: Patient Form OR Confirmation ===== -->
+  <div class="right-panel">
+
+    <!-- Patient Details Form -->
+    <div id="panel-form">
+      <div class="card">
+        <div class="card-title">Patient Details</div>
+
+        <div class="toggle-group">
+          <button class="toggle-btn active" id="toggle-new">New Patient</button>
+          <button class="toggle-btn" id="toggle-existing">Existing Patient</button>
+        </div>
+
+        <!-- New Patient Form -->
+        <div id="form-new">
+          <div class="form-group">
+            <label class="form-label" for="inp-name">Full Name *</label>
+            <input type="text" class="form-input" id="inp-name" placeholder="Enter your full name" autocomplete="name">
+            <div class="form-error" id="err-name">Please enter your name</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Phone Number *</label>
+            <div class="phone-row">
+              <input type="text" class="form-input phone-code" id="inp-code" value="+91">
+              <input type="tel" class="form-input phone-number" id="inp-phone" placeholder="Phone number" autocomplete="tel">
+            </div>
+            <div class="form-error" id="err-phone">Please enter a valid phone number</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="inp-email">Email (optional)</label>
+            <input type="email" class="form-input" id="inp-email" placeholder="your@email.com" autocomplete="email">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="inp-reason">What brings you in?</label>
+            <select class="form-select" id="inp-reason">
+              <option value="General consultation">General consultation</option>
+              <option value="Back or neck pain">Back or neck pain</option>
+              <option value="Knee or leg pain">Knee or leg pain</option>
+              <option value="Shoulder or arm pain">Shoulder or arm pain</option>
+              <option value="Post-surgery recovery">Post-surgery recovery</option>
+              <option value="Sports injury">Sports injury</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label" for="inp-notes">Any additional notes? (optional)</label>
+            <textarea class="form-input" id="inp-notes" rows="2" placeholder="Anything else we should know..."></textarea>
+          </div>
+        </div>
+
+        <!-- Existing Patient Form -->
+        <div id="form-existing" class="hidden">
+          <div class="form-group">
+            <label class="form-label">Phone Number</label>
+            <div class="phone-row">
+              <input type="text" class="form-input phone-code" id="inp-ex-code" value="+91">
+              <input type="tel" class="form-input phone-number" id="inp-ex-phone" placeholder="Enter registered phone">
+            </div>
+            <div class="form-error" id="err-ex-phone">Patient not found with this number</div>
+          </div>
+          <div id="ex-patient-info" class="hidden" style="background:var(--success-bg);border-radius:var(--radius);padding:0.75rem;margin-bottom:1rem;">
+            <div style="font-size:0.8rem;color:var(--gray-500);">Patient found</div>
+            <div style="font-weight:600;color:var(--gray-800);" id="ex-patient-name"></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="inp-ex-reason">What brings you in?</label>
+            <select class="form-select" id="inp-ex-reason">
+              <option value="General consultation">General consultation</option>
+              <option value="Back or neck pain">Back or neck pain</option>
+              <option value="Knee or leg pain">Knee or leg pain</option>
+              <option value="Shoulder or arm pain">Shoulder or arm pain</option>
+              <option value="Post-surgery recovery">Post-surgery recovery</option>
+              <option value="Sports injury">Sports injury</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label" for="inp-ex-notes">Any additional notes? (optional)</label>
+            <textarea class="form-input" id="inp-ex-notes" rows="2" placeholder="Anything else we should know..."></textarea>
+          </div>
+        </div>
+
+        <div style="margin-top:auto; padding-top:1rem;">
+          <button class="btn btn-primary btn-block" id="btn-book" disabled>Book Appointment</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Confirmation (replaces form after booking) -->
+    <div id="panel-confirm" class="hidden">
+      <div class="card">
+        <div class="confirm-wrap">
+          <div class="confirm-check">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+          </div>
+          <h2>Appointment Booked!</h2>
+          <p>You will receive a confirmation shortly.</p>
+          <div class="confirm-detail" id="confirm-detail"></div>
+          <button class="btn btn-primary btn-block" id="btn-another" style="margin-top:0.75rem;">Book Another Appointment</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  // ============ FIREBASE INIT ============
+  var firebaseConfig = {
+    apiKey: "AIzaSyBcaymsJYlDpQ-EPF2Wtd-nYX2P6u7HQoE",
+    authDomain: "physio-clinic-4ae53.firebaseapp.com",
+    projectId: "physio-clinic-4ae53",
+    storageBucket: "physio-clinic-4ae53.firebasestorage.app",
+    messagingSenderId: "791291492733",
+    appId: "1:791291492733:web:9edaccf13df450b5513414"
+  };
+
+  var fbDb = null;
+  try {
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    fbDb = firebase.firestore();
+    console.log('[Book1] Firebase initialized');
+  } catch(e) {
+    console.warn('[Book1] Firebase init failed, using local only:', e);
+  }
+
+  // ============ CLINIC SCOPING ============
+  var clinicId = null;
+  var clinicSlug = null;
+
+  // Parse ?c=slug from URL
+  var urlParams = new URLSearchParams(window.location.search);
+  clinicSlug = urlParams.get('c');
+
+  var SCOPED_COLLECTIONS = ['patients', 'appointments', 'activity_log', 'online_bookings'];
+
+  // Get scoped localStorage key
+  function scopedKey(collName) {
+    var cid = clinicId || 'default';
+    return 'physio_' + cid + '_' + collName;
+  }
+
+  // Get Firestore collection reference scoped to clinic
+  function getCollRef(collName) {
+    if (!fbDb || !clinicId) return null;
+    return fbDb.collection('clinics').doc(clinicId).collection(collName);
+  }
+
+  function fbSaveDoc(collName, item) {
+    var ref = getCollRef(collName);
+    if (!ref || !item) return;
+    var docId = item.id || ('doc_' + Date.now());
+    ref.doc(docId).set(JSON.parse(JSON.stringify(item)))
+      .then(function() { console.log('[Book1] Synced ' + docId + ' to clinics/' + clinicId + '/' + collName); })
+      .catch(function(e) { console.error('[Book1] Sync failed:', e); });
+  }
+
+  function fbSaveCollection(collName) {
+    var ref = getCollRef(collName);
+    if (!ref) return;
+    var items = [];
+    try { items = JSON.parse(localStorage.getItem(scopedKey(collName))) || []; } catch(e) { return; }
+    var batch = fbDb.batch();
+    for (var i = 0; i < items.length; i++) {
+      var docId = items[i].id || ('doc_' + i);
+      batch.set(ref.doc(docId), JSON.parse(JSON.stringify(items[i])));
+    }
+    batch.commit().catch(function(e) { console.error('[Book1] Batch sync failed:', e); });
+  }
+
+  function fbPullCollection(collName) {
+    var ref = getCollRef(collName);
+    if (!ref) return Promise.resolve();
+    return ref.get().then(function(snapshot) {
+      if (snapshot.empty) return;
+      var items = [];
+      snapshot.forEach(function(doc) { items.push(doc.data()); });
+      localStorage.setItem(scopedKey(collName), JSON.stringify(items));
+      console.log('[Book1] Pulled ' + items.length + ' docs from clinics/' + clinicId + '/' + collName);
+    }).catch(function(e) { console.warn('[Book1] Pull failed:', e); });
+  }
+
+  // ============ UTILITIES ============
+  var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var DAYS_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  var PHONE_MAP = [
+    { phone: '+91', digits: 11 },
+    { phone: '+1', digits: 10 },
+    { phone: '+44', digits: 11 },
+    { phone: '+49', digits: 11 },
+    { phone: '+61', digits: 9 },
+    { phone: '+971', digits: 9 },
+    { phone: '+966', digits: 9 },
+    { phone: '+974', digits: 8 },
+    { phone: '+968', digits: 8 },
+    { phone: '+973', digits: 8 },
+    { phone: '+65', digits: 8 },
+    { phone: '+60', digits: 10 },
+    { phone: '+977', digits: 10 },
+    { phone: '+94', digits: 9 },
+    { phone: '+880', digits: 10 },
+    { phone: '+92', digits: 10 },
+    { phone: '+27', digits: 9 },
+    { phone: '+234', digits: 10 },
+    { phone: '+254', digits: 9 },
+    { phone: '+55', digits: 11 },
+    { phone: '+81', digits: 10 },
+    { phone: '+82', digits: 10 },
+    { phone: '+86', digits: 11 }
+  ];
+
+  function getDigitsForCode(code) {
+    code = (code || '').trim();
+    if (code.charAt(0) !== '+') code = '+' + code;
+    for (var i = 0; i < PHONE_MAP.length; i++) {
+      if (PHONE_MAP[i].phone === code) return PHONE_MAP[i].digits;
+    }
+    var stored = parseInt(localStorage.getItem('physio_phone_digits'), 10);
+    return stored || 10;
+  }
+
+  function generateId() {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+  }
+
+  function todayStr() {
+    return new Date().toISOString().split('T')[0];
+  }
+
+  function toDateString(date) {
+    var d = new Date(date);
+    var m = (d.getMonth() + 1).toString();
+    var day = d.getDate().toString();
+    if (m.length < 2) m = '0' + m;
+    if (day.length < 2) day = '0' + day;
+    return d.getFullYear() + '-' + m + '-' + day;
+  }
+
+  function formatDate(dateStr) {
+    if (!dateStr) return '-';
+    var d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+  }
+
+  function formatTime(timeStr) {
+    if (!timeStr) return '-';
+    var parts = timeStr.split(':');
+    var h = parseInt(parts[0], 10);
+    var m = parts[1];
+    var ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    return h + ':' + m + ' ' + ampm;
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    var div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function timeToMinutes(t) {
+    var parts = t.split(':');
+    return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+  }
+
+  // ============ STORE (simplified, scoped by clinic) ============
+  function getAll(collName) {
+    try { return JSON.parse(localStorage.getItem(scopedKey(collName))) || []; }
+    catch(e) { return []; }
+  }
+
+  function saveAll(collName, data) {
+    localStorage.setItem(scopedKey(collName), JSON.stringify(data));
+  }
+
+  function getPatientByPhone(phone) {
+    var patients = getAll('patients');
+    var clean = phone.replace(/\D/g, '');
+    for (var i = 0; i < patients.length; i++) {
+      if (patients[i].phone && patients[i].phone.replace(/\D/g, '') === clean) return patients[i];
+    }
+    return null;
+  }
+
+  function hasConflict(date, time) {
+    var appts = getAll('appointments');
+    var newStart = timeToMinutes(time);
+    var newEnd = newStart + 30;
+    for (var i = 0; i < appts.length; i++) {
+      var a = appts[i];
+      if (a.date === date && a.status !== 'cancelled') {
+        var aStart = timeToMinutes(a.time);
+        var aEnd = aStart + (parseInt(a.duration, 10) || 30);
+        if (newStart < aEnd && newEnd > aStart) return true;
+      }
+    }
+    return false;
+  }
+
+  function createPatient(data) {
+    var patients = getAll('patients');
+    data.id = data.id || 'obp_' + generateId();
+    data.createdAt = new Date().toISOString();
+    patients.push(data);
+    saveAll('patients', patients);
+    fbSaveDoc('patients', data);
+    logActivity('New patient added: ' + data.name + ' (online booking)');
+    return data;
+  }
+
+  function createAppointment(data) {
+    var appts = getAll('appointments');
+    data.id = data.id || 'ob_' + generateId();
+    data.createdAt = new Date().toISOString();
+    appts.push(data);
+    saveAll('appointments', appts);
+    fbSaveDoc('appointments', data);
+    logActivity('Appointment booked for ' + (data.patientName || 'patient') + ' (online)');
+    return data;
+  }
+
+  function logActivity(text) {
+    var log = getAll('activity_log');
+    var entry = { text: text, time: new Date().toISOString() };
+    log.unshift(entry);
+    if (log.length > 50) log = log.slice(0, 50);
+    saveAll('activity_log', log);
+    fbSaveCollection('activity_log');
+  }
+
+  function addOnlineBookingIndex(appointmentId, patientId) {
+    var index = getAll('online_bookings');
+    var entry = { id: 'obi_' + generateId(), appointmentId: appointmentId, patientId: patientId, bookedAt: new Date().toISOString() };
+    index.push(entry);
+    saveAll('online_bookings', index);
+    fbSaveDoc('online_bookings', entry);
+  }
+
+  // ============ TOAST ============
+  function toast(message, type) {
+    type = type || 'info';
+    var container = document.getElementById('toast-container');
+    var el = document.createElement('div');
+    el.className = 'toast toast-' + type;
+    el.textContent = message;
+    container.appendChild(el);
+    setTimeout(function() {
+      el.classList.add('removing');
+      setTimeout(function() {
+        if (el.parentNode) el.parentNode.removeChild(el);
+      }, 300);
+    }, 3000);
+  }
+
+  // ============ APP STATE ============
+  var state = {
+    currentMonth: new Date().getMonth(),
+    currentYear: new Date().getFullYear(),
+    selectedDate: null,
+    selectedTime: null,
+    patientMode: 'new',
+    foundPatient: null
+  };
+
+  // ============ DOM REFS ============
+  var $calGrid = document.getElementById('cal-grid');
+  var $calLabel = document.getElementById('cal-month-label');
+  var $calPrev = document.getElementById('cal-prev');
+  var $calNext = document.getElementById('cal-next');
+  var $timeGrid = document.getElementById('time-grid');
+  var $timeLabel = document.getElementById('time-label');
+  var $selSummary = document.getElementById('selection-summary');
+  var $btnBook = document.getElementById('btn-book');
+  var $btnAnother = document.getElementById('btn-another');
+  var $toggleNew = document.getElementById('toggle-new');
+  var $toggleExisting = document.getElementById('toggle-existing');
+  var $formNew = document.getElementById('form-new');
+  var $formExisting = document.getElementById('form-existing');
+  var $panelForm = document.getElementById('panel-form');
+  var $panelConfirm = document.getElementById('panel-confirm');
+  var $timePlaceholder = document.getElementById('time-placeholder');
+
+  // ============ CALENDAR ============
+  function renderCalendar() {
+    var year = state.currentYear;
+    var month = state.currentMonth;
+    $calLabel.textContent = MONTHS[month] + ' ' + year;
+
+    var todayS = todayStr();
+    var firstDay = new Date(year, month, 1).getDay();
+    var daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    var maxDate = new Date();
+    maxDate.setMonth(maxDate.getMonth() + 3);
+    var maxS = toDateString(maxDate);
+
+    var now = new Date();
+    $calPrev.disabled = (year === now.getFullYear() && month === now.getMonth());
+    $calNext.disabled = (year === maxDate.getFullYear() && month >= maxDate.getMonth());
+
+    var html = '';
+    for (var d = 0; d < 7; d++) {
+      html += '<div class="cal-dow">' + DAYS_SHORT[d] + '</div>';
+    }
+    for (var e = 0; e < firstDay; e++) {
+      html += '<div class="cal-day empty"></div>';
+    }
+    for (var day = 1; day <= daysInMonth; day++) {
+      var dateStr = year + '-' + (month + 1 < 10 ? '0' : '') + (month + 1) + '-' + (day < 10 ? '0' : '') + day;
+      var cls = 'cal-day';
+      var isPast = dateStr < todayS;
+      var isFuture = dateStr > maxS;
+      var isToday = dateStr === todayS;
+
+      if (isPast || isFuture) cls += ' disabled';
+      if (isToday) cls += ' today';
+      if (state.selectedDate === dateStr) cls += ' selected';
+
+      var hasDot = '';
+      if (!isPast && !isFuture) {
+        if (hasAvailableSlots(dateStr)) {
+          hasDot = '<div class="cal-dot"></div>';
+        }
+      }
+
+      html += '<div class="' + cls + '" data-date="' + dateStr + '">' + day + hasDot + '</div>';
+    }
+
+    $calGrid.innerHTML = html;
+  }
+
+  function hasAvailableSlots(dateStr) {
+    var slots = generateTimeSlots(dateStr);
+    for (var i = 0; i < slots.length; i++) {
+      if (slots[i].available) return true;
+    }
+    return false;
+  }
+
+  // ============ TIME SLOTS ============
+  function generateTimeSlots(dateStr) {
+    var slots = [];
+    var now = new Date();
+    var isToday = dateStr === todayStr();
+    var currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+    for (var h = 8; h <= 17; h++) {
+      for (var m = 0; m < 60; m += 30) {
+        if (h === 17 && m > 30) continue;
+        var time = (h < 10 ? '0' : '') + h + ':' + (m === 0 ? '00' : '30');
+        var mins = h * 60 + m;
+        var available = true;
+
+        if (isToday && mins <= currentMinutes) {
+          available = false;
+        }
+        if (available && hasConflict(dateStr, time)) {
+          available = false;
+        }
+
+        slots.push({ time: time, label: formatTime(time), available: available });
+      }
+    }
+    return slots;
+  }
+
+  function renderTimeSlots() {
+    if (!state.selectedDate) {
+      $timePlaceholder.style.display = '';
+      $timeGrid.innerHTML = '';
+      $timeLabel.textContent = 'Available Times';
+      updateBookButton();
+      updateSelectionSummary();
+      return;
+    }
+
+    $timePlaceholder.style.display = 'none';
+    $timeLabel.textContent = 'Available times for ' + formatDate(state.selectedDate);
+
+    var slots = generateTimeSlots(state.selectedDate);
+    var html = '';
+    for (var i = 0; i < slots.length; i++) {
+      var s = slots[i];
+      var cls = 'time-slot';
+      if (!s.available) cls += ' unavailable';
+      if (state.selectedTime === s.time) cls += ' selected';
+      html += '<div class="' + cls + '" data-time="' + s.time + '">' + s.label + '</div>';
+    }
+    $timeGrid.innerHTML = html;
+    updateBookButton();
+    updateSelectionSummary();
+  }
+
+  function updateSelectionSummary() {
+    if (state.selectedDate && state.selectedTime) {
+      $selSummary.innerHTML = '<strong>' + formatDate(state.selectedDate) + '</strong> at <strong>' + formatTime(state.selectedTime) + '</strong>';
+      $selSummary.classList.add('show');
+    } else {
+      $selSummary.classList.remove('show');
+    }
+  }
+
+  function updateBookButton() {
+    $btnBook.disabled = !(state.selectedDate && state.selectedTime);
+  }
+
+  // ============ PHONE INPUT ENFORCEMENT ============
+  function enforceDigits(input, codeInput) {
+    input.addEventListener('input', function() {
+      this.value = this.value.replace(/\D/g, '');
+      var maxDigits = getDigitsForCode(codeInput.value);
+      if (this.value.length > maxDigits) {
+        this.value = this.value.slice(0, maxDigits);
+      }
+    });
+    codeInput.addEventListener('input', function() {
+      var val = this.value.replace(/[^0-9+]/g, '');
+      if (val && val.charAt(0) !== '+') val = '+' + val;
+      this.value = val;
+    });
+  }
+
+  function loadDefaultPhoneCode() {
+    var code = localStorage.getItem('physio_phone_code') || '+91';
+    document.getElementById('inp-code').value = code;
+    document.getElementById('inp-ex-code').value = code;
+  }
+
+  // ============ PATIENT FORM LOGIC ============
+  function searchExistingPatient() {
+    var phone = document.getElementById('inp-ex-phone').value.trim();
+    var errEl = document.getElementById('err-ex-phone');
+    var infoEl = document.getElementById('ex-patient-info');
+    var nameEl = document.getElementById('ex-patient-name');
+
+    if (!phone || phone.length < 4) {
+      infoEl.classList.add('hidden');
+      errEl.classList.remove('show');
+      state.foundPatient = null;
+      return;
+    }
+
+    var patient = getPatientByPhone(phone);
+    if (patient) {
+      state.foundPatient = patient;
+      nameEl.textContent = patient.name;
+      infoEl.classList.remove('hidden');
+      errEl.classList.remove('show');
+    } else {
+      state.foundPatient = null;
+      infoEl.classList.add('hidden');
+      errEl.classList.add('show');
+      errEl.textContent = 'Patient not found with this number';
+    }
+  }
+
+  // ============ BOOKING LOGIC ============
+  function buildNotesString(reason, extraNotes) {
+    var notes = 'Booked online';
+    if (reason) notes += ' — ' + reason;
+    if (extraNotes) notes += '. Notes: ' + extraNotes;
+    return notes;
+  }
+
+  function validateAndBook() {
+    var patient = null;
+    var reason, extraNotes;
+
+    if (state.patientMode === 'new') {
+      var name = document.getElementById('inp-name').value.trim();
+      var phone = document.getElementById('inp-phone').value.trim();
+      var phoneCode = document.getElementById('inp-code').value.trim();
+      var email = document.getElementById('inp-email').value.trim();
+      reason = document.getElementById('inp-reason').value;
+      extraNotes = document.getElementById('inp-notes').value.trim();
+
+      var nameOk = name.length >= 2;
+      document.getElementById('inp-name').classList.toggle('error', !nameOk);
+      document.getElementById('err-name').classList.toggle('show', !nameOk);
+
+      var maxDigits = getDigitsForCode(phoneCode);
+      var phoneOk = phone.length >= 6 && phone.length <= maxDigits;
+      document.getElementById('inp-phone').classList.toggle('error', !phoneOk);
+      document.getElementById('err-phone').classList.toggle('show', !phoneOk);
+      if (!phoneOk) {
+        document.getElementById('err-phone').textContent = 'Please enter a valid phone number';
+      }
+
+      if (!nameOk || !phoneOk) return;
+
+      var existing = getPatientByPhone(phone);
+      if (existing) {
+        document.getElementById('inp-phone').classList.add('error');
+        document.getElementById('err-phone').textContent = 'This phone is already registered. Use "Existing Patient" to book.';
+        document.getElementById('err-phone').classList.add('show');
+        return;
+      }
+
+      patient = createPatient({
+        name: name,
+        phone: phone,
+        phoneCode: phoneCode || '+91',
+        email: email,
+        dob: '',
+        gender: '',
+        status: 'active',
+        tags: [],
+        bodyRegions: [],
+        source: 'online'
+      });
+
+    } else {
+      if (!state.foundPatient) {
+        document.getElementById('err-ex-phone').classList.add('show');
+        document.getElementById('err-ex-phone').textContent = 'Please find your patient record first';
+        return;
+      }
+      patient = state.foundPatient;
+      reason = document.getElementById('inp-ex-reason').value;
+      extraNotes = document.getElementById('inp-ex-notes').value.trim();
+    }
+
+    // Double-check slot availability
+    if (hasConflict(state.selectedDate, state.selectedTime)) {
+      toast('This time slot is no longer available. Please select another.', 'error');
+      state.selectedTime = null;
+      renderTimeSlots();
+      return;
+    }
+
+    var appt = createAppointment({
+      patientId: patient.id,
+      patientName: patient.name,
+      date: state.selectedDate,
+      time: state.selectedTime,
+      duration: '30',
+      type: 'Treatment',
+      status: 'scheduled',
+      notes: buildNotesString(reason, extraNotes),
+      source: 'online'
+    });
+
+    addOnlineBookingIndex(appt.id, patient.id);
+    showConfirmation(patient, appt, reason);
+  }
+
+  function showConfirmation(patient, appt, reason) {
+    var detail = document.getElementById('confirm-detail');
+    detail.innerHTML =
+      '<div class="row"><span class="label">Patient</span><span class="value">' + escapeHtml(patient.name) + '</span></div>' +
+      '<div class="row"><span class="label">Date</span><span class="value">' + formatDate(appt.date) + '</span></div>' +
+      '<div class="row"><span class="label">Time</span><span class="value">' + formatTime(appt.time) + '</span></div>' +
+      '<div class="row"><span class="label">Duration</span><span class="value">30 minutes</span></div>' +
+      (reason ? '<div class="row"><span class="label">Reason</span><span class="value">' + escapeHtml(reason) + '</span></div>' : '');
+
+    $panelForm.classList.add('hidden');
+    $panelConfirm.classList.remove('hidden');
+    toast('Appointment booked successfully!', 'success');
+  }
+
+  function resetAll() {
+    state.selectedDate = null;
+    state.selectedTime = null;
+    state.foundPatient = null;
+    state.patientMode = 'new';
+    state.currentMonth = new Date().getMonth();
+    state.currentYear = new Date().getFullYear();
+
+    document.getElementById('inp-name').value = '';
+    document.getElementById('inp-phone').value = '';
+    document.getElementById('inp-email').value = '';
+    document.getElementById('inp-reason').selectedIndex = 0;
+    document.getElementById('inp-notes').value = '';
+    document.getElementById('inp-ex-phone').value = '';
+    document.getElementById('inp-ex-reason').selectedIndex = 0;
+    document.getElementById('inp-ex-notes').value = '';
+    document.getElementById('ex-patient-info').classList.add('hidden');
+    loadDefaultPhoneCode();
+
+    var errors = document.querySelectorAll('.form-error');
+    for (var i = 0; i < errors.length; i++) errors[i].classList.remove('show');
+    var errorInputs = document.querySelectorAll('.form-input.error');
+    for (var j = 0; j < errorInputs.length; j++) errorInputs[j].classList.remove('error');
+
+    $toggleNew.classList.add('active');
+    $toggleExisting.classList.remove('active');
+    $formNew.classList.remove('hidden');
+    $formExisting.classList.add('hidden');
+
+    $panelConfirm.classList.add('hidden');
+    $panelForm.classList.remove('hidden');
+
+    renderCalendar();
+    renderTimeSlots();
+    $btnBook.disabled = true;
+  }
+
+  // ============ EVENT HANDLERS ============
+
+  // Calendar day click
+  $calGrid.addEventListener('click', function(e) {
+    var dayEl = e.target.closest('.cal-day');
+    if (!dayEl || dayEl.classList.contains('disabled') || dayEl.classList.contains('empty')) return;
+
+    state.selectedDate = dayEl.getAttribute('data-date');
+    state.selectedTime = null;
+    renderCalendar();
+    renderTimeSlots();
+  });
+
+  // Time slot click
+  $timeGrid.addEventListener('click', function(e) {
+    var slotEl = e.target.closest('.time-slot');
+    if (!slotEl || slotEl.classList.contains('unavailable')) return;
+
+    state.selectedTime = slotEl.getAttribute('data-time');
+    renderTimeSlots();
+  });
+
+  // Calendar navigation
+  $calPrev.addEventListener('click', function() {
+    state.currentMonth--;
+    if (state.currentMonth < 0) {
+      state.currentMonth = 11;
+      state.currentYear--;
+    }
+    renderCalendar();
+  });
+
+  $calNext.addEventListener('click', function() {
+    state.currentMonth++;
+    if (state.currentMonth > 11) {
+      state.currentMonth = 0;
+      state.currentYear++;
+    }
+    renderCalendar();
+  });
+
+  // Book button
+  $btnBook.addEventListener('click', function() {
+    validateAndBook();
+  });
+
+  // Book another
+  $btnAnother.addEventListener('click', function() {
+    resetAll();
+  });
+
+  // Toggle new/existing
+  $toggleNew.addEventListener('click', function() {
+    state.patientMode = 'new';
+    state.foundPatient = null;
+    $toggleNew.classList.add('active');
+    $toggleExisting.classList.remove('active');
+    $formNew.classList.remove('hidden');
+    $formExisting.classList.add('hidden');
+  });
+
+  $toggleExisting.addEventListener('click', function() {
+    state.patientMode = 'existing';
+    $toggleNew.classList.remove('active');
+    $toggleExisting.classList.add('active');
+    $formNew.classList.add('hidden');
+    $formExisting.classList.remove('hidden');
+  });
+
+  // Existing patient phone search (debounced)
+  var searchTimer = null;
+  document.getElementById('inp-ex-phone').addEventListener('input', function() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(searchExistingPatient, 400);
+  });
+
+  // Enforce phone digits
+  enforceDigits(document.getElementById('inp-phone'), document.getElementById('inp-code'));
+  enforceDigits(document.getElementById('inp-ex-phone'), document.getElementById('inp-ex-code'));
+
+  // ============ INIT ============
+  var $mainGrid = document.querySelector('.main-grid');
+  var $loadingState = document.getElementById('loading-state');
+  var $errorState = document.getElementById('error-state');
+  var $errorMessage = document.getElementById('error-message');
+  var $headerName = document.getElementById('header-clinic-name');
+
+  function showError(msg) {
+    $mainGrid.style.display = 'none';
+    $loadingState.style.display = 'none';
+    $errorState.style.display = 'block';
+    $errorMessage.textContent = msg;
+  }
+
+  function startApp() {
+    $loadingState.style.display = 'none';
+    $errorState.style.display = 'none';
+    $mainGrid.style.display = '';
+
+    loadDefaultPhoneCode();
+    state.selectedDate = todayStr();
+    renderCalendar();
+    renderTimeSlots();
+
+    // Pull latest data from Firestore
+    if (fbDb && clinicId) {
+      Promise.all([
+        fbPullCollection('patients'),
+        fbPullCollection('appointments')
+      ]).then(function() {
+        console.log('[Book1] Cloud data loaded for clinic ' + clinicId);
+        renderCalendar();
+        renderTimeSlots();
+      }).catch(function() {
+        console.warn('[Book1] Cloud pull failed, using local data');
+      });
+    }
+  }
+
+  // Resolve clinic from ?c= parameter
+  if (!clinicSlug) {
+    // No clinic param - try default
+    clinicId = 'default';
+    $headerName.textContent = 'PhysioClinic';
+    startApp();
+  } else if (fbDb) {
+    // Show loading while resolving
+    $mainGrid.style.display = 'none';
+    $loadingState.style.display = 'block';
+
+    fbDb.collection('booking_slugs').doc(clinicSlug).get().then(function(doc) {
+      if (!doc.exists) {
+        showError('No clinic found for "' + escapeHtml(clinicSlug) + '". Please check your booking link.');
+        return;
+      }
+      clinicId = doc.data().clinicId;
+
+      // Read clinic doc for name and feature check
+      return fbDb.collection('clinics').doc(clinicId).get().then(function(clinicDoc) {
+        if (clinicDoc.exists) {
+          var clinicData = clinicDoc.data();
+
+          // Check if online booking is enabled
+          if (clinicData.features && clinicData.features.onlineBooking === false) {
+            showError('Online booking is currently disabled for this clinic.');
+            return;
+          }
+
+          // Set clinic name in header
+          $headerName.textContent = clinicData.name || 'PhysioClinic';
+        }
+
+        startApp();
+      });
+    }).catch(function(err) {
+      console.error('[Book1] Clinic resolution failed:', err);
+      // Fallback: use slug as clinicId
+      clinicId = clinicSlug;
+      $headerName.textContent = 'PhysioClinic';
+      startApp();
+    });
+  } else {
+    // No Firebase - use slug as clinicId directly
+    clinicId = clinicSlug;
+    $headerName.textContent = 'PhysioClinic';
+    startApp();
+  }
+
+})();
+</script>
+</body>
+</html>

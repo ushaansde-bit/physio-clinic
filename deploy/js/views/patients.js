@@ -244,7 +244,10 @@ window.PatientsView = (function() {
     var body = '<form id="patient-form">';
     body += '<div class="form-row">';
     body += formField('Full Name', 'name', 'text', patient ? patient.name : '', true);
-    body += formField('Date of Birth', 'dob', 'date', patient ? patient.dob : '', true);
+    body += '<div class="form-group"><label>Date of Birth</label>';
+    body += Utils.dobPickerHtml(patient ? patient.dob : '');
+    body += '<div class="dob-age" style="font-size:0.8em;color:var(--text-muted);margin-top:4px;">' + (patient && patient.dob ? 'Age: ' + Utils.calculateAge(patient.dob) : '') + '</div>';
+    body += '</div>';
     body += '</div>';
     body += '<div class="form-row">';
     body += '<div class="form-group"><label>Gender</label>';
@@ -267,9 +270,9 @@ window.PatientsView = (function() {
     body += formField('Address', 'address', 'text', patient ? patient.address : '');
     body += formField('Insurance', 'insurance', 'text', patient ? patient.insurance : '');
     body += '<div class="form-group"><label>Diagnosis ' + Utils.micHtml('pf-diagnosis') + '</label>';
-    body += '<textarea id="pf-diagnosis" name="diagnosis" rows="2">' + Utils.escapeHtml(patient ? patient.diagnosis || '' : '') + '</textarea></div>';
+    body += '<textarea id="pf-diagnosis" name="diagnosis" rows="2" data-ac="diagnosis" placeholder="Start typing for suggestions...">' + Utils.escapeHtml(patient ? patient.diagnosis || '' : '') + '</textarea></div>';
     body += '<div class="form-group"><label>Treatment Plan ' + Utils.micHtml('pf-treatplan') + '</label>';
-    body += '<textarea id="pf-treatplan" name="treatmentPlan" rows="3">' + Utils.escapeHtml(patient ? patient.treatmentPlan || '' : '') + '</textarea></div>';
+    body += '<textarea id="pf-treatplan" name="treatmentPlan" rows="3" data-ac="treatmentPlan" placeholder="Start typing for suggestions...">' + Utils.escapeHtml(patient ? patient.treatmentPlan || '' : '') + '</textarea></div>';
     body += '<div class="form-row">';
     body += formField('Emergency Contact', 'emergencyContact', 'text', patient ? patient.emergencyContact : '');
     body += phoneField('Emergency Phone', 'emergencyPhone', 'emergencyPhoneCode', patient ? patient.emergencyPhone : '', patient ? patient.emergencyPhoneCode : '');
@@ -300,8 +303,11 @@ window.PatientsView = (function() {
 
     Utils.showModal(title, body, footer, { large: true });
 
-    // Bind mic buttons
-    Utils.bindMicButtons(document.getElementById('modal-body'));
+    // Bind mic buttons, autocomplete, and DOB picker
+    var modalBody = document.getElementById('modal-body');
+    Utils.bindMicButtons(modalBody);
+    Utils.bindAllAutocomplete(modalBody);
+    Utils.bindDobPicker(modalBody);
 
     // Tag pill toggle
     var tagPills = document.querySelectorAll('.tag-pill');
