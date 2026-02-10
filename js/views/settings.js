@@ -19,11 +19,60 @@ window.SettingsView = (function() {
     { key: 'settings', label: 'Settings', adminOnly: true }
   ];
 
+  // Granular billing permissions
+  var BILLING_PERMISSIONS = [
+    { key: 'billing_view', label: 'View Invoices' },
+    { key: 'billing_viewFinancials', label: 'View Financial Summary' },
+    { key: 'billing_create', label: 'Create Invoices' },
+    { key: 'billing_recordPayment', label: 'Record Payments' },
+    { key: 'billing_delete', label: 'Delete Invoices' }
+  ];
+
+  var ALL_BILLING_PERM_KEYS = [];
+  for (var bp = 0; bp < BILLING_PERMISSIONS.length; bp++) ALL_BILLING_PERM_KEYS.push(BILLING_PERMISSIONS[bp].key);
+
+  function getDefaultBillingPerms(role) {
+    if (role === 'admin') return ALL_BILLING_PERM_KEYS.slice();
+    if (role === 'receptionist') return ['billing_view', 'billing_viewFinancials', 'billing_create', 'billing_recordPayment'];
+    if (role === 'physiotherapist') return ['billing_view', 'billing_create'];
+    // Custom roles or unknown: check if role has defaultBillingPerms defined
+    var all = getAllRoles();
+    for (var i = 0; i < all.length; i++) {
+      if (all[i].value === role && all[i].defaultBillingPerms) return all[i].defaultBillingPerms.slice();
+    }
+    return ['billing_view'];
+  }
+
+  function buildBillingPermCheckboxes(selectedPerms) {
+    var html = '<div class="billing-perm-checkboxes" style="display:flex;flex-wrap:wrap;gap:6px 16px;">';
+    for (var i = 0; i < BILLING_PERMISSIONS.length; i++) {
+      var p = BILLING_PERMISSIONS[i];
+      var checked = selectedPerms.indexOf(p.key) !== -1;
+      var isView = p.key === 'billing_view';
+      html += '<label style="display:flex;align-items:center;gap:4px;font-size:0.9em;cursor:' + (isView ? 'default' : 'pointer') + ';">';
+      html += '<input type="checkbox" class="billing-perm-cb" data-perm="' + p.key + '"' + (checked ? ' checked' : '') + (isView ? ' checked disabled' : '') + '>';
+      html += Utils.escapeHtml(p.label);
+      html += '</label>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function getCheckedBillingPerms() {
+    var perms = [];
+    var cbs = document.querySelectorAll('.billing-perm-cb');
+    for (var i = 0; i < cbs.length; i++) {
+      if (cbs[i].checked) perms.push(cbs[i].getAttribute('data-perm'));
+    }
+    if (perms.indexOf('billing_view') === -1) perms.unshift('billing_view');
+    return perms;
+  }
+
   // Built-in role definitions
   var BUILTIN_ROLES = [
-    { value: 'admin', label: 'Admin', badge: 'badge-info', description: 'Full access - manage staff, settings, all features', defaultPages: ['dashboard','patients','appointments','billing','messaging','settings'], builtin: true },
-    { value: 'physiotherapist', label: 'Physiotherapist', badge: 'badge-primary', description: 'Patients, sessions, exercises, prescriptions', defaultPages: ['dashboard','patients','appointments'], builtin: true },
-    { value: 'receptionist', label: 'Receptionist', badge: 'badge-success', description: 'Appointments, billing, patient registration', defaultPages: ['dashboard','patients','appointments','billing'], builtin: true }
+    { value: 'admin', label: 'Admin', badge: 'badge-info', description: 'Full access - manage staff, settings, all features', defaultPages: ['dashboard','patients','appointments','billing','messaging','settings'], defaultBillingPerms: ALL_BILLING_PERM_KEYS.slice(), builtin: true },
+    { value: 'physiotherapist', label: 'Physiotherapist', badge: 'badge-primary', description: 'Patients, sessions, exercises, prescriptions', defaultPages: ['dashboard','patients','appointments'], defaultBillingPerms: ['billing_view', 'billing_create'], builtin: true },
+    { value: 'receptionist', label: 'Receptionist', badge: 'badge-success', description: 'Appointments, billing, patient registration', defaultPages: ['dashboard','patients','appointments','billing'], defaultBillingPerms: ['billing_view', 'billing_viewFinancials', 'billing_create', 'billing_recordPayment'], builtin: true }
   ];
 
   // Keep ROLES reference for backward compat within this file
@@ -158,11 +207,11 @@ window.SettingsView = (function() {
     html += '</div>';
     html += '<div class="card-body"><div class="table-wrapper">';
     html += '<table class="data-table"><thead><tr>';
-    html += '<th>Name</th><th>Username</th><th>Role</th><th>Phone</th><th>Email</th><th>Actions</th>';
+    html += '<th>Name</th><th>Role</th><th>Phone</th><th>Email</th><th>Actions</th>';
     html += '</tr></thead><tbody>';
 
     if (users.length === 0) {
-      html += '<tr class="no-hover"><td colspan="6"><div class="empty-state"><p>No staff members found</p></div></td></tr>';
+      html += '<tr class="no-hover"><td colspan="5"><div class="empty-state"><p>No staff members found</p></div></td></tr>';
     } else {
       for (var i = 0; i < users.length; i++) {
         var u = users[i];
@@ -181,7 +230,6 @@ window.SettingsView = (function() {
 
         html += '<tr class="no-hover">';
         html += '<td style="font-weight:500;">' + Utils.escapeHtml(u.name) + (isSelf ? ' <span style="color:var(--text-muted);font-weight:400;">(you)</span>' : '') + '</td>';
-        html += '<td>' + Utils.escapeHtml(u.username) + '</td>';
         html += '<td><span class="badge ' + roleBadge + '">' + Utils.escapeHtml(roleLabel) + '</span><br>' + pagesDisplay + '</td>';
         html += '<td>' + Utils.escapeHtml(u.phone || '-') + '</td>';
         html += '<td>' + Utils.escapeHtml(u.email || '-') + '</td>';
@@ -306,12 +354,32 @@ window.SettingsView = (function() {
     body += '<label>Default Page Access</label>';
     body += buildPageCheckboxes(['dashboard'], 'custom');
     body += '</div>';
+    body += '<div class="form-group" id="billing-perms-group" style="display:none;">';
+    body += '<label>Default Billing Permissions</label>';
+    body += buildBillingPermCheckboxes(['billing_view']);
+    body += '</div>';
     body += '</form>';
 
     var footer = '<button class="btn btn-secondary" id="modal-cancel">Cancel</button>';
     footer += '<button class="btn btn-primary" id="modal-save">Add Role</button>';
 
     Utils.showModal('Add Custom Role', body, footer);
+
+    // Toggle billing perms visibility when billing page checkbox changes
+    function updateRoleBillingPermsVisibility() {
+      var billingCb = document.querySelector('.page-access-cb[data-page="billing"]');
+      var billingGroup = document.getElementById('billing-perms-group');
+      if (!billingGroup) return;
+      billingGroup.style.display = (billingCb && billingCb.checked) ? '' : 'none';
+    }
+    var rolePageGroup = document.getElementById('page-access-group');
+    if (rolePageGroup) {
+      rolePageGroup.addEventListener('change', function(e) {
+        if (e.target.classList.contains('page-access-cb') && e.target.getAttribute('data-page') === 'billing') {
+          updateRoleBillingPermsVisibility();
+        }
+      });
+    }
 
     document.getElementById('modal-cancel').onclick = Utils.closeModal;
     document.getElementById('modal-save').onclick = function() {
@@ -336,6 +404,7 @@ window.SettingsView = (function() {
         }
       }
       var pages = getCheckedPages();
+      var billingPerms = pages.indexOf('billing') !== -1 ? getCheckedBillingPerms() : ['billing_view'];
       var custom = getCustomRoles();
       custom.push({
         value: value,
@@ -343,6 +412,7 @@ window.SettingsView = (function() {
         description: data.description || '',
         badge: data.badge || 'badge-primary',
         defaultPages: pages,
+        defaultBillingPerms: billingPerms,
         builtin: false
       });
       saveCustomRoles(custom);
@@ -382,12 +452,34 @@ window.SettingsView = (function() {
     body += '<label>Default Page Access</label>';
     body += buildPageCheckboxes(role.defaultPages || ['dashboard'], 'custom');
     body += '</div>';
+    var editRoleBillingPerms = role.defaultBillingPerms || ['billing_view'];
+    var editRoleBillingVisible = (role.defaultPages || []).indexOf('billing') !== -1;
+    body += '<div class="form-group" id="billing-perms-group" style="' + (editRoleBillingVisible ? '' : 'display:none;') + '">';
+    body += '<label>Default Billing Permissions</label>';
+    body += buildBillingPermCheckboxes(editRoleBillingPerms);
+    body += '</div>';
     body += '</form>';
 
     var footer = '<button class="btn btn-secondary" id="modal-cancel">Cancel</button>';
     footer += '<button class="btn btn-primary" id="modal-save">Save Changes</button>';
 
     Utils.showModal('Edit Role — ' + Utils.escapeHtml(role.label), body, footer);
+
+    // Toggle billing perms visibility when billing page checkbox changes
+    function updateEditRoleBillingPermsVisibility() {
+      var billingCb = document.querySelector('.page-access-cb[data-page="billing"]');
+      var billingGroup = document.getElementById('billing-perms-group');
+      if (!billingGroup) return;
+      billingGroup.style.display = (billingCb && billingCb.checked) ? '' : 'none';
+    }
+    var editRolePageGroup = document.getElementById('page-access-group');
+    if (editRolePageGroup) {
+      editRolePageGroup.addEventListener('change', function(e) {
+        if (e.target.classList.contains('page-access-cb') && e.target.getAttribute('data-page') === 'billing') {
+          updateEditRoleBillingPermsVisibility();
+        }
+      });
+    }
 
     document.getElementById('modal-cancel').onclick = Utils.closeModal;
     document.getElementById('modal-save').onclick = function() {
@@ -398,10 +490,12 @@ window.SettingsView = (function() {
         return;
       }
       var pages = getCheckedPages();
+      var billingPerms = pages.indexOf('billing') !== -1 ? getCheckedBillingPerms() : ['billing_view'];
       custom[roleIdx].label = data.label;
       custom[roleIdx].description = data.description || '';
       custom[roleIdx].badge = data.badge || 'badge-primary';
       custom[roleIdx].defaultPages = pages;
+      custom[roleIdx].defaultBillingPerms = billingPerms;
       saveCustomRoles(custom);
       Utils.toast('Role updated', 'success');
       Utils.closeModal();
@@ -683,18 +777,12 @@ window.SettingsView = (function() {
     body += buildPageCheckboxes(getDefaultPagesForRole('physiotherapist'), 'physiotherapist');
     body += '</div>';
 
-    body += '<hr style="border:none;border-top:1px solid var(--border-color);margin:12px 0;">';
-    body += '<p style="font-size:0.85em;color:var(--text-muted);margin-bottom:12px;">Login Credentials</p>';
-
-    body += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 12px;">';
-    body += '<div class="form-group">';
-    body += '<label>Username <span style="color:var(--danger);">*</span></label>';
-    body += '<input type="text" name="username" required placeholder="Login username" autocomplete="off">';
-    body += '</div>';
-    body += '<div class="form-group">';
-    body += '<label>Password <span style="color:var(--danger);">*</span></label>';
-    body += '<input type="password" name="password" required placeholder="Login password">';
-    body += '</div>';
+    // Billing permissions (visible only when billing page is checked)
+    var defBillingPerms = getDefaultBillingPerms('physiotherapist');
+    var billingChecked = getDefaultPagesForRole('physiotherapist').indexOf('billing') !== -1;
+    body += '<div class="form-group" id="billing-perms-group" style="' + (billingChecked ? '' : 'display:none;') + '">';
+    body += '<label>Billing Permissions</label>';
+    body += buildBillingPermCheckboxes(defBillingPerms);
     body += '</div>';
 
     body += '</form>';
@@ -704,15 +792,49 @@ window.SettingsView = (function() {
 
     Utils.showModal('Add Staff Member', body, footer);
 
-    // Role change updates page checkboxes
+    function updateBillingPermsVisibility() {
+      var billingCb = document.querySelector('.page-access-cb[data-page="billing"]');
+      var billingGroup = document.getElementById('billing-perms-group');
+      var roleVal = document.querySelector('#add-staff-form select[name="role"]');
+      if (!billingGroup) return;
+      if (roleVal && roleVal.value === 'admin') {
+        billingGroup.style.display = 'none';
+      } else if (billingCb && billingCb.checked) {
+        billingGroup.style.display = '';
+      } else {
+        billingGroup.style.display = 'none';
+      }
+    }
+
+    // Toggle billing perms when billing page checkbox changes
+    document.getElementById('page-access-group').addEventListener('change', function(e) {
+      if (e.target.classList.contains('page-access-cb') && e.target.getAttribute('data-page') === 'billing') {
+        updateBillingPermsVisibility();
+      }
+    });
+
+    // Role change updates page checkboxes + billing perms
     var roleSelect = document.querySelector('#add-staff-form select[name="role"]');
     if (roleSelect) {
       roleSelect.addEventListener('change', function() {
         var group = document.getElementById('page-access-group');
+        var billingGroup = document.getElementById('billing-perms-group');
         if (group) {
           var role = roleSelect.value;
           group.innerHTML = '<label>Page Access</label>' + buildPageCheckboxes(getDefaultPagesForRole(role), role);
+          // Re-attach billing checkbox listener
+          group.addEventListener('change', function(e) {
+            if (e.target.classList.contains('page-access-cb') && e.target.getAttribute('data-page') === 'billing') {
+              updateBillingPermsVisibility();
+            }
+          });
         }
+        if (billingGroup) {
+          var newRole = roleSelect.value;
+          var perms = getDefaultBillingPerms(newRole);
+          billingGroup.innerHTML = '<label>Billing Permissions</label>' + buildBillingPermCheckboxes(perms);
+        }
+        updateBillingPermsVisibility();
       });
     }
 
@@ -721,55 +843,28 @@ window.SettingsView = (function() {
       var form = document.getElementById('add-staff-form');
       var data = Utils.getFormData(form);
 
-      if (!data.name || !data.username || !data.password) {
-        Utils.toast('Please fill in all required fields', 'error');
-        return;
-      }
-
-      if (data.password.length < 4) {
-        Utils.toast('Password must be at least 4 characters', 'error');
-        return;
-      }
-
-      // Check for duplicate username
-      var existingUser = Store.getUserByUsername(data.username);
-      if (existingUser) {
-        Utils.toast('Username "' + data.username + '" is already taken', 'error');
+      if (!data.name) {
+        Utils.toast('Name is required', 'error');
         return;
       }
 
       var role = data.role || 'physiotherapist';
       var allowedPages = role === 'admin' ? null : getCheckedPages();
+      var billingPerms = role === 'admin' ? null : getCheckedBillingPerms();
 
       var newUser = Store.create(Store.KEYS.users, {
         name: data.name,
-        username: data.username,
-        password: data.password,
         role: role,
         phone: data.phone || '',
         email: data.email || '',
-        allowedPages: allowedPages
+        allowedPages: allowedPages,
+        billingPermissions: billingPerms
       });
 
       Store.logActivity('New staff member added: ' + data.name + ' (' + getRoleLabel(data.role) + ')');
+      Utils.toast('Staff member added', 'success');
       Utils.closeModal();
       renderView(container);
-
-      // Show login credentials modal
-      var clinicSlug = Store.getClinicSettings().bookingSlug || sessionStorage.getItem('physio_clinicId') || 'default';
-      var credBody = '<div style="background:var(--bg-secondary);border-radius:8px;padding:16px;margin-bottom:12px;">';
-      credBody += '<p style="margin:0 0 12px;color:var(--text-muted);font-size:0.85em;">Share these credentials with <strong>' + Utils.escapeHtml(data.name) + '</strong> to allow them to log in:</p>';
-      credBody += '<table style="width:100%;border-collapse:collapse;">';
-      credBody += '<tr><td style="padding:6px 8px;font-weight:600;width:110px;color:var(--text-muted);">Clinic Code</td><td style="padding:6px 8px;font-size:1.05em;"><code style="background:var(--bg-primary);padding:2px 8px;border-radius:4px;">' + Utils.escapeHtml(clinicSlug) + '</code></td></tr>';
-      credBody += '<tr><td style="padding:6px 8px;font-weight:600;color:var(--text-muted);">Username</td><td style="padding:6px 8px;font-size:1.05em;"><code style="background:var(--bg-primary);padding:2px 8px;border-radius:4px;">' + Utils.escapeHtml(data.username) + '</code></td></tr>';
-      credBody += '<tr><td style="padding:6px 8px;font-weight:600;color:var(--text-muted);">Password</td><td style="padding:6px 8px;font-size:1.05em;"><code style="background:var(--bg-primary);padding:2px 8px;border-radius:4px;">' + Utils.escapeHtml(data.password) + '</code></td></tr>';
-      credBody += '<tr><td style="padding:6px 8px;font-weight:600;color:var(--text-muted);">Role</td><td style="padding:6px 8px;"><span class="badge ' + getRoleBadge(data.role) + '">' + Utils.escapeHtml(getRoleLabel(data.role)) + '</span></td></tr>';
-      credBody += '</table></div>';
-      credBody += '<p style="font-size:0.85em;color:var(--text-muted);margin:0;">This is the only time the password is shown. If forgotten, reset it from the staff edit page.</p>';
-
-      var credFooter = '<button class="btn btn-primary" id="cred-done-btn">Done</button>';
-      Utils.showModal('Staff Login Credentials', credBody, credFooter);
-      document.getElementById('cred-done-btn').onclick = Utils.closeModal;
     };
   }
 
@@ -818,18 +913,12 @@ window.SettingsView = (function() {
     body += buildPageCheckboxes(editPages, user.role);
     body += '</div>';
 
-    body += '<hr style="border:none;border-top:1px solid var(--border-color);margin:12px 0;">';
-    body += '<p style="font-size:0.85em;color:var(--text-muted);margin-bottom:12px;">Login Credentials</p>';
-
-    body += '<div class="form-group">';
-    body += '<label>Username</label>';
-    body += '<input type="text" name="username" value="' + Utils.escapeHtml(user.username || '') + '" disabled style="background:var(--bg-secondary);">';
-    body += '<small style="color:var(--text-muted);">Username cannot be changed</small>';
-    body += '</div>';
-
-    body += '<div class="form-group">';
-    body += '<label>New Password <span style="color:var(--text-muted);font-weight:400;">(leave blank to keep current)</span></label>';
-    body += '<input type="password" name="newPassword" placeholder="Enter new password to change">';
+    // Billing permissions
+    var editBillingPerms = user.billingPermissions || getDefaultBillingPerms(user.role);
+    var editBillingVisible = user.role !== 'admin' && editPages.indexOf('billing') !== -1;
+    body += '<div class="form-group" id="billing-perms-group" style="' + (editBillingVisible ? '' : 'display:none;') + '">';
+    body += '<label>Billing Permissions' + (isSelf ? ' <span style="color:var(--text-muted);font-weight:400;">(cannot change own access)</span>' : '') + '</label>';
+    body += buildBillingPermCheckboxes(editBillingPerms);
     body += '</div>';
 
     body += '</form>';
@@ -839,22 +928,60 @@ window.SettingsView = (function() {
 
     Utils.showModal('Edit Staff — ' + Utils.escapeHtml(user.name), body, footer);
 
-    // Disable page checkboxes when editing self
+    // Disable page checkboxes and billing perm checkboxes when editing self
     if (isSelf) {
       var selfCbs = document.querySelectorAll('.page-access-cb');
       for (var s = 0; s < selfCbs.length; s++) selfCbs[s].disabled = true;
+      var selfBpCbs = document.querySelectorAll('.billing-perm-cb');
+      for (var sb = 0; sb < selfBpCbs.length; sb++) selfBpCbs[sb].disabled = true;
     }
 
-    // Role change updates page checkboxes (only for non-self)
+    function updateEditBillingPermsVisibility() {
+      var billingCb = document.querySelector('.page-access-cb[data-page="billing"]');
+      var billingGroup = document.getElementById('billing-perms-group');
+      var roleVal = document.querySelector('#edit-staff-form select[name="role"]');
+      if (!billingGroup) return;
+      if (roleVal && roleVal.value === 'admin') {
+        billingGroup.style.display = 'none';
+      } else if (billingCb && billingCb.checked) {
+        billingGroup.style.display = '';
+      } else {
+        billingGroup.style.display = 'none';
+      }
+    }
+
+    // Toggle billing perms when billing page checkbox changes
+    var editPageGroup = document.getElementById('page-access-group');
+    if (editPageGroup) {
+      editPageGroup.addEventListener('change', function(e) {
+        if (e.target.classList.contains('page-access-cb') && e.target.getAttribute('data-page') === 'billing') {
+          updateEditBillingPermsVisibility();
+        }
+      });
+    }
+
+    // Role change updates page checkboxes + billing perms (only for non-self)
     if (!isSelf) {
       var editRoleSelect = document.querySelector('#edit-staff-form select[name="role"]');
       if (editRoleSelect) {
         editRoleSelect.addEventListener('change', function() {
           var group = document.getElementById('page-access-group');
+          var billingGroup = document.getElementById('billing-perms-group');
           if (group) {
             var role = editRoleSelect.value;
             group.innerHTML = '<label>Page Access</label>' + buildPageCheckboxes(getDefaultPagesForRole(role), role);
+            group.addEventListener('change', function(e) {
+              if (e.target.classList.contains('page-access-cb') && e.target.getAttribute('data-page') === 'billing') {
+                updateEditBillingPermsVisibility();
+              }
+            });
           }
+          if (billingGroup) {
+            var newRole = editRoleSelect.value;
+            var perms = getDefaultBillingPerms(newRole);
+            billingGroup.innerHTML = '<label>Billing Permissions</label>' + buildBillingPermCheckboxes(perms);
+          }
+          updateEditBillingPermsVisibility();
         });
       }
     }
@@ -871,23 +998,16 @@ window.SettingsView = (function() {
 
       var updatedRole = data.role || user.role;
       var allowedPages = updatedRole === 'admin' ? null : (isSelf ? user.allowedPages : getCheckedPages());
+      var billingPerms = updatedRole === 'admin' ? null : (isSelf ? user.billingPermissions : getCheckedBillingPerms());
 
       var updates = {
         name: data.name,
         role: updatedRole,
         phone: data.phone || '',
         email: data.email || '',
-        allowedPages: allowedPages
+        allowedPages: allowedPages,
+        billingPermissions: billingPerms
       };
-
-      // Update password only if provided
-      if (data.newPassword) {
-        if (data.newPassword.length < 4) {
-          Utils.toast('Password must be at least 4 characters', 'error');
-          return;
-        }
-        updates.password = data.newPassword;
-      }
 
       Store.update(Store.KEYS.users, userId, updates);
 

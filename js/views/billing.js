@@ -14,6 +14,14 @@ window.BillingView = (function() {
     perPage: 15
   };
 
+  function hasBillingPerm(permKey) {
+    var user = App.getCurrentUser();
+    if (!user) return false;
+    if (user.role === 'admin') return true;
+    if (!user.billingPermissions) return true; // backward compat
+    return user.billingPermissions.indexOf(permKey) !== -1;
+  }
+
   function render(container) {
     state.search = '';
     state.statusFilter = '';
@@ -83,11 +91,13 @@ window.BillingView = (function() {
     var html = '';
 
     // Summary cards
-    html += '<div class="billing-summary">';
-    html += '<div class="billing-stat pending"><h4>Total Outstanding</h4><div class="amount">' + Utils.formatCurrency(totalOutstanding) + '</div></div>';
-    html += '<div class="billing-stat paid"><h4>Paid This Month</h4><div class="amount">' + Utils.formatCurrency(paidThisMonth) + '</div></div>';
-    html += '<div class="billing-stat total"><h4>Revenue This Month</h4><div class="amount">' + Utils.formatCurrency(revenueThisMonth) + '</div></div>';
-    html += '</div>';
+    if (hasBillingPerm('billing_viewFinancials')) {
+      html += '<div class="billing-summary">';
+      html += '<div class="billing-stat pending"><h4>Total Outstanding</h4><div class="amount">' + Utils.formatCurrency(totalOutstanding) + '</div></div>';
+      html += '<div class="billing-stat paid"><h4>Paid This Month</h4><div class="amount">' + Utils.formatCurrency(paidThisMonth) + '</div></div>';
+      html += '<div class="billing-stat total"><h4>Revenue This Month</h4><div class="amount">' + Utils.formatCurrency(revenueThisMonth) + '</div></div>';
+      html += '</div>';
+    }
 
     // Toolbar
     html += '<div class="toolbar">';
@@ -102,9 +112,11 @@ window.BillingView = (function() {
     html += '</select>';
     html += '<input type="date" class="filter-select" id="billing-date-from" value="' + state.dateFrom + '">';
     html += '<input type="date" class="filter-select" id="billing-date-to" value="' + state.dateTo + '">';
-    html += '<button class="btn btn-primary" id="create-invoice-btn">';
-    html += '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
-    html += 'Create Invoice</button>';
+    if (hasBillingPerm('billing_create')) {
+      html += '<button class="btn btn-primary" id="create-invoice-btn">';
+      html += '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
+      html += 'Create Invoice</button>';
+    }
     html += '</div>';
 
     // Table
@@ -127,10 +139,12 @@ window.BillingView = (function() {
         html += '<td style="font-weight:600;white-space:nowrap;">' + Utils.formatCurrency(item.amount) + '</td>';
         html += '<td><span class="badge ' + statusCls + '">' + item.status + '</span></td>';
         html += '<td><div class="btn-group">';
-        if (item.status === 'pending') {
+        if (item.status === 'pending' && hasBillingPerm('billing_recordPayment')) {
           html += '<button class="btn btn-sm btn-success mark-paid-btn" data-id="' + item.id + '">Mark Paid</button>';
         }
-        html += '<button class="btn btn-sm btn-ghost delete-billing-btn" data-id="' + item.id + '" style="color:var(--danger);">Delete</button>';
+        if (hasBillingPerm('billing_delete')) {
+          html += '<button class="btn btn-sm btn-ghost delete-billing-btn" data-id="' + item.id + '" style="color:var(--danger);">Delete</button>';
+        }
         html += '</div></td>';
         html += '</tr>';
       }
@@ -211,6 +225,7 @@ window.BillingView = (function() {
       // Mark paid
       var markPaidBtn = e.target.closest('.mark-paid-btn');
       if (markPaidBtn) {
+        if (!hasBillingPerm('billing_recordPayment')) return;
         var billId = markPaidBtn.getAttribute('data-id');
         Store.updateBilling(billId, { status: 'paid', paidDate: Utils.today() });
         Store.logActivity('Payment received');
@@ -222,6 +237,7 @@ window.BillingView = (function() {
       // Delete
       var deleteBtn = e.target.closest('.delete-billing-btn');
       if (deleteBtn) {
+        if (!hasBillingPerm('billing_delete')) return;
         Utils.confirm('Delete this billing record?', function() {
           Store.deleteBilling(deleteBtn.getAttribute('data-id'));
           Utils.toast('Billing record deleted', 'success');
@@ -232,6 +248,7 @@ window.BillingView = (function() {
 
       // Create invoice
       if (e.target.closest('#create-invoice-btn')) {
+        if (!hasBillingPerm('billing_create')) return;
         showCreateInvoice(container);
         return;
       }
