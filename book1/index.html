@@ -73,58 +73,48 @@ body {
   margin-top: 0.15rem;
 }
 
-/* --- Step Indicator --- */
-.steps {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0;
-  padding: 1.25rem 1rem 0.75rem;
-  max-width: 400px;
+/* --- Main Grid (side-by-side) --- */
+.main-grid {
+  max-width: 960px;
   margin: 0 auto;
+  padding: 1rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  align-items: stretch;
 }
-.step-item {
+.left-panel, .right-panel {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.8rem;
-  color: var(--gray-400);
-  white-space: nowrap;
+  flex-direction: column;
 }
-.step-item.active { color: var(--primary); font-weight: 600; }
-.step-item.done { color: var(--success); }
-.step-num {
-  width: 26px; height: 26px;
-  border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 0.75rem; font-weight: 700;
-  border: 2px solid var(--gray-300);
-  background: var(--white);
-  flex-shrink: 0;
+.right-panel > #panel-form,
+.right-panel > #panel-confirm {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }
-.step-item.active .step-num {
-  border-color: var(--primary);
-  background: var(--primary);
-  color: var(--white);
+.right-panel > #panel-form > .card,
+.right-panel > #panel-confirm > .card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
-.step-item.done .step-num {
-  border-color: var(--success);
-  background: var(--success);
-  color: var(--white);
+.right-panel > #panel-form > .card > #form-new,
+.right-panel > #panel-form > .card > #form-existing {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
-.step-line {
-  width: 40px; height: 2px;
-  background: var(--gray-300);
-  margin: 0 0.25rem;
-  flex-shrink: 0;
+.right-panel > #panel-form > .card > #form-new > .form-group:last-child,
+.right-panel > #panel-form > .card > #form-existing > .form-group:last-child {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
-.step-line.done { background: var(--success); }
-
-/* --- Container --- */
-.container {
-  max-width: 520px;
-  margin: 0 auto;
-  padding: 0 1rem 2rem;
+.right-panel > #panel-form > .card > #form-new > .form-group:last-child > textarea,
+.right-panel > #panel-form > .card > #form-existing > .form-group:last-child > textarea {
+  flex: 1;
+  min-height: 60px;
 }
 
 /* --- Card --- */
@@ -133,7 +123,6 @@ body {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
   padding: 1.25rem;
-  margin-top: 0.75rem;
 }
 .card-title {
   font-size: 1rem;
@@ -218,11 +207,6 @@ body {
 .cal-day.disabled .cal-dot { background: var(--gray-300); }
 
 /* --- Time Slots --- */
-.time-section {
-  margin-top: 1rem;
-  display: none;
-}
-.time-section.show { display: block; }
 .time-label {
   font-size: 0.85rem;
   font-weight: 600;
@@ -263,6 +247,28 @@ body {
   border-color: var(--gray-200);
 }
 
+/* --- Selection Summary --- */
+.selection-summary {
+  background: var(--primary-50);
+  border: 1px solid var(--primary-200);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.85rem;
+  margin-top: 1rem;
+  font-size: 0.8rem;
+  color: var(--primary-dark);
+  display: none;
+}
+.selection-summary.show { display: block; }
+.selection-summary strong { font-weight: 600; }
+
+/* --- Time Placeholder --- */
+.time-placeholder {
+  text-align: center;
+  padding: 1.5rem 0.5rem;
+  color: var(--gray-400);
+  font-size: 0.85rem;
+}
+
 /* --- Buttons --- */
 .btn {
   display: inline-flex;
@@ -294,12 +300,6 @@ body {
 }
 .btn-secondary:hover { background: var(--gray-50); }
 .btn-block { width: 100%; }
-.btn-group {
-  display: flex;
-  gap: 0.75rem;
-  margin-top: 1.25rem;
-}
-.btn-group .btn { flex: 1; }
 
 /* --- Forms --- */
 .form-group { margin-bottom: 1rem; }
@@ -310,7 +310,7 @@ body {
   color: var(--gray-700);
   margin-bottom: 0.3rem;
 }
-.form-input {
+.form-input, .form-select {
   width: 100%;
   padding: 0.55rem 0.75rem;
   border: 1px solid var(--border);
@@ -319,8 +319,9 @@ body {
   color: var(--gray-800);
   background: var(--white);
   transition: var(--transition);
+  font-family: inherit;
 }
-.form-input:focus {
+.form-input:focus, .form-select:focus {
   outline: none;
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
@@ -459,30 +460,16 @@ body {
 /* --- Hidden --- */
 .hidden { display: none !important; }
 
-/* --- Selection Summary --- */
-.selection-summary {
-  background: var(--primary-50);
-  border: 1px solid var(--primary-200);
-  border-radius: var(--radius);
-  padding: 0.6rem 0.85rem;
-  margin-top: 1rem;
-  font-size: 0.8rem;
-  color: var(--primary-dark);
-  display: none;
-}
-.selection-summary.show { display: block; }
-.selection-summary strong { font-weight: 600; }
-
-/* --- Responsive --- */
+/* --- Responsive: Mobile stacked --- */
 @media (max-width: 768px) {
-  .time-grid { grid-template-columns: repeat(3, 1fr); }
-  .container { padding: 0 0.75rem 2rem; }
+  .main-grid {
+    grid-template-columns: 1fr;
+    padding: 0.75rem;
+  }
   .card { padding: 1rem; }
 }
 @media (max-width: 380px) {
   .time-grid { grid-template-columns: repeat(2, 1fr); }
-  .step-item span { display: none; }
-  .step-line { width: 28px; }
 }
 </style>
 </head>
@@ -494,28 +481,11 @@ body {
   <p>Book an Appointment</p>
 </div>
 
-<!-- Step Indicator -->
-<div class="steps">
-  <div class="step-item active" id="step-ind-1">
-    <div class="step-num">1</div>
-    <span>Date & Time</span>
-  </div>
-  <div class="step-line" id="step-line-1"></div>
-  <div class="step-item" id="step-ind-2">
-    <div class="step-num">2</div>
-    <span>Details</span>
-  </div>
-  <div class="step-line" id="step-line-2"></div>
-  <div class="step-item" id="step-ind-3">
-    <div class="step-num">3</div>
-    <span>Confirmed</span>
-  </div>
-</div>
+<!-- Side-by-Side Layout -->
+<div class="main-grid">
 
-<div class="container">
-
-  <!-- ===== STEP 1: Calendar + Time ===== -->
-  <div id="step-1">
+  <!-- ===== LEFT PANEL: Calendar + Time Slots ===== -->
+  <div class="left-panel">
     <div class="card">
       <div class="cal-header">
         <button class="cal-nav" id="cal-prev" title="Previous month">&#9664;</button>
@@ -525,89 +495,120 @@ body {
       <div class="cal-grid" id="cal-grid"></div>
     </div>
 
-    <div class="time-section" id="time-section">
+    <div class="card" style="margin-top:0.75rem; flex:1;">
+      <div class="time-label" id="time-label">Available Times</div>
+      <div class="time-placeholder" id="time-placeholder">Select a date to see available times</div>
+      <div class="time-grid" id="time-grid"></div>
+      <div class="selection-summary" id="selection-summary"></div>
+    </div>
+  </div>
+
+  <!-- ===== RIGHT PANEL: Patient Form OR Confirmation ===== -->
+  <div class="right-panel">
+
+    <!-- Patient Details Form -->
+    <div id="panel-form">
       <div class="card">
-        <div class="time-label" id="time-label">Select a time</div>
-        <div class="time-grid" id="time-grid"></div>
-      </div>
-    </div>
+        <div class="card-title">Patient Details</div>
 
-    <div class="selection-summary" id="selection-summary"></div>
-
-    <div class="btn-group">
-      <button class="btn btn-primary btn-block" id="btn-next" disabled>Next</button>
-    </div>
-  </div>
-
-  <!-- ===== STEP 2: Patient Details ===== -->
-  <div id="step-2" class="hidden">
-    <div class="card">
-      <div class="toggle-group">
-        <button class="toggle-btn active" id="toggle-new">New Patient</button>
-        <button class="toggle-btn" id="toggle-existing">Existing Patient</button>
-      </div>
-
-      <!-- New Patient Form -->
-      <div id="form-new">
-        <div class="form-group">
-          <label class="form-label" for="inp-name">Full Name *</label>
-          <input type="text" class="form-input" id="inp-name" placeholder="Enter your full name" autocomplete="name">
-          <div class="form-error" id="err-name">Please enter your name</div>
+        <div class="toggle-group">
+          <button class="toggle-btn active" id="toggle-new">New Patient</button>
+          <button class="toggle-btn" id="toggle-existing">Existing Patient</button>
         </div>
-        <div class="form-group">
-          <label class="form-label">Phone Number *</label>
-          <div class="phone-row">
-            <input type="text" class="form-input phone-code" id="inp-code" value="+91">
-            <input type="tel" class="form-input phone-number" id="inp-phone" placeholder="Phone number" autocomplete="tel">
+
+        <!-- New Patient Form -->
+        <div id="form-new">
+          <div class="form-group">
+            <label class="form-label" for="inp-name">Full Name *</label>
+            <input type="text" class="form-input" id="inp-name" placeholder="Enter your full name" autocomplete="name">
+            <div class="form-error" id="err-name">Please enter your name</div>
           </div>
-          <div class="form-error" id="err-phone">Please enter a valid phone number</div>
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="inp-email">Email (optional)</label>
-          <input type="email" class="form-input" id="inp-email" placeholder="your@email.com" autocomplete="email">
-        </div>
-      </div>
-
-      <!-- Existing Patient Form -->
-      <div id="form-existing" class="hidden">
-        <div class="form-group">
-          <label class="form-label">Phone Number</label>
-          <div class="phone-row">
-            <input type="text" class="form-input phone-code" id="inp-ex-code" value="+91">
-            <input type="tel" class="form-input phone-number" id="inp-ex-phone" placeholder="Enter registered phone">
+          <div class="form-group">
+            <label class="form-label">Phone Number *</label>
+            <div class="phone-row">
+              <input type="text" class="form-input phone-code" id="inp-code" value="+91">
+              <input type="tel" class="form-input phone-number" id="inp-phone" placeholder="Phone number" autocomplete="tel">
+            </div>
+            <div class="form-error" id="err-phone">Please enter a valid phone number</div>
           </div>
-          <div class="form-error" id="err-ex-phone">Patient not found with this number</div>
+          <div class="form-group">
+            <label class="form-label" for="inp-email">Email (optional)</label>
+            <input type="email" class="form-input" id="inp-email" placeholder="your@email.com" autocomplete="email">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="inp-reason">What brings you in?</label>
+            <select class="form-select" id="inp-reason">
+              <option value="General consultation">General consultation</option>
+              <option value="Back or neck pain">Back or neck pain</option>
+              <option value="Knee or leg pain">Knee or leg pain</option>
+              <option value="Shoulder or arm pain">Shoulder or arm pain</option>
+              <option value="Post-surgery recovery">Post-surgery recovery</option>
+              <option value="Sports injury">Sports injury</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label" for="inp-notes">Any additional notes? (optional)</label>
+            <textarea class="form-input" id="inp-notes" rows="2" placeholder="Anything else we should know..."></textarea>
+          </div>
         </div>
-        <div id="ex-patient-info" class="hidden" style="background:var(--success-bg);border-radius:var(--radius);padding:0.75rem;margin-top:0.5rem;">
-          <div style="font-size:0.8rem;color:var(--gray-500);">Patient found</div>
-          <div style="font-weight:600;color:var(--gray-800);" id="ex-patient-name"></div>
+
+        <!-- Existing Patient Form -->
+        <div id="form-existing" class="hidden">
+          <div class="form-group">
+            <label class="form-label">Phone Number</label>
+            <div class="phone-row">
+              <input type="text" class="form-input phone-code" id="inp-ex-code" value="+91">
+              <input type="tel" class="form-input phone-number" id="inp-ex-phone" placeholder="Enter registered phone">
+            </div>
+            <div class="form-error" id="err-ex-phone">Patient not found with this number</div>
+          </div>
+          <div id="ex-patient-info" class="hidden" style="background:var(--success-bg);border-radius:var(--radius);padding:0.75rem;margin-bottom:1rem;">
+            <div style="font-size:0.8rem;color:var(--gray-500);">Patient found</div>
+            <div style="font-weight:600;color:var(--gray-800);" id="ex-patient-name"></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="inp-ex-reason">What brings you in?</label>
+            <select class="form-select" id="inp-ex-reason">
+              <option value="General consultation">General consultation</option>
+              <option value="Back or neck pain">Back or neck pain</option>
+              <option value="Knee or leg pain">Knee or leg pain</option>
+              <option value="Shoulder or arm pain">Shoulder or arm pain</option>
+              <option value="Post-surgery recovery">Post-surgery recovery</option>
+              <option value="Sports injury">Sports injury</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label" for="inp-ex-notes">Any additional notes? (optional)</label>
+            <textarea class="form-input" id="inp-ex-notes" rows="2" placeholder="Anything else we should know..."></textarea>
+          </div>
+        </div>
+
+        <div style="margin-top:auto; padding-top:1rem;">
+          <button class="btn btn-primary btn-block" id="btn-book" disabled>Book Appointment</button>
         </div>
       </div>
     </div>
 
-    <div class="btn-group">
-      <button class="btn btn-secondary" id="btn-back">Back</button>
-      <button class="btn btn-primary" id="btn-book">Book Appointment</button>
-    </div>
-  </div>
-
-  <!-- ===== STEP 3: Confirmation ===== -->
-  <div id="step-3" class="hidden">
-    <div class="card">
-      <div class="confirm-wrap">
-        <div class="confirm-check">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="20 6 9 17 4 12"/>
-          </svg>
+    <!-- Confirmation (replaces form after booking) -->
+    <div id="panel-confirm" class="hidden">
+      <div class="card">
+        <div class="confirm-wrap">
+          <div class="confirm-check">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+          </div>
+          <h2>Appointment Booked!</h2>
+          <p>You will receive a confirmation shortly.</p>
+          <div class="confirm-detail" id="confirm-detail"></div>
+          <button class="btn btn-primary btn-block" id="btn-another" style="margin-top:0.75rem;">Book Another Appointment</button>
         </div>
-        <h2>Appointment Booked!</h2>
-        <p>You will receive a confirmation shortly.</p>
-        <div class="confirm-detail" id="confirm-detail"></div>
-        <button class="btn btn-primary btn-block" id="btn-another" style="margin-top:0.75rem;">Book Another Appointment</button>
       </div>
     </div>
-  </div>
 
+  </div>
 </div>
 
 <!-- Toast Container -->
@@ -621,7 +622,6 @@ body {
   var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   var DAYS_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
-  // Currency phone code mapping (matching main app)
   var PHONE_MAP = [
     { phone: '+91', digits: 11 },
     { phone: '+1', digits: 10 },
@@ -715,15 +715,6 @@ body {
     localStorage.setItem(key, JSON.stringify(data));
   }
 
-  function getAppointmentsByDate(date) {
-    var items = getAll('physio_appointments');
-    var result = [];
-    for (var i = 0; i < items.length; i++) {
-      if (items[i].date === date) result.push(items[i]);
-    }
-    return result;
-  }
-
   function getPatientByPhone(phone) {
     var patients = getAll('physio_patients');
     var clean = phone.replace(/\D/g, '');
@@ -754,7 +745,6 @@ body {
     data.createdAt = new Date().toISOString();
     patients.push(data);
     saveAll('physio_patients', patients);
-    // Log activity
     logActivity('New patient added: ' + data.name + ' (online booking)');
     return data;
   }
@@ -804,49 +794,27 @@ body {
     currentYear: new Date().getFullYear(),
     selectedDate: null,
     selectedTime: null,
-    patientMode: 'new', // 'new' or 'existing'
+    patientMode: 'new',
     foundPatient: null
   };
 
   // ============ DOM REFS ============
-  var $step1 = document.getElementById('step-1');
-  var $step2 = document.getElementById('step-2');
-  var $step3 = document.getElementById('step-3');
   var $calGrid = document.getElementById('cal-grid');
   var $calLabel = document.getElementById('cal-month-label');
   var $calPrev = document.getElementById('cal-prev');
   var $calNext = document.getElementById('cal-next');
-  var $timeSection = document.getElementById('time-section');
   var $timeGrid = document.getElementById('time-grid');
   var $timeLabel = document.getElementById('time-label');
   var $selSummary = document.getElementById('selection-summary');
-  var $btnNext = document.getElementById('btn-next');
-  var $btnBack = document.getElementById('btn-back');
   var $btnBook = document.getElementById('btn-book');
   var $btnAnother = document.getElementById('btn-another');
   var $toggleNew = document.getElementById('toggle-new');
   var $toggleExisting = document.getElementById('toggle-existing');
   var $formNew = document.getElementById('form-new');
   var $formExisting = document.getElementById('form-existing');
-
-  // ============ STEP NAVIGATION ============
-  function showStep(n) {
-    $step1.classList.toggle('hidden', n !== 1);
-    $step2.classList.toggle('hidden', n !== 2);
-    $step3.classList.toggle('hidden', n !== 3);
-
-    for (var i = 1; i <= 3; i++) {
-      var ind = document.getElementById('step-ind-' + i);
-      ind.classList.remove('active', 'done');
-      if (i < n) ind.classList.add('done');
-      else if (i === n) ind.classList.add('active');
-    }
-    for (var j = 1; j <= 2; j++) {
-      var line = document.getElementById('step-line-' + j);
-      line.classList.toggle('done', j < n);
-    }
-    window.scrollTo(0, 0);
-  }
+  var $panelForm = document.getElementById('panel-form');
+  var $panelConfirm = document.getElementById('panel-confirm');
+  var $timePlaceholder = document.getElementById('time-placeholder');
 
   // ============ CALENDAR ============
   function renderCalendar() {
@@ -854,17 +822,14 @@ body {
     var month = state.currentMonth;
     $calLabel.textContent = MONTHS[month] + ' ' + year;
 
-    var today = new Date();
     var todayS = todayStr();
     var firstDay = new Date(year, month, 1).getDay();
     var daysInMonth = new Date(year, month + 1, 0).getDate();
 
-    // Max date: 3 months ahead
     var maxDate = new Date();
     maxDate.setMonth(maxDate.getMonth() + 3);
     var maxS = toDateString(maxDate);
 
-    // Nav button state
     var now = new Date();
     $calPrev.disabled = (year === now.getFullYear() && month === now.getMonth());
     $calNext.disabled = (year === maxDate.getFullYear() && month >= maxDate.getMonth());
@@ -887,7 +852,6 @@ body {
       if (isToday) cls += ' today';
       if (state.selectedDate === dateStr) cls += ' selected';
 
-      // Availability dot: check if any slots are open
       var hasDot = '';
       if (!isPast && !isFuture) {
         if (hasAvailableSlots(dateStr)) {
@@ -916,7 +880,6 @@ body {
     var isToday = dateStr === todayStr();
     var currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-    // 8:00 AM to 5:30 PM, 30 min intervals = 20 slots
     for (var h = 8; h <= 17; h++) {
       for (var m = 0; m < 60; m += 30) {
         if (h === 17 && m > 30) continue;
@@ -924,11 +887,9 @@ body {
         var mins = h * 60 + m;
         var available = true;
 
-        // Past time on today
         if (isToday && mins <= currentMinutes) {
           available = false;
         }
-        // Conflict with existing appointment
         if (available && hasConflict(dateStr, time)) {
           available = false;
         }
@@ -941,11 +902,15 @@ body {
 
   function renderTimeSlots() {
     if (!state.selectedDate) {
-      $timeSection.classList.remove('show');
+      $timePlaceholder.style.display = '';
+      $timeGrid.innerHTML = '';
+      $timeLabel.textContent = 'Available Times';
+      updateBookButton();
+      updateSelectionSummary();
       return;
     }
 
-    $timeSection.classList.add('show');
+    $timePlaceholder.style.display = 'none';
     $timeLabel.textContent = 'Available times for ' + formatDate(state.selectedDate);
 
     var slots = generateTimeSlots(state.selectedDate);
@@ -958,6 +923,7 @@ body {
       html += '<div class="' + cls + '" data-time="' + s.time + '">' + s.label + '</div>';
     }
     $timeGrid.innerHTML = html;
+    updateBookButton();
     updateSelectionSummary();
   }
 
@@ -965,11 +931,13 @@ body {
     if (state.selectedDate && state.selectedTime) {
       $selSummary.innerHTML = '<strong>' + formatDate(state.selectedDate) + '</strong> at <strong>' + formatTime(state.selectedTime) + '</strong>';
       $selSummary.classList.add('show');
-      $btnNext.disabled = false;
     } else {
       $selSummary.classList.remove('show');
-      $btnNext.disabled = true;
     }
+  }
+
+  function updateBookButton() {
+    $btnBook.disabled = !(state.selectedDate && state.selectedTime);
   }
 
   // ============ PHONE INPUT ENFORCEMENT ============
@@ -988,7 +956,6 @@ body {
     });
   }
 
-  // Load default phone code from main app settings
   function loadDefaultPhoneCode() {
     var code = localStorage.getItem('physio_phone_code') || '+91';
     document.getElementById('inp-code').value = code;
@@ -1024,21 +991,29 @@ body {
   }
 
   // ============ BOOKING LOGIC ============
+  function buildNotesString(reason, extraNotes) {
+    var notes = 'Booked online';
+    if (reason) notes += ' — ' + reason;
+    if (extraNotes) notes += '. Notes: ' + extraNotes;
+    return notes;
+  }
+
   function validateAndBook() {
     var patient = null;
+    var reason, extraNotes;
 
     if (state.patientMode === 'new') {
       var name = document.getElementById('inp-name').value.trim();
       var phone = document.getElementById('inp-phone').value.trim();
       var phoneCode = document.getElementById('inp-code').value.trim();
       var email = document.getElementById('inp-email').value.trim();
+      reason = document.getElementById('inp-reason').value;
+      extraNotes = document.getElementById('inp-notes').value.trim();
 
-      // Validate name
       var nameOk = name.length >= 2;
       document.getElementById('inp-name').classList.toggle('error', !nameOk);
       document.getElementById('err-name').classList.toggle('show', !nameOk);
 
-      // Validate phone
       var maxDigits = getDigitsForCode(phoneCode);
       var phoneOk = phone.length >= 6 && phone.length <= maxDigits;
       document.getElementById('inp-phone').classList.toggle('error', !phoneOk);
@@ -1049,7 +1024,6 @@ body {
 
       if (!nameOk || !phoneOk) return;
 
-      // Duplicate phone check
       var existing = getPatientByPhone(phone);
       if (existing) {
         document.getElementById('inp-phone').classList.add('error');
@@ -1058,7 +1032,6 @@ body {
         return;
       }
 
-      // Create patient
       patient = createPatient({
         name: name,
         phone: phone,
@@ -1073,24 +1046,24 @@ body {
       });
 
     } else {
-      // Existing patient
       if (!state.foundPatient) {
         document.getElementById('err-ex-phone').classList.add('show');
         document.getElementById('err-ex-phone').textContent = 'Please find your patient record first';
         return;
       }
       patient = state.foundPatient;
+      reason = document.getElementById('inp-ex-reason').value;
+      extraNotes = document.getElementById('inp-ex-notes').value.trim();
     }
 
     // Double-check slot availability
     if (hasConflict(state.selectedDate, state.selectedTime)) {
       toast('This time slot is no longer available. Please select another.', 'error');
-      showStep(1);
+      state.selectedTime = null;
       renderTimeSlots();
       return;
     }
 
-    // Create appointment
     var appt = createAppointment({
       patientId: patient.id,
       patientName: patient.name,
@@ -1099,27 +1072,25 @@ body {
       duration: '30',
       type: 'Treatment',
       status: 'scheduled',
-      notes: 'Booked online',
+      notes: buildNotesString(reason, extraNotes),
       source: 'online'
     });
 
-    // Add to online bookings index
     addOnlineBookingIndex(appt.id, patient.id);
-
-    // Show confirmation
-    showConfirmation(patient, appt);
+    showConfirmation(patient, appt, reason);
   }
 
-  function showConfirmation(patient, appt) {
+  function showConfirmation(patient, appt, reason) {
     var detail = document.getElementById('confirm-detail');
     detail.innerHTML =
       '<div class="row"><span class="label">Patient</span><span class="value">' + escapeHtml(patient.name) + '</span></div>' +
       '<div class="row"><span class="label">Date</span><span class="value">' + formatDate(appt.date) + '</span></div>' +
       '<div class="row"><span class="label">Time</span><span class="value">' + formatTime(appt.time) + '</span></div>' +
       '<div class="row"><span class="label">Duration</span><span class="value">30 minutes</span></div>' +
-      '<div class="row"><span class="label">Type</span><span class="value">Treatment</span></div>';
+      (reason ? '<div class="row"><span class="label">Reason</span><span class="value">' + escapeHtml(reason) + '</span></div>' : '');
 
-    showStep(3);
+    $panelForm.classList.add('hidden');
+    $panelConfirm.classList.remove('hidden');
     toast('Appointment booked successfully!', 'success');
   }
 
@@ -1134,28 +1105,30 @@ body {
     document.getElementById('inp-name').value = '';
     document.getElementById('inp-phone').value = '';
     document.getElementById('inp-email').value = '';
+    document.getElementById('inp-reason').selectedIndex = 0;
+    document.getElementById('inp-notes').value = '';
     document.getElementById('inp-ex-phone').value = '';
+    document.getElementById('inp-ex-reason').selectedIndex = 0;
+    document.getElementById('inp-ex-notes').value = '';
     document.getElementById('ex-patient-info').classList.add('hidden');
     loadDefaultPhoneCode();
 
-    // Clear errors
     var errors = document.querySelectorAll('.form-error');
     for (var i = 0; i < errors.length; i++) errors[i].classList.remove('show');
     var errorInputs = document.querySelectorAll('.form-input.error');
     for (var j = 0; j < errorInputs.length; j++) errorInputs[j].classList.remove('error');
 
-    // Reset toggle
     $toggleNew.classList.add('active');
     $toggleExisting.classList.remove('active');
     $formNew.classList.remove('hidden');
     $formExisting.classList.add('hidden');
 
-    renderCalendar();
-    $timeSection.classList.remove('show');
-    $selSummary.classList.remove('show');
-    $btnNext.disabled = true;
+    $panelConfirm.classList.add('hidden');
+    $panelForm.classList.remove('hidden');
 
-    showStep(1);
+    renderCalendar();
+    renderTimeSlots();
+    $btnBook.disabled = true;
   }
 
   // ============ EVENT HANDLERS ============
@@ -1199,21 +1172,12 @@ body {
     renderCalendar();
   });
 
-  // Step navigation
-  $btnNext.addEventListener('click', function() {
-    if (state.selectedDate && state.selectedTime) {
-      showStep(2);
-    }
-  });
-
-  $btnBack.addEventListener('click', function() {
-    showStep(1);
-  });
-
+  // Book button
   $btnBook.addEventListener('click', function() {
     validateAndBook();
   });
 
+  // Book another
   $btnAnother.addEventListener('click', function() {
     resetAll();
   });
@@ -1249,8 +1213,9 @@ body {
 
   // ============ INIT ============
   loadDefaultPhoneCode();
+  state.selectedDate = todayStr();
   renderCalendar();
-  showStep(1);
+  renderTimeSlots();
 
 })();
 </script>
