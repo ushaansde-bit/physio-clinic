@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PhysioClinic — Book Appointment</title>
+<style>
+/* --- CSS Custom Properties (matching main app) --- */
+:root {
+  --primary: #0d9488;
+  --primary-dark: #0f766e;
+  --primary-light: #14b8a6;
+  --primary-50: #f0fdfa;
+  --primary-100: #ccfbf1;
+  --primary-200: #99f6e4;
+  --success: #22c55e;
+  --success-bg: #f0fdf4;
+  --warning: #f59e0b;
+  --warning-bg: #fffbeb;
+  --danger: #ef4444;
+  --danger-bg: #fef2f2;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
+  --white: #ffffff;
+  --bg: #f0f4f8;
+  --card-bg: #ffffff;
+  --border: #e5e7eb;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.06);
+  --shadow-lg: 0 10px 15px rgba(0,0,0,0.1), 0 4px 6px rgba(0,0,0,0.05);
+  --radius: 8px;
+  --radius-sm: 4px;
+  --radius-lg: 12px;
+  --transition: 0.2s ease;
+}
+
+/* --- Reset & Base --- */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; -webkit-font-smoothing: antialiased; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  color: var(--gray-800);
+  background: var(--bg);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+/* --- Header --- */
+.header {
+  background: linear-gradient(135deg, #0d9488 0%, #0e7490 100%);
+  color: var(--white);
+  padding: 1rem 1.5rem;
+  text-align: center;
+  box-shadow: var(--shadow-md);
+}
+.header h1 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.header p {
+  font-size: 0.85rem;
+  opacity: 0.9;
+  margin-top: 0.15rem;
+}
+
+/* --- Step Indicator --- */
+.steps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 1.25rem 1rem 0.75rem;
+  max-width: 400px;
+  margin: 0 auto;
+}
+.step-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--gray-400);
+  white-space: nowrap;
+}
+.step-item.active { color: var(--primary); font-weight: 600; }
+.step-item.done { color: var(--success); }
+.step-num {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.75rem; font-weight: 700;
+  border: 2px solid var(--gray-300);
+  background: var(--white);
+  flex-shrink: 0;
+}
+.step-item.active .step-num {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--white);
+}
+.step-item.done .step-num {
+  border-color: var(--success);
+  background: var(--success);
+  color: var(--white);
+}
+.step-line {
+  width: 40px; height: 2px;
+  background: var(--gray-300);
+  margin: 0 0.25rem;
+  flex-shrink: 0;
+}
+.step-line.done { background: var(--success); }
+
+/* --- Container --- */
+.container {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 0 1rem 2rem;
+}
+
+/* --- Card --- */
+.card {
+  background: var(--card-bg);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 1.25rem;
+  margin-top: 0.75rem;
+}
+.card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--gray-800);
+  margin-bottom: 1rem;
+}
+
+/* --- Calendar --- */
+.cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+.cal-header h3 {
+  font-size: 1rem;
+  font-weight: 600;
+}
+.cal-nav {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  width: 32px; height: 32px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--gray-600);
+  transition: var(--transition);
+}
+.cal-nav:hover { background: var(--gray-100); color: var(--primary); }
+.cal-nav:disabled { opacity: 0.3; cursor: not-allowed; }
+.cal-nav:disabled:hover { background: none; color: var(--gray-600); }
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  text-align: center;
+}
+.cal-dow {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--gray-500);
+  padding: 0.35rem 0;
+  text-transform: uppercase;
+}
+.cal-day {
+  position: relative;
+  padding: 0.45rem 0;
+  font-size: 0.85rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition);
+  border: 2px solid transparent;
+}
+.cal-day:hover { background: var(--primary-50); }
+.cal-day.today { font-weight: 700; color: var(--primary); }
+.cal-day.selected {
+  background: var(--primary);
+  color: var(--white);
+  font-weight: 600;
+}
+.cal-day.selected:hover { background: var(--primary-dark); }
+.cal-day.disabled {
+  color: var(--gray-300);
+  cursor: not-allowed;
+  background: none;
+}
+.cal-day.disabled:hover { background: none; }
+.cal-day.empty { cursor: default; }
+.cal-day.empty:hover { background: none; }
+.cal-dot {
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: var(--success);
+}
+.cal-day.selected .cal-dot { background: var(--white); }
+.cal-day.disabled .cal-dot { background: var(--gray-300); }
+
+/* --- Time Slots --- */
+.time-section {
+  margin-top: 1rem;
+  display: none;
+}
+.time-section.show { display: block; }
+.time-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--gray-700);
+  margin-bottom: 0.5rem;
+}
+.time-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.4rem;
+}
+.time-slot {
+  padding: 0.5rem 0.25rem;
+  text-align: center;
+  font-size: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition);
+  background: var(--white);
+}
+.time-slot:hover { border-color: var(--primary); background: var(--primary-50); }
+.time-slot.selected {
+  background: var(--primary);
+  color: var(--white);
+  border-color: var(--primary);
+  font-weight: 600;
+}
+.time-slot.unavailable {
+  background: var(--gray-100);
+  color: var(--gray-400);
+  cursor: not-allowed;
+  border-color: var(--gray-200);
+  text-decoration: line-through;
+}
+.time-slot.unavailable:hover {
+  background: var(--gray-100);
+  border-color: var(--gray-200);
+}
+
+/* --- Buttons --- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1.25rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: var(--transition);
+  text-decoration: none;
+}
+.btn-primary {
+  background: var(--primary);
+  color: var(--white);
+}
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-primary:disabled {
+  background: var(--gray-300);
+  cursor: not-allowed;
+}
+.btn-secondary {
+  background: var(--white);
+  color: var(--gray-700);
+  border: 1px solid var(--border);
+}
+.btn-secondary:hover { background: var(--gray-50); }
+.btn-block { width: 100%; }
+.btn-group {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+.btn-group .btn { flex: 1; }
+
+/* --- Forms --- */
+.form-group { margin-bottom: 1rem; }
+.form-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--gray-700);
+  margin-bottom: 0.3rem;
+}
+.form-input {
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  color: var(--gray-800);
+  background: var(--white);
+  transition: var(--transition);
+}
+.form-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+}
+.form-input.error {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+.form-error {
+  font-size: 0.75rem;
+  color: var(--danger);
+  margin-top: 0.2rem;
+  display: none;
+}
+.form-error.show { display: block; }
+.form-hint {
+  font-size: 0.75rem;
+  color: var(--gray-500);
+  margin-top: 0.2rem;
+}
+
+/* Phone row */
+.phone-row {
+  display: flex;
+  gap: 0.5rem;
+}
+.phone-code {
+  width: 72px;
+  flex-shrink: 0;
+  text-align: center;
+}
+.phone-number { flex: 1; }
+
+/* --- Toggle --- */
+.toggle-group {
+  display: flex;
+  background: var(--gray-100);
+  border-radius: var(--radius);
+  padding: 3px;
+  margin-bottom: 1rem;
+}
+.toggle-btn {
+  flex: 1;
+  padding: 0.5rem;
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background: none;
+  color: var(--gray-600);
+  transition: var(--transition);
+}
+.toggle-btn.active {
+  background: var(--white);
+  color: var(--primary);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
+/* --- Confirmation --- */
+.confirm-wrap {
+  text-align: center;
+  padding: 1.5rem 0 1rem;
+}
+.confirm-check {
+  width: 64px; height: 64px;
+  border-radius: 50%;
+  background: var(--success-bg);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 1rem;
+}
+.confirm-check svg {
+  width: 32px; height: 32px;
+  stroke: var(--success);
+}
+.confirm-wrap h2 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--gray-900);
+  margin-bottom: 0.5rem;
+}
+.confirm-wrap p {
+  color: var(--gray-600);
+  font-size: 0.85rem;
+  margin-bottom: 0.3rem;
+}
+.confirm-detail {
+  background: var(--gray-50);
+  border-radius: var(--radius);
+  padding: 1rem;
+  margin: 1rem 0;
+  text-align: left;
+}
+.confirm-detail .row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.35rem 0;
+  font-size: 0.85rem;
+}
+.confirm-detail .row .label {
+  color: var(--gray-500);
+}
+.confirm-detail .row .value {
+  font-weight: 600;
+  color: var(--gray-800);
+}
+
+/* --- Toast --- */
+.toast-container {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.toast {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  color: var(--white);
+  box-shadow: var(--shadow-lg);
+  animation: slideIn 0.3s ease;
+  max-width: 320px;
+}
+.toast-info { background: var(--primary); }
+.toast-error { background: var(--danger); }
+.toast-success { background: var(--success); }
+.toast.removing { animation: slideOut 0.3s ease forwards; }
+@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes slideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
+
+/* --- Hidden --- */
+.hidden { display: none !important; }
+
+/* --- Selection Summary --- */
+.selection-summary {
+  background: var(--primary-50);
+  border: 1px solid var(--primary-200);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.85rem;
+  margin-top: 1rem;
+  font-size: 0.8rem;
+  color: var(--primary-dark);
+  display: none;
+}
+.selection-summary.show { display: block; }
+.selection-summary strong { font-weight: 600; }
+
+/* --- Responsive --- */
+@media (max-width: 768px) {
+  .time-grid { grid-template-columns: repeat(3, 1fr); }
+  .container { padding: 0 0.75rem 2rem; }
+  .card { padding: 1rem; }
+}
+@media (max-width: 380px) {
+  .time-grid { grid-template-columns: repeat(2, 1fr); }
+  .step-item span { display: none; }
+  .step-line { width: 28px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <h1>PhysioClinic</h1>
+  <p>Book an Appointment</p>
+</div>
+
+<!-- Step Indicator -->
+<div class="steps">
+  <div class="step-item active" id="step-ind-1">
+    <div class="step-num">1</div>
+    <span>Date & Time</span>
+  </div>
+  <div class="step-line" id="step-line-1"></div>
+  <div class="step-item" id="step-ind-2">
+    <div class="step-num">2</div>
+    <span>Details</span>
+  </div>
+  <div class="step-line" id="step-line-2"></div>
+  <div class="step-item" id="step-ind-3">
+    <div class="step-num">3</div>
+    <span>Confirmed</span>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- ===== STEP 1: Calendar + Time ===== -->
+  <div id="step-1">
+    <div class="card">
+      <div class="cal-header">
+        <button class="cal-nav" id="cal-prev" title="Previous month">&#9664;</button>
+        <h3 id="cal-month-label"></h3>
+        <button class="cal-nav" id="cal-next" title="Next month">&#9654;</button>
+      </div>
+      <div class="cal-grid" id="cal-grid"></div>
+    </div>
+
+    <div class="time-section" id="time-section">
+      <div class="card">
+        <div class="time-label" id="time-label">Select a time</div>
+        <div class="time-grid" id="time-grid"></div>
+      </div>
+    </div>
+
+    <div class="selection-summary" id="selection-summary"></div>
+
+    <div class="btn-group">
+      <button class="btn btn-primary btn-block" id="btn-next" disabled>Next</button>
+    </div>
+  </div>
+
+  <!-- ===== STEP 2: Patient Details ===== -->
+  <div id="step-2" class="hidden">
+    <div class="card">
+      <div class="toggle-group">
+        <button class="toggle-btn active" id="toggle-new">New Patient</button>
+        <button class="toggle-btn" id="toggle-existing">Existing Patient</button>
+      </div>
+
+      <!-- New Patient Form -->
+      <div id="form-new">
+        <div class="form-group">
+          <label class="form-label" for="inp-name">Full Name *</label>
+          <input type="text" class="form-input" id="inp-name" placeholder="Enter your full name" autocomplete="name">
+          <div class="form-error" id="err-name">Please enter your name</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Phone Number *</label>
+          <div class="phone-row">
+            <input type="text" class="form-input phone-code" id="inp-code" value="+91">
+            <input type="tel" class="form-input phone-number" id="inp-phone" placeholder="Phone number" autocomplete="tel">
+          </div>
+          <div class="form-error" id="err-phone">Please enter a valid phone number</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="inp-email">Email (optional)</label>
+          <input type="email" class="form-input" id="inp-email" placeholder="your@email.com" autocomplete="email">
+        </div>
+      </div>
+
+      <!-- Existing Patient Form -->
+      <div id="form-existing" class="hidden">
+        <div class="form-group">
+          <label class="form-label">Phone Number</label>
+          <div class="phone-row">
+            <input type="text" class="form-input phone-code" id="inp-ex-code" value="+91">
+            <input type="tel" class="form-input phone-number" id="inp-ex-phone" placeholder="Enter registered phone">
+          </div>
+          <div class="form-error" id="err-ex-phone">Patient not found with this number</div>
+        </div>
+        <div id="ex-patient-info" class="hidden" style="background:var(--success-bg);border-radius:var(--radius);padding:0.75rem;margin-top:0.5rem;">
+          <div style="font-size:0.8rem;color:var(--gray-500);">Patient found</div>
+          <div style="font-weight:600;color:var(--gray-800);" id="ex-patient-name"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="btn-group">
+      <button class="btn btn-secondary" id="btn-back">Back</button>
+      <button class="btn btn-primary" id="btn-book">Book Appointment</button>
+    </div>
+  </div>
+
+  <!-- ===== STEP 3: Confirmation ===== -->
+  <div id="step-3" class="hidden">
+    <div class="card">
+      <div class="confirm-wrap">
+        <div class="confirm-check">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+        </div>
+        <h2>Appointment Booked!</h2>
+        <p>You will receive a confirmation shortly.</p>
+        <div class="confirm-detail" id="confirm-detail"></div>
+        <button class="btn btn-primary btn-block" id="btn-another" style="margin-top:0.75rem;">Book Another Appointment</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ============ UTILITIES ============
+  var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var DAYS_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  // Currency phone code mapping (matching main app)
+  var PHONE_MAP = [
+    { phone: '+91', digits: 11 },
+    { phone: '+1', digits: 10 },
+    { phone: '+44', digits: 11 },
+    { phone: '+49', digits: 11 },
+    { phone: '+61', digits: 9 },
+    { phone: '+971', digits: 9 },
+    { phone: '+966', digits: 9 },
+    { phone: '+974', digits: 8 },
+    { phone: '+968', digits: 8 },
+    { phone: '+973', digits: 8 },
+    { phone: '+65', digits: 8 },
+    { phone: '+60', digits: 10 },
+    { phone: '+977', digits: 10 },
+    { phone: '+94', digits: 9 },
+    { phone: '+880', digits: 10 },
+    { phone: '+92', digits: 10 },
+    { phone: '+27', digits: 9 },
+    { phone: '+234', digits: 10 },
+    { phone: '+254', digits: 9 },
+    { phone: '+55', digits: 11 },
+    { phone: '+81', digits: 10 },
+    { phone: '+82', digits: 10 },
+    { phone: '+86', digits: 11 }
+  ];
+
+  function getDigitsForCode(code) {
+    code = (code || '').trim();
+    if (code.charAt(0) !== '+') code = '+' + code;
+    for (var i = 0; i < PHONE_MAP.length; i++) {
+      if (PHONE_MAP[i].phone === code) return PHONE_MAP[i].digits;
+    }
+    var stored = parseInt(localStorage.getItem('physio_phone_digits'), 10);
+    return stored || 10;
+  }
+
+  function generateId() {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+  }
+
+  function todayStr() {
+    return new Date().toISOString().split('T')[0];
+  }
+
+  function toDateString(date) {
+    var d = new Date(date);
+    var m = (d.getMonth() + 1).toString();
+    var day = d.getDate().toString();
+    if (m.length < 2) m = '0' + m;
+    if (day.length < 2) day = '0' + day;
+    return d.getFullYear() + '-' + m + '-' + day;
+  }
+
+  function formatDate(dateStr) {
+    if (!dateStr) return '-';
+    var d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+  }
+
+  function formatTime(timeStr) {
+    if (!timeStr) return '-';
+    var parts = timeStr.split(':');
+    var h = parseInt(parts[0], 10);
+    var m = parts[1];
+    var ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    return h + ':' + m + ' ' + ampm;
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    var div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function timeToMinutes(t) {
+    var parts = t.split(':');
+    return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+  }
+
+  // ============ STORE (simplified) ============
+  function getAll(key) {
+    try { return JSON.parse(localStorage.getItem(key)) || []; }
+    catch(e) { return []; }
+  }
+
+  function saveAll(key, data) {
+    localStorage.setItem(key, JSON.stringify(data));
+  }
+
+  function getAppointmentsByDate(date) {
+    var items = getAll('physio_appointments');
+    var result = [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].date === date) result.push(items[i]);
+    }
+    return result;
+  }
+
+  function getPatientByPhone(phone) {
+    var patients = getAll('physio_patients');
+    var clean = phone.replace(/\D/g, '');
+    for (var i = 0; i < patients.length; i++) {
+      if (patients[i].phone && patients[i].phone.replace(/\D/g, '') === clean) return patients[i];
+    }
+    return null;
+  }
+
+  function hasConflict(date, time) {
+    var appts = getAll('physio_appointments');
+    var newStart = timeToMinutes(time);
+    var newEnd = newStart + 30;
+    for (var i = 0; i < appts.length; i++) {
+      var a = appts[i];
+      if (a.date === date && a.status !== 'cancelled') {
+        var aStart = timeToMinutes(a.time);
+        var aEnd = aStart + (parseInt(a.duration, 10) || 30);
+        if (newStart < aEnd && newEnd > aStart) return true;
+      }
+    }
+    return false;
+  }
+
+  function createPatient(data) {
+    var patients = getAll('physio_patients');
+    data.id = data.id || 'obp_' + generateId();
+    data.createdAt = new Date().toISOString();
+    patients.push(data);
+    saveAll('physio_patients', patients);
+    // Log activity
+    logActivity('New patient added: ' + data.name + ' (online booking)');
+    return data;
+  }
+
+  function createAppointment(data) {
+    var appts = getAll('physio_appointments');
+    data.id = data.id || 'ob_' + generateId();
+    data.createdAt = new Date().toISOString();
+    appts.push(data);
+    saveAll('physio_appointments', appts);
+    logActivity('Appointment booked for ' + (data.patientName || 'patient') + ' (online)');
+    return data;
+  }
+
+  function logActivity(text) {
+    var log = getAll('physio_activity_log');
+    log.unshift({ text: text, time: new Date().toISOString() });
+    if (log.length > 50) log = log.slice(0, 50);
+    saveAll('physio_activity_log', log);
+  }
+
+  function addOnlineBookingIndex(appointmentId, patientId) {
+    var index = getAll('physio_online_bookings');
+    index.push({ appointmentId: appointmentId, patientId: patientId, bookedAt: new Date().toISOString() });
+    saveAll('physio_online_bookings', index);
+  }
+
+  // ============ TOAST ============
+  function toast(message, type) {
+    type = type || 'info';
+    var container = document.getElementById('toast-container');
+    var el = document.createElement('div');
+    el.className = 'toast toast-' + type;
+    el.textContent = message;
+    container.appendChild(el);
+    setTimeout(function() {
+      el.classList.add('removing');
+      setTimeout(function() {
+        if (el.parentNode) el.parentNode.removeChild(el);
+      }, 300);
+    }, 3000);
+  }
+
+  // ============ APP STATE ============
+  var state = {
+    currentMonth: new Date().getMonth(),
+    currentYear: new Date().getFullYear(),
+    selectedDate: null,
+    selectedTime: null,
+    patientMode: 'new', // 'new' or 'existing'
+    foundPatient: null
+  };
+
+  // ============ DOM REFS ============
+  var $step1 = document.getElementById('step-1');
+  var $step2 = document.getElementById('step-2');
+  var $step3 = document.getElementById('step-3');
+  var $calGrid = document.getElementById('cal-grid');
+  var $calLabel = document.getElementById('cal-month-label');
+  var $calPrev = document.getElementById('cal-prev');
+  var $calNext = document.getElementById('cal-next');
+  var $timeSection = document.getElementById('time-section');
+  var $timeGrid = document.getElementById('time-grid');
+  var $timeLabel = document.getElementById('time-label');
+  var $selSummary = document.getElementById('selection-summary');
+  var $btnNext = document.getElementById('btn-next');
+  var $btnBack = document.getElementById('btn-back');
+  var $btnBook = document.getElementById('btn-book');
+  var $btnAnother = document.getElementById('btn-another');
+  var $toggleNew = document.getElementById('toggle-new');
+  var $toggleExisting = document.getElementById('toggle-existing');
+  var $formNew = document.getElementById('form-new');
+  var $formExisting = document.getElementById('form-existing');
+
+  // ============ STEP NAVIGATION ============
+  function showStep(n) {
+    $step1.classList.toggle('hidden', n !== 1);
+    $step2.classList.toggle('hidden', n !== 2);
+    $step3.classList.toggle('hidden', n !== 3);
+
+    for (var i = 1; i <= 3; i++) {
+      var ind = document.getElementById('step-ind-' + i);
+      ind.classList.remove('active', 'done');
+      if (i < n) ind.classList.add('done');
+      else if (i === n) ind.classList.add('active');
+    }
+    for (var j = 1; j <= 2; j++) {
+      var line = document.getElementById('step-line-' + j);
+      line.classList.toggle('done', j < n);
+    }
+    window.scrollTo(0, 0);
+  }
+
+  // ============ CALENDAR ============
+  function renderCalendar() {
+    var year = state.currentYear;
+    var month = state.currentMonth;
+    $calLabel.textContent = MONTHS[month] + ' ' + year;
+
+    var today = new Date();
+    var todayS = todayStr();
+    var firstDay = new Date(year, month, 1).getDay();
+    var daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    // Max date: 3 months ahead
+    var maxDate = new Date();
+    maxDate.setMonth(maxDate.getMonth() + 3);
+    var maxS = toDateString(maxDate);
+
+    // Nav button state
+    var now = new Date();
+    $calPrev.disabled = (year === now.getFullYear() && month === now.getMonth());
+    $calNext.disabled = (year === maxDate.getFullYear() && month >= maxDate.getMonth());
+
+    var html = '';
+    for (var d = 0; d < 7; d++) {
+      html += '<div class="cal-dow">' + DAYS_SHORT[d] + '</div>';
+    }
+    for (var e = 0; e < firstDay; e++) {
+      html += '<div class="cal-day empty"></div>';
+    }
+    for (var day = 1; day <= daysInMonth; day++) {
+      var dateStr = year + '-' + (month + 1 < 10 ? '0' : '') + (month + 1) + '-' + (day < 10 ? '0' : '') + day;
+      var cls = 'cal-day';
+      var isPast = dateStr < todayS;
+      var isFuture = dateStr > maxS;
+      var isToday = dateStr === todayS;
+
+      if (isPast || isFuture) cls += ' disabled';
+      if (isToday) cls += ' today';
+      if (state.selectedDate === dateStr) cls += ' selected';
+
+      // Availability dot: check if any slots are open
+      var hasDot = '';
+      if (!isPast && !isFuture) {
+        if (hasAvailableSlots(dateStr)) {
+          hasDot = '<div class="cal-dot"></div>';
+        }
+      }
+
+      html += '<div class="' + cls + '" data-date="' + dateStr + '">' + day + hasDot + '</div>';
+    }
+
+    $calGrid.innerHTML = html;
+  }
+
+  function hasAvailableSlots(dateStr) {
+    var slots = generateTimeSlots(dateStr);
+    for (var i = 0; i < slots.length; i++) {
+      if (slots[i].available) return true;
+    }
+    return false;
+  }
+
+  // ============ TIME SLOTS ============
+  function generateTimeSlots(dateStr) {
+    var slots = [];
+    var now = new Date();
+    var isToday = dateStr === todayStr();
+    var currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+    // 8:00 AM to 5:30 PM, 30 min intervals = 20 slots
+    for (var h = 8; h <= 17; h++) {
+      for (var m = 0; m < 60; m += 30) {
+        if (h === 17 && m > 30) continue;
+        var time = (h < 10 ? '0' : '') + h + ':' + (m === 0 ? '00' : '30');
+        var mins = h * 60 + m;
+        var available = true;
+
+        // Past time on today
+        if (isToday && mins <= currentMinutes) {
+          available = false;
+        }
+        // Conflict with existing appointment
+        if (available && hasConflict(dateStr, time)) {
+          available = false;
+        }
+
+        slots.push({ time: time, label: formatTime(time), available: available });
+      }
+    }
+    return slots;
+  }
+
+  function renderTimeSlots() {
+    if (!state.selectedDate) {
+      $timeSection.classList.remove('show');
+      return;
+    }
+
+    $timeSection.classList.add('show');
+    $timeLabel.textContent = 'Available times for ' + formatDate(state.selectedDate);
+
+    var slots = generateTimeSlots(state.selectedDate);
+    var html = '';
+    for (var i = 0; i < slots.length; i++) {
+      var s = slots[i];
+      var cls = 'time-slot';
+      if (!s.available) cls += ' unavailable';
+      if (state.selectedTime === s.time) cls += ' selected';
+      html += '<div class="' + cls + '" data-time="' + s.time + '">' + s.label + '</div>';
+    }
+    $timeGrid.innerHTML = html;
+    updateSelectionSummary();
+  }
+
+  function updateSelectionSummary() {
+    if (state.selectedDate && state.selectedTime) {
+      $selSummary.innerHTML = '<strong>' + formatDate(state.selectedDate) + '</strong> at <strong>' + formatTime(state.selectedTime) + '</strong>';
+      $selSummary.classList.add('show');
+      $btnNext.disabled = false;
+    } else {
+      $selSummary.classList.remove('show');
+      $btnNext.disabled = true;
+    }
+  }
+
+  // ============ PHONE INPUT ENFORCEMENT ============
+  function enforceDigits(input, codeInput) {
+    input.addEventListener('input', function() {
+      this.value = this.value.replace(/\D/g, '');
+      var maxDigits = getDigitsForCode(codeInput.value);
+      if (this.value.length > maxDigits) {
+        this.value = this.value.slice(0, maxDigits);
+      }
+    });
+    codeInput.addEventListener('input', function() {
+      var val = this.value.replace(/[^0-9+]/g, '');
+      if (val && val.charAt(0) !== '+') val = '+' + val;
+      this.value = val;
+    });
+  }
+
+  // Load default phone code from main app settings
+  function loadDefaultPhoneCode() {
+    var code = localStorage.getItem('physio_phone_code') || '+91';
+    document.getElementById('inp-code').value = code;
+    document.getElementById('inp-ex-code').value = code;
+  }
+
+  // ============ PATIENT FORM LOGIC ============
+  function searchExistingPatient() {
+    var phone = document.getElementById('inp-ex-phone').value.trim();
+    var errEl = document.getElementById('err-ex-phone');
+    var infoEl = document.getElementById('ex-patient-info');
+    var nameEl = document.getElementById('ex-patient-name');
+
+    if (!phone || phone.length < 4) {
+      infoEl.classList.add('hidden');
+      errEl.classList.remove('show');
+      state.foundPatient = null;
+      return;
+    }
+
+    var patient = getPatientByPhone(phone);
+    if (patient) {
+      state.foundPatient = patient;
+      nameEl.textContent = patient.name;
+      infoEl.classList.remove('hidden');
+      errEl.classList.remove('show');
+    } else {
+      state.foundPatient = null;
+      infoEl.classList.add('hidden');
+      errEl.classList.add('show');
+      errEl.textContent = 'Patient not found with this number';
+    }
+  }
+
+  // ============ BOOKING LOGIC ============
+  function validateAndBook() {
+    var patient = null;
+
+    if (state.patientMode === 'new') {
+      var name = document.getElementById('inp-name').value.trim();
+      var phone = document.getElementById('inp-phone').value.trim();
+      var phoneCode = document.getElementById('inp-code').value.trim();
+      var email = document.getElementById('inp-email').value.trim();
+
+      // Validate name
+      var nameOk = name.length >= 2;
+      document.getElementById('inp-name').classList.toggle('error', !nameOk);
+      document.getElementById('err-name').classList.toggle('show', !nameOk);
+
+      // Validate phone
+      var maxDigits = getDigitsForCode(phoneCode);
+      var phoneOk = phone.length >= 6 && phone.length <= maxDigits;
+      document.getElementById('inp-phone').classList.toggle('error', !phoneOk);
+      document.getElementById('err-phone').classList.toggle('show', !phoneOk);
+      if (!phoneOk) {
+        document.getElementById('err-phone').textContent = 'Please enter a valid phone number';
+      }
+
+      if (!nameOk || !phoneOk) return;
+
+      // Duplicate phone check
+      var existing = getPatientByPhone(phone);
+      if (existing) {
+        document.getElementById('inp-phone').classList.add('error');
+        document.getElementById('err-phone').textContent = 'This phone is already registered. Use "Existing Patient" to book.';
+        document.getElementById('err-phone').classList.add('show');
+        return;
+      }
+
+      // Create patient
+      patient = createPatient({
+        name: name,
+        phone: phone,
+        phoneCode: phoneCode || '+91',
+        email: email,
+        dob: '',
+        gender: '',
+        status: 'active',
+        tags: [],
+        bodyRegions: [],
+        source: 'online'
+      });
+
+    } else {
+      // Existing patient
+      if (!state.foundPatient) {
+        document.getElementById('err-ex-phone').classList.add('show');
+        document.getElementById('err-ex-phone').textContent = 'Please find your patient record first';
+        return;
+      }
+      patient = state.foundPatient;
+    }
+
+    // Double-check slot availability
+    if (hasConflict(state.selectedDate, state.selectedTime)) {
+      toast('This time slot is no longer available. Please select another.', 'error');
+      showStep(1);
+      renderTimeSlots();
+      return;
+    }
+
+    // Create appointment
+    var appt = createAppointment({
+      patientId: patient.id,
+      patientName: patient.name,
+      date: state.selectedDate,
+      time: state.selectedTime,
+      duration: '30',
+      type: 'Treatment',
+      status: 'scheduled',
+      notes: 'Booked online',
+      source: 'online'
+    });
+
+    // Add to online bookings index
+    addOnlineBookingIndex(appt.id, patient.id);
+
+    // Show confirmation
+    showConfirmation(patient, appt);
+  }
+
+  function showConfirmation(patient, appt) {
+    var detail = document.getElementById('confirm-detail');
+    detail.innerHTML =
+      '<div class="row"><span class="label">Patient</span><span class="value">' + escapeHtml(patient.name) + '</span></div>' +
+      '<div class="row"><span class="label">Date</span><span class="value">' + formatDate(appt.date) + '</span></div>' +
+      '<div class="row"><span class="label">Time</span><span class="value">' + formatTime(appt.time) + '</span></div>' +
+      '<div class="row"><span class="label">Duration</span><span class="value">30 minutes</span></div>' +
+      '<div class="row"><span class="label">Type</span><span class="value">Treatment</span></div>';
+
+    showStep(3);
+    toast('Appointment booked successfully!', 'success');
+  }
+
+  function resetAll() {
+    state.selectedDate = null;
+    state.selectedTime = null;
+    state.foundPatient = null;
+    state.patientMode = 'new';
+    state.currentMonth = new Date().getMonth();
+    state.currentYear = new Date().getFullYear();
+
+    document.getElementById('inp-name').value = '';
+    document.getElementById('inp-phone').value = '';
+    document.getElementById('inp-email').value = '';
+    document.getElementById('inp-ex-phone').value = '';
+    document.getElementById('ex-patient-info').classList.add('hidden');
+    loadDefaultPhoneCode();
+
+    // Clear errors
+    var errors = document.querySelectorAll('.form-error');
+    for (var i = 0; i < errors.length; i++) errors[i].classList.remove('show');
+    var errorInputs = document.querySelectorAll('.form-input.error');
+    for (var j = 0; j < errorInputs.length; j++) errorInputs[j].classList.remove('error');
+
+    // Reset toggle
+    $toggleNew.classList.add('active');
+    $toggleExisting.classList.remove('active');
+    $formNew.classList.remove('hidden');
+    $formExisting.classList.add('hidden');
+
+    renderCalendar();
+    $timeSection.classList.remove('show');
+    $selSummary.classList.remove('show');
+    $btnNext.disabled = true;
+
+    showStep(1);
+  }
+
+  // ============ EVENT HANDLERS ============
+
+  // Calendar day click
+  $calGrid.addEventListener('click', function(e) {
+    var dayEl = e.target.closest('.cal-day');
+    if (!dayEl || dayEl.classList.contains('disabled') || dayEl.classList.contains('empty')) return;
+
+    state.selectedDate = dayEl.getAttribute('data-date');
+    state.selectedTime = null;
+    renderCalendar();
+    renderTimeSlots();
+  });
+
+  // Time slot click
+  $timeGrid.addEventListener('click', function(e) {
+    var slotEl = e.target.closest('.time-slot');
+    if (!slotEl || slotEl.classList.contains('unavailable')) return;
+
+    state.selectedTime = slotEl.getAttribute('data-time');
+    renderTimeSlots();
+  });
+
+  // Calendar navigation
+  $calPrev.addEventListener('click', function() {
+    state.currentMonth--;
+    if (state.currentMonth < 0) {
+      state.currentMonth = 11;
+      state.currentYear--;
+    }
+    renderCalendar();
+  });
+
+  $calNext.addEventListener('click', function() {
+    state.currentMonth++;
+    if (state.currentMonth > 11) {
+      state.currentMonth = 0;
+      state.currentYear++;
+    }
+    renderCalendar();
+  });
+
+  // Step navigation
+  $btnNext.addEventListener('click', function() {
+    if (state.selectedDate && state.selectedTime) {
+      showStep(2);
+    }
+  });
+
+  $btnBack.addEventListener('click', function() {
+    showStep(1);
+  });
+
+  $btnBook.addEventListener('click', function() {
+    validateAndBook();
+  });
+
+  $btnAnother.addEventListener('click', function() {
+    resetAll();
+  });
+
+  // Toggle new/existing
+  $toggleNew.addEventListener('click', function() {
+    state.patientMode = 'new';
+    state.foundPatient = null;
+    $toggleNew.classList.add('active');
+    $toggleExisting.classList.remove('active');
+    $formNew.classList.remove('hidden');
+    $formExisting.classList.add('hidden');
+  });
+
+  $toggleExisting.addEventListener('click', function() {
+    state.patientMode = 'existing';
+    $toggleNew.classList.remove('active');
+    $toggleExisting.classList.add('active');
+    $formNew.classList.add('hidden');
+    $formExisting.classList.remove('hidden');
+  });
+
+  // Existing patient phone search (debounced)
+  var searchTimer = null;
+  document.getElementById('inp-ex-phone').addEventListener('input', function() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(searchExistingPatient, 400);
+  });
+
+  // Enforce phone digits
+  enforceDigits(document.getElementById('inp-phone'), document.getElementById('inp-code'));
+  enforceDigits(document.getElementById('inp-ex-phone'), document.getElementById('inp-ex-code'));
+
+  // ============ INIT ============
+  loadDefaultPhoneCode();
+  renderCalendar();
+  showStep(1);
+
+})();
+</script>
+</body>
+</html>
