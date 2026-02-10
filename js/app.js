@@ -3,8 +3,7 @@
    ============================================ */
 (function() {
 
-  // Initialize seed data
-  // Reset to load fresh 3-month INR test data (remove this block after first load)
+  // Initialize seed data (local fallback)
   if (!localStorage.getItem('physio_noid_v7')) {
     var physioKeys = ['physio_users','physio_patients','physio_appointments','physio_sessions',
       'physio_exercises','physio_billing','physio_activity_log','physio_tags',
@@ -14,6 +13,29 @@
   }
   Store.seed();
   Store.migrate();
+
+  // Initialize Firebase and sync
+  if (window.FirebaseSync) {
+    FirebaseSync.init().then(function() {
+      return FirebaseSync.hasData();
+    }).then(function(cloudHasData) {
+      if (cloudHasData) {
+        // Cloud has data — pull it to localStorage
+        return FirebaseSync.pullAll().then(function() {
+          console.log('[App] Pulled cloud data to local');
+          // Re-render current view with fresh data
+          if (isLoggedIn()) route();
+        });
+      } else {
+        // Cloud is empty — push local seed data up
+        return FirebaseSync.pushAll().then(function() {
+          console.log('[App] Pushed local seed data to cloud');
+        });
+      }
+    }).catch(function(e) {
+      console.warn('[App] Firebase sync failed, using local data:', e);
+    });
+  }
 
   // DOM refs
   var loginScreen = document.getElementById('login-screen');

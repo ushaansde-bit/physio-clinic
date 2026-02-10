@@ -614,9 +614,70 @@ body {
 <!-- Toast Container -->
 <div class="toast-container" id="toast-container"></div>
 
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+
 <script>
 (function() {
   'use strict';
+
+  // ============ FIREBASE INIT ============
+  var firebaseConfig = {
+    apiKey: "AIzaSyBcaymsJYlDpQ-EPF2Wtd-nYX2P6u7HQoE",
+    authDomain: "physio-clinic-4ae53.firebaseapp.com",
+    projectId: "physio-clinic-4ae53",
+    storageBucket: "physio-clinic-4ae53.firebasestorage.app",
+    messagingSenderId: "791291492733",
+    appId: "1:791291492733:web:9edaccf13df450b5513414"
+  };
+
+  var fbDb = null;
+  try {
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    fbDb = firebase.firestore();
+    console.log('[Book1] Firebase initialized');
+  } catch(e) {
+    console.warn('[Book1] Firebase init failed, using local only:', e);
+  }
+
+  var FB_COLLECTIONS = {
+    'physio_patients': 'patients',
+    'physio_appointments': 'appointments',
+    'physio_activity_log': 'activity_log',
+    'physio_online_bookings': 'online_bookings'
+  };
+
+  function fbSaveDoc(localKey, item) {
+    if (!fbDb || !FB_COLLECTIONS[localKey] || !item) return;
+    var docId = item.id || ('doc_' + Date.now());
+    fbDb.collection(FB_COLLECTIONS[localKey]).doc(docId).set(JSON.parse(JSON.stringify(item)))
+      .then(function() { console.log('[Book1] Synced ' + docId + ' to ' + FB_COLLECTIONS[localKey]); })
+      .catch(function(e) { console.error('[Book1] Sync failed:', e); });
+  }
+
+  function fbSaveCollection(localKey) {
+    if (!fbDb || !FB_COLLECTIONS[localKey]) return;
+    var items = [];
+    try { items = JSON.parse(localStorage.getItem(localKey)) || []; } catch(e) { return; }
+    var batch = fbDb.batch();
+    for (var i = 0; i < items.length; i++) {
+      var docId = items[i].id || ('doc_' + i);
+      batch.set(fbDb.collection(FB_COLLECTIONS[localKey]).doc(docId), JSON.parse(JSON.stringify(items[i])));
+    }
+    batch.commit().catch(function(e) { console.error('[Book1] Batch sync failed:', e); });
+  }
+
+  function fbPullCollection(localKey) {
+    if (!fbDb || !FB_COLLECTIONS[localKey]) return Promise.resolve();
+    return fbDb.collection(FB_COLLECTIONS[localKey]).get().then(function(snapshot) {
+      if (snapshot.empty) return;
+      var items = [];
+      snapshot.forEach(function(doc) { items.push(doc.data()); });
+      localStorage.setItem(localKey, JSON.stringify(items));
+      console.log('[Book1] Pulled ' + items.length + ' docs from ' + FB_COLLECTIONS[localKey]);
+    }).catch(function(e) { console.warn('[Book1] Pull failed:', e); });
+  }
 
   // ============ UTILITIES ============
   var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -745,6 +806,7 @@ body {
     data.createdAt = new Date().toISOString();
     patients.push(data);
     saveAll('physio_patients', patients);
+    fbSaveDoc('physio_patients', data);
     logActivity('New patient added: ' + data.name + ' (online booking)');
     return data;
   }
@@ -755,21 +817,26 @@ body {
     data.createdAt = new Date().toISOString();
     appts.push(data);
     saveAll('physio_appointments', appts);
+    fbSaveDoc('physio_appointments', data);
     logActivity('Appointment booked for ' + (data.patientName || 'patient') + ' (online)');
     return data;
   }
 
   function logActivity(text) {
     var log = getAll('physio_activity_log');
-    log.unshift({ text: text, time: new Date().toISOString() });
+    var entry = { text: text, time: new Date().toISOString() };
+    log.unshift(entry);
     if (log.length > 50) log = log.slice(0, 50);
     saveAll('physio_activity_log', log);
+    fbSaveCollection('physio_activity_log');
   }
 
   function addOnlineBookingIndex(appointmentId, patientId) {
     var index = getAll('physio_online_bookings');
-    index.push({ appointmentId: appointmentId, patientId: patientId, bookedAt: new Date().toISOString() });
+    var entry = { id: 'obi_' + generateId(), appointmentId: appointmentId, patientId: patientId, bookedAt: new Date().toISOString() };
+    index.push(entry);
     saveAll('physio_online_bookings', index);
+    fbSaveDoc('physio_online_bookings', entry);
   }
 
   // ============ TOAST ============
@@ -1216,6 +1283,20 @@ body {
   state.selectedDate = todayStr();
   renderCalendar();
   renderTimeSlots();
+
+  // Pull latest data from Firestore (for conflict checking & existing patient lookup)
+  if (fbDb) {
+    Promise.all([
+      fbPullCollection('physio_patients'),
+      fbPullCollection('physio_appointments')
+    ]).then(function() {
+      console.log('[Book1] Cloud data loaded');
+      renderCalendar();
+      renderTimeSlots();
+    }).catch(function() {
+      console.warn('[Book1] Cloud pull failed, using local data');
+    });
+  }
 
 })();
 </script>

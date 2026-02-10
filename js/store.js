@@ -25,6 +25,8 @@ window.Store = (function() {
 
   function saveAll(key, data) {
     localStorage.setItem(key, JSON.stringify(data));
+    // Sync entire collection to Firestore
+    if (window.FirebaseSync) FirebaseSync.saveCollection(key);
   }
 
   function getById(key, id) {
@@ -40,7 +42,9 @@ window.Store = (function() {
     item.id = item.id || Utils.generateId();
     item.createdAt = item.createdAt || new Date().toISOString();
     items.push(item);
-    saveAll(key, items);
+    localStorage.setItem(key, JSON.stringify(items));
+    // Sync single doc to Firestore (faster than full collection)
+    if (window.FirebaseSync) FirebaseSync.saveDoc(key, item);
     return item;
   }
 
@@ -52,7 +56,9 @@ window.Store = (function() {
           if (updates.hasOwnProperty(k)) items[i][k] = updates[k];
         }
         items[i].updatedAt = new Date().toISOString();
-        saveAll(key, items);
+        localStorage.setItem(key, JSON.stringify(items));
+        // Sync updated doc to Firestore
+        if (window.FirebaseSync) FirebaseSync.saveDoc(key, items[i]);
         return items[i];
       }
     }
@@ -65,7 +71,9 @@ window.Store = (function() {
     for (var i = 0; i < items.length; i++) {
       if (items[i].id !== id) filtered.push(items[i]);
     }
-    saveAll(key, filtered);
+    localStorage.setItem(key, JSON.stringify(filtered));
+    // Delete doc from Firestore
+    if (window.FirebaseSync) FirebaseSync.deleteDoc(key, id);
   }
 
   function getByField(key, field, value) {
