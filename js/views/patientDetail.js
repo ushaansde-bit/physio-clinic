@@ -161,21 +161,26 @@ window.PatientDetailView = (function() {
   function renderOverview(patient) {
     var html = '';
 
-    // Book Next Visit inline form (when active)
-    if (sub.bookingView === 'form') {
-      html += renderBookNextVisitForm(patient);
-    }
-
     // Edit Patient form (inline, replaces read-only view when editing)
     if (sub.editingPatient) {
       html += renderEditPatientForm(patient);
       return html;
     }
 
-    // Book Next Visit inline form (when active) - shown above read-only view
+    // Book Next Visit inline form (when active)
     if (sub.bookingView === 'form') {
       html += renderBookNextVisitForm(patient);
     }
+
+    // Top action bar: Edit + Book Next Visit
+    html += '<div style="display:flex;gap:0.5rem;margin-bottom:1rem;">';
+    html += '<button class="btn btn-primary" id="edit-patient-info-btn">';
+    html += '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+    html += ' Edit Patient</button>';
+    html += '<button class="btn btn-secondary" id="book-next-visit-btn">';
+    html += '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
+    html += ' Book Visit</button>';
+    html += '</div>';
 
     // Next/Last Visit info cards
     var allAppts = Store.getAppointmentsByPatient(patient.id);
@@ -219,10 +224,8 @@ window.PatientDetailView = (function() {
     html += '</div></div>';
     html += '</div>';
 
-    // Patient info
-    html += '<div class="card mb-2"><div class="card-header"><h3>Patient Information</h3>';
-    html += '<button class="btn btn-sm btn-secondary edit-patient-info-btn" id="edit-patient-info-btn">Edit</button>';
-    html += '</div><div class="card-body">';
+    // Patient info card (includes contact + emergency contact)
+    html += '<div class="card mb-2"><div class="card-header"><h3>Patient Information</h3></div><div class="card-body">';
     html += '<div class="info-grid">';
     html += infoItem('Full Name', patient.name);
     html += infoItem('Date of Birth', Utils.formatDate(patient.dob) + (patient.dob ? ' (Age ' + Utils.calculateAge(patient.dob) + ')' : ''));
@@ -232,6 +235,8 @@ window.PatientDetailView = (function() {
     html += infoItem('Address', patient.address);
     html += infoItem('Insurance', patient.insurance);
     html += infoItem('Status', patient.status ? patient.status.charAt(0).toUpperCase() + patient.status.slice(1) : 'Active');
+    var emergencyVal = (patient.emergencyContact || '-') + (patient.emergencyPhone ? ' (' + (patient.emergencyPhoneCode || Utils.getPhoneCode()) + ' ' + patient.emergencyPhone + ')' : '');
+    html += infoItem('Emergency Contact', emergencyVal);
     html += '</div></div></div>';
 
     // Diagnosis & treatment
@@ -283,20 +288,6 @@ window.PatientDetailView = (function() {
       }
       html += '</div></div></div>';
     }
-
-    // Book Next Visit button
-    html += '<div style="margin-bottom:1rem;">';
-    html += '<button class="btn btn-primary" id="book-next-visit-btn">';
-    html += '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
-    html += ' Book Next Visit</button>';
-    html += '</div>';
-
-    // Emergency contact
-    html += '<div class="card"><div class="card-header"><h3>Emergency Contact</h3></div><div class="card-body">';
-    html += '<div class="info-grid">';
-    html += infoItem('Contact Name', patient.emergencyContact);
-    html += infoItem('Contact Phone', patient.emergencyPhone);
-    html += '</div></div></div>';
 
     // Print options (inline collapsible)
     if (sub.printExpanded) {
