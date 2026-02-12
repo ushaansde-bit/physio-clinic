@@ -405,13 +405,13 @@ window.AppointmentsView = (function() {
     html += '</div>';
     html += '<div class="form-row">';
     html += '<div class="form-group"><label>Type</label>';
-    html += '<select name="type">';
+    html += '<select name="type" required>';
     html += '<option value="Initial Evaluation"' + (defaultType === 'Initial Evaluation' ? ' selected' : '') + '>Initial Evaluation</option>';
     html += '<option value="Treatment"' + (defaultType === 'Treatment' ? ' selected' : '') + '>Treatment</option>';
     html += '<option value="Follow-up"' + (defaultType === 'Follow-up' ? ' selected' : '') + '>Follow-up</option>';
     html += '</select></div>';
     html += '<div class="form-group"><label>Duration (min)</label>';
-    html += '<select name="duration">';
+    html += '<select name="duration" required>';
     var durations = ['15','30','45','60','90'];
     for (var d = 0; d < durations.length; d++) {
       html += '<option value="' + durations[d] + '"' + (durations[d] === String(defaultDuration) ? ' selected' : '') + '>' + durations[d] + ' min</option>';

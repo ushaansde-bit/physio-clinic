@@ -44,6 +44,8 @@
   --radius: 8px;
   --radius-sm: 4px;
   --radius-lg: 12px;
+  --text-muted: #6b7280;
+  --bg-secondary: #f3f4f6;
   --sidebar-width: 250px;
   --topbar-height: 60px;
   --transition: 0.2s ease;
@@ -450,7 +452,7 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
 /* --- Stat Cards --- */
 .stat-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 1rem;
   margin-bottom: 1.5rem;
 }

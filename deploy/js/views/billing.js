@@ -199,7 +199,7 @@ window.BillingView = (function() {
     html += '<div class="form-row">';
     html += '<div class="form-group"><label>Date</label>';
     html += '<input type="date" name="date" value="' + Utils.today() + '" required></div>';
-    html += '<div class="form-group"><label>Amount (\u20B9)</label>';
+    html += '<div class="form-group"><label>Amount (' + Utils.getCurrencySymbol() + ')</label>';
     html += '<input type="number" name="amount" step="0.01" min="0" required placeholder="0.00"></div>';
     html += '</div>';
     html += '<div class="form-group"><label>Description ' + Utils.micHtml('inv-description') + '</label>';

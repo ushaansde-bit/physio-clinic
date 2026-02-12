@@ -172,17 +172,7 @@ window.PatientDetailView = (function() {
       html += renderBookNextVisitForm(patient);
     }
 
-    // Top action bar: Edit + Book Next Visit
-    html += '<div style="display:flex;gap:0.5rem;margin-bottom:1rem;">';
-    html += '<button class="btn btn-primary" id="edit-patient-info-btn">';
-    html += '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
-    html += ' Edit Patient</button>';
-    html += '<button class="btn btn-secondary" id="book-next-visit-btn">';
-    html += '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
-    html += ' Book Visit</button>';
-    html += '</div>';
-
-    // Next/Last Visit info cards
+    // Next/Last Visit info cards + Book Visit button
     var allAppts = Store.getAppointmentsByPatient(patient.id);
     var todayStr = Utils.today();
     var nextAppt = null;
@@ -201,7 +191,7 @@ window.PatientDetailView = (function() {
       }
     }
 
-    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:1rem;">';
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:0.75rem;">';
     html += '<div class="visit-info-card">';
     html += '<div class="visit-info-icon next"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>';
     html += '<div class="visit-info-detail">';
@@ -224,8 +214,20 @@ window.PatientDetailView = (function() {
     html += '</div></div>';
     html += '</div>';
 
+    // Book Visit button (below visit cards, hidden when form is open)
+    if (sub.bookingView !== 'form') {
+      html += '<div style="margin-bottom:1rem;">';
+      html += '<button class="btn btn-primary btn-sm" id="book-next-visit-btn">';
+      html += '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
+      html += ' Book Next Visit</button>';
+      html += '</div>';
+    }
+
+    // Helper for card header with edit button
+    var editBtn = '<button class="btn btn-sm btn-ghost edit-patient-info-btn" style="font-size:0.78rem;padding:0.2rem 0.5rem;">Edit</button>';
+
     // Patient info card (includes contact + emergency contact)
-    html += '<div class="card mb-2"><div class="card-header"><h3>Patient Information</h3></div><div class="card-body">';
+    html += '<div class="card mb-2"><div class="card-header"><h3>Patient Information</h3>' + editBtn + '</div><div class="card-body">';
     html += '<div class="info-grid">';
     html += infoItem('Full Name', patient.name);
     html += infoItem('Date of Birth', Utils.formatDate(patient.dob) + (patient.dob ? ' (Age ' + Utils.calculateAge(patient.dob) + ')' : ''));
@@ -240,7 +242,7 @@ window.PatientDetailView = (function() {
     html += '</div></div></div>';
 
     // Diagnosis & treatment
-    html += '<div class="card mb-2"><div class="card-header"><h3>Diagnosis & Treatment Plan</h3></div><div class="card-body">';
+    html += '<div class="card mb-2"><div class="card-header"><h3>Diagnosis & Treatment Plan</h3>' + editBtn + '</div><div class="card-body">';
     html += '<div class="info-grid" style="grid-template-columns:1fr;">';
     html += infoItem('Diagnosis', patient.diagnosis);
     html += infoItem('Treatment Plan', patient.treatmentPlan);
@@ -249,7 +251,7 @@ window.PatientDetailView = (function() {
 
     // Affected Body Areas
     if (Store.isFeatureEnabled('bodyDiagram')) {
-      html += '<div class="card mb-2"><div class="card-header"><h3>Affected Body Areas</h3></div><div class="card-body body-diagram-card">';
+      html += '<div class="card mb-2"><div class="card-header"><h3>Affected Body Areas</h3>' + editBtn + '</div><div class="card-body body-diagram-card">';
       if (patient.bodyRegions && patient.bodyRegions.length > 0) {
         html += '<div class="body-diagram-screen">';
         html += BodyDiagram.renderHtml(patient.bodyRegions, { readOnly: true });
@@ -268,7 +270,8 @@ window.PatientDetailView = (function() {
     var sessions = Store.getSessionsByPatient(patient.id);
     if (sessions.length > 0) {
       sessions.sort(function(a, b) { return a.date < b.date ? -1 : 1; });
-      html += '<div class="card mb-2"><div class="card-header"><h3>Progress Snapshot</h3></div><div class="card-body">';
+      var editSessionBtn = '<button class="btn btn-sm btn-ghost edit-progress-btn" style="font-size:0.78rem;padding:0.2rem 0.5rem;">Edit</button>';
+      html += '<div class="card mb-2"><div class="card-header"><h3>Progress Snapshot</h3>' + editSessionBtn + '</div><div class="card-body">';
       html += '<div class="progress-chart">';
       for (var i = 0; i < sessions.length; i++) {
         var s = sessions[i];
@@ -329,13 +332,13 @@ window.PatientDetailView = (function() {
     html += '</div>';
     html += '<div class="form-row">';
     html += '<div class="form-group"><label>Type</label>';
-    html += '<select name="type">';
+    html += '<select name="type" required>';
     html += '<option value="Initial Evaluation"' + (defaultType === 'Initial Evaluation' ? ' selected' : '') + '>Initial Evaluation</option>';
     html += '<option value="Treatment"' + (defaultType === 'Treatment' ? ' selected' : '') + '>Treatment</option>';
     html += '<option value="Follow-up"' + (defaultType === 'Follow-up' ? ' selected' : '') + '>Follow-up</option>';
     html += '</select></div>';
     html += '<div class="form-group"><label>Duration (min)</label>';
-    html += '<select name="duration">';
+    html += '<select name="duration" required>';
     var durations = ['15','30','45','60','90'];
     for (var d = 0; d < durations.length; d++) {
       html += '<option value="' + durations[d] + '"' + (durations[d] === String(defaultDuration) ? ' selected' : '') + '>' + durations[d] + ' min</option>';
@@ -390,7 +393,7 @@ window.PatientDetailView = (function() {
     html += '<div class="form-group"><label>Phone</label>';
     html += '<div class="phone-input-wrap">';
     html += '<input type="text" name="phoneCode" class="phone-code-input" value="' + Utils.escapeHtml(patient.phoneCode || Utils.getPhoneCode()) + '" maxlength="5">';
-    html += '<input type="tel" name="phone" class="phone-number-input" value="' + Utils.escapeHtml(patient.phone || '') + '" maxlength="' + Utils.getPhoneDigits() + '">';
+    html += '<input type="tel" name="phone" class="phone-number-input" value="' + Utils.escapeHtml(patient.phone || '') + '" maxlength="' + Utils.getPhoneDigits() + '" required>';
     html += '</div></div>';
     html += '<div class="form-group"><label>Email</label>';
     html += '<input type="email" name="email" value="' + Utils.escapeHtml(patient.email || '') + '"></div>';
@@ -707,7 +710,7 @@ window.PatientDetailView = (function() {
     html += '<input type="number" name="functionScore" min="0" max="10" value="' + (session ? session.functionScore : '5') + '" required></div>';
     html += '</div>';
     html += '<div class="form-group"><label>Subjective ' + Utils.micHtml('sf-subjective') + '</label>';
-    html += '<textarea id="sf-subjective" name="subjective" rows="3" data-ac="subjective" placeholder="Patient report, symptoms, functional status...">' + Utils.escapeHtml(session ? session.subjective || '' : '') + '</textarea></div>';
+    html += '<textarea id="sf-subjective" name="subjective" rows="3" data-ac="subjective" required placeholder="Patient report, symptoms, functional status...">' + Utils.escapeHtml(session ? session.subjective || '' : '') + '</textarea></div>';
     html += '<div class="form-group"><label>Objective ' + Utils.micHtml('sf-objective') + '</label>';
     html += '<textarea id="sf-objective" name="objective" rows="3" data-ac="objective" placeholder="Measurements, ROM, strength, observations...">' + Utils.escapeHtml(session ? session.objective || '' : '') + '</textarea></div>';
     html += '<div class="form-group"><label>Assessment ' + Utils.micHtml('sf-assessment') + '</label>';
@@ -804,9 +807,9 @@ window.PatientDetailView = (function() {
     html += '<input type="text" name="name" value="' + Utils.escapeHtml(exercise ? exercise.name : '') + '" required placeholder="e.g., Quad Sets"></div>';
     html += '<div class="form-row-4">';
     html += '<div class="form-group"><label>Sets</label>';
-    html += '<input type="text" name="sets" value="' + Utils.escapeHtml(exercise ? exercise.sets : '3') + '" placeholder="3"></div>';
+    html += '<input type="text" name="sets" value="' + Utils.escapeHtml(exercise ? exercise.sets : '3') + '" placeholder="3" required></div>';
     html += '<div class="form-group"><label>Reps</label>';
-    html += '<input type="text" name="reps" value="' + Utils.escapeHtml(exercise ? exercise.reps : '10') + '" placeholder="10"></div>';
+    html += '<input type="text" name="reps" value="' + Utils.escapeHtml(exercise ? exercise.reps : '10') + '" placeholder="10" required></div>';
     html += '<div class="form-group"><label>Hold</label>';
     html += '<input type="text" name="hold" value="' + Utils.escapeHtml(exercise ? exercise.hold : '') + '" placeholder="5 sec"></div>';
     html += '<div class="form-group"><label>Frequency</label>';
@@ -918,7 +921,7 @@ window.PatientDetailView = (function() {
     html += '<div class="form-group"><label>Dosage</label>';
     html += '<input type="text" name="dosage" value="' + Utils.escapeHtml(rx ? rx.dosage : '') + '" required placeholder="e.g., 100mg"></div>';
     html += '<div class="form-group"><label>Route</label>';
-    html += '<select name="route">';
+    html += '<select name="route" required>';
     var routes = ['Oral', 'Topical', 'Intramuscular', 'Intravenous', 'Subcutaneous', 'Inhalation', 'Sublingual', 'Rectal', 'Transdermal'];
     for (var r = 0; r < routes.length; r++) {
       html += '<option value="' + routes[r] + '"' + (rx && rx.route === routes[r] ? ' selected' : '') + '>' + routes[r] + '</option>';
@@ -1283,7 +1286,7 @@ window.PatientDetailView = (function() {
           html += '<td>' + Utils.escapeHtml(sn.objective || '-') + '</td>';
           html += '<td>' + Utils.escapeHtml(sn.assessment || '-') + '</td>';
           html += '<td>' + Utils.escapeHtml(sn.plan || '-') + '</td>';
-          html += '<td>' + (sn.painLevel != null ? sn.painLevel + '/10' : '-') + '</td>';
+          html += '<td>' + (sn.painScore != null ? sn.painScore + '/10' : '-') + '</td>';
           html += '</tr>';
         }
         html += '</tbody></table></div>';
@@ -1497,9 +1500,16 @@ window.PatientDetailView = (function() {
         return;
       }
 
-      // === Edit Patient Info ===
-      if (e.target.closest('#edit-patient-info-btn')) {
+      // === Edit Patient Info (any .edit-patient-info-btn on any card) ===
+      if (e.target.closest('.edit-patient-info-btn')) {
         sub.editingPatient = true;
+        renderDetail(container, patient);
+        return;
+      }
+
+      // === Edit Progress Snapshot → switch to Treatment Notes tab ===
+      if (e.target.closest('.edit-progress-btn')) {
+        sub.activeTab = 'sessions';
         renderDetail(container, patient);
         return;
       }
