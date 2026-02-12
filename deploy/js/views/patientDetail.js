@@ -166,9 +166,15 @@ window.PatientDetailView = (function() {
       html += renderBookNextVisitForm(patient);
     }
 
-    // Edit Patient form (inline, shown when editing)
+    // Edit Patient form (inline, replaces read-only view when editing)
     if (sub.editingPatient) {
       html += renderEditPatientForm(patient);
+      return html;
+    }
+
+    // Book Next Visit inline form (when active) - shown above read-only view
+    if (sub.bookingView === 'form') {
+      html += renderBookNextVisitForm(patient);
     }
 
     // Next/Last Visit info cards
@@ -215,9 +221,7 @@ window.PatientDetailView = (function() {
 
     // Patient info
     html += '<div class="card mb-2"><div class="card-header"><h3>Patient Information</h3>';
-    if (!sub.editingPatient) {
-      html += '<button class="btn btn-sm btn-secondary edit-patient-info-btn" id="edit-patient-info-btn">Edit</button>';
-    }
+    html += '<button class="btn btn-sm btn-secondary edit-patient-info-btn" id="edit-patient-info-btn">Edit</button>';
     html += '</div><div class="card-body">';
     html += '<div class="info-grid">';
     html += infoItem('Full Name', patient.name);
