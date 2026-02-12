@@ -161,9 +161,9 @@ window.PatientDetailView = (function() {
   function renderOverview(patient) {
     var html = '';
 
-    // Edit Patient form (inline, replaces read-only view when editing)
+    // Edit Patient section (inline, replaces that card only)
     if (sub.editingPatient) {
-      html += renderEditPatientForm(patient);
+      html += renderEditPatientSection(patient, sub.editingPatient);
       return html;
     }
 
@@ -191,15 +191,22 @@ window.PatientDetailView = (function() {
       }
     }
 
-    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:0.75rem;">';
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:1rem;">';
     html += '<div class="visit-info-card">';
     html += '<div class="visit-info-icon next"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>';
     html += '<div class="visit-info-detail">';
     html += '<div class="visit-label">Next Appointment</div>';
     if (nextAppt) {
       html += '<div class="visit-value">' + Utils.formatDate(nextAppt.date) + ' at ' + Utils.formatTime(nextAppt.time) + '</div>';
+      if (sub.bookingView !== 'form') {
+        html += '<a href="javascript:void(0)" id="book-next-visit-btn" style="font-size:0.75rem;color:var(--primary);margin-top:0.25rem;display:inline-block;">Book Another</a>';
+      }
     } else {
-      html += '<div class="visit-value" style="color:var(--gray-400);">None scheduled</div>';
+      if (sub.bookingView !== 'form') {
+        html += '<button class="btn btn-primary btn-sm" id="book-next-visit-btn" style="margin-top:0.35rem;font-size:0.75rem;padding:0.25rem 0.6rem;">Book Now</button>';
+      } else {
+        html += '<div class="visit-value" style="color:var(--gray-400);">None scheduled</div>';
+      }
     }
     html += '</div></div>';
     html += '<div class="visit-info-card">';
@@ -214,20 +221,8 @@ window.PatientDetailView = (function() {
     html += '</div></div>';
     html += '</div>';
 
-    // Book Visit button (below visit cards, hidden when form is open)
-    if (sub.bookingView !== 'form') {
-      html += '<div style="margin-bottom:1rem;">';
-      html += '<button class="btn btn-primary btn-sm" id="book-next-visit-btn">';
-      html += '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
-      html += ' Book Next Visit</button>';
-      html += '</div>';
-    }
-
-    // Helper for card header with edit button
-    var editBtn = '<button class="btn btn-sm btn-ghost edit-patient-info-btn" style="font-size:0.78rem;padding:0.2rem 0.5rem;">Edit</button>';
-
     // Patient info card (includes contact + emergency contact)
-    html += '<div class="card mb-2"><div class="card-header"><h3>Patient Information</h3>' + editBtn + '</div><div class="card-body">';
+    html += '<div class="card mb-2"><div class="card-header"><h3>Patient Information</h3><button class="btn btn-sm btn-ghost edit-section-btn" data-section="personal" style="font-size:0.78rem;padding:0.2rem 0.5rem;">Edit</button></div><div class="card-body">';
     html += '<div class="info-grid">';
     html += infoItem('Full Name', patient.name);
     html += infoItem('Date of Birth', Utils.formatDate(patient.dob) + (patient.dob ? ' (Age ' + Utils.calculateAge(patient.dob) + ')' : ''));
@@ -242,7 +237,7 @@ window.PatientDetailView = (function() {
     html += '</div></div></div>';
 
     // Diagnosis & treatment
-    html += '<div class="card mb-2"><div class="card-header"><h3>Diagnosis & Treatment Plan</h3>' + editBtn + '</div><div class="card-body">';
+    html += '<div class="card mb-2"><div class="card-header"><h3>Diagnosis & Treatment Plan</h3><button class="btn btn-sm btn-ghost edit-section-btn" data-section="clinical" style="font-size:0.78rem;padding:0.2rem 0.5rem;">Edit</button></div><div class="card-body">';
     html += '<div class="info-grid" style="grid-template-columns:1fr;">';
     html += infoItem('Diagnosis', patient.diagnosis);
     html += infoItem('Treatment Plan', patient.treatmentPlan);
@@ -251,7 +246,7 @@ window.PatientDetailView = (function() {
 
     // Affected Body Areas
     if (Store.isFeatureEnabled('bodyDiagram')) {
-      html += '<div class="card mb-2"><div class="card-header"><h3>Affected Body Areas</h3>' + editBtn + '</div><div class="card-body body-diagram-card">';
+      html += '<div class="card mb-2"><div class="card-header"><h3>Affected Body Areas</h3><button class="btn btn-sm btn-ghost edit-section-btn" data-section="body" style="font-size:0.78rem;padding:0.2rem 0.5rem;">Edit</button></div><div class="card-body body-diagram-card">';
       if (patient.bodyRegions && patient.bodyRegions.length > 0) {
         html += '<div class="body-diagram-screen">';
         html += BodyDiagram.renderHtml(patient.bodyRegions, { readOnly: true });
@@ -270,8 +265,7 @@ window.PatientDetailView = (function() {
     var sessions = Store.getSessionsByPatient(patient.id);
     if (sessions.length > 0) {
       sessions.sort(function(a, b) { return a.date < b.date ? -1 : 1; });
-      var editSessionBtn = '<button class="btn btn-sm btn-ghost edit-progress-btn" style="font-size:0.78rem;padding:0.2rem 0.5rem;">Edit</button>';
-      html += '<div class="card mb-2"><div class="card-header"><h3>Progress Snapshot</h3>' + editSessionBtn + '</div><div class="card-body">';
+      html += '<div class="card mb-2"><div class="card-header"><h3>Progress Snapshot</h3></div><div class="card-body">';
       html += '<div class="progress-chart">';
       for (var i = 0; i < sessions.length; i++) {
         var s = sessions[i];
@@ -357,101 +351,95 @@ window.PatientDetailView = (function() {
     return html;
   }
 
-  // ==================== EDIT PATIENT INFO (inline) ====================
-  function editSectionLabel(text) {
-    return '<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--gray-400);margin:1.25rem 0 0.5rem;padding-bottom:0.35rem;border-bottom:1px solid var(--border);">' + text + '</div>';
-  }
-
-  function renderEditPatientForm(patient) {
+  // ==================== EDIT PATIENT SECTION (inline per-card) ====================
+  function renderEditPatientSection(patient, section) {
+    var titles = { personal: 'Edit Patient Information', clinical: 'Edit Diagnosis & Treatment', body: 'Edit Affected Body Areas' };
     var html = '<div class="inline-form-card mb-2">';
     html += '<div class="inline-form-header">';
     html += '<button class="back-btn" id="edit-patient-back">';
     html += '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>';
     html += '</button>';
-    html += '<h3>Edit Patient Info</h3>';
+    html += '<h3>' + (titles[section] || 'Edit') + '</h3>';
     html += '</div>';
     html += '<div class="inline-form-body">';
     html += '<form id="edit-patient-form">';
 
-    // -- Personal --
-    html += editSectionLabel('Personal');
-    html += '<div class="form-group"><label>Full Name</label>';
-    html += '<input type="text" name="name" value="' + Utils.escapeHtml(patient.name || '') + '" required></div>';
-    html += '<div class="form-row">';
-    html += '<div class="form-group"><label>Date of Birth</label>';
-    html += Utils.dobPickerHtml(patient.dob || '');
-    html += '</div>';
-    html += '<div class="form-group"><label>Gender</label>';
-    html += '<select name="gender">';
-    html += '<option value="">Select...</option>';
-    html += '<option value="male"' + (patient.gender === 'male' ? ' selected' : '') + '>Male</option>';
-    html += '<option value="female"' + (patient.gender === 'female' ? ' selected' : '') + '>Female</option>';
-    html += '<option value="other"' + (patient.gender === 'other' ? ' selected' : '') + '>Other</option>';
-    html += '</select></div>';
-    html += '</div>';
-    html += '<div class="form-row">';
-    html += '<div class="form-group"><label>Phone</label>';
-    html += '<div class="phone-input-wrap">';
-    html += '<input type="text" name="phoneCode" class="phone-code-input" value="' + Utils.escapeHtml(patient.phoneCode || Utils.getPhoneCode()) + '" maxlength="5">';
-    html += '<input type="tel" name="phone" class="phone-number-input" value="' + Utils.escapeHtml(patient.phone || '') + '" maxlength="' + Utils.getPhoneDigits() + '" required>';
-    html += '</div></div>';
-    html += '<div class="form-group"><label>Email</label>';
-    html += '<input type="email" name="email" value="' + Utils.escapeHtml(patient.email || '') + '"></div>';
-    html += '</div>';
-    html += '<div class="form-row">';
-    html += '<div class="form-group"><label>Address</label>';
-    html += '<input type="text" name="address" value="' + Utils.escapeHtml(patient.address || '') + '"></div>';
-    html += '<div class="form-group"><label>Insurance</label>';
-    html += '<input type="text" name="insurance" value="' + Utils.escapeHtml(patient.insurance || '') + '"></div>';
-    html += '</div>';
-    html += '<div class="form-group"><label>Status</label>';
-    html += '<select name="status" style="max-width:200px;">';
-    html += '<option value="active"' + (patient.status === 'active' ? ' selected' : '') + '>Active</option>';
-    html += '<option value="completed"' + (patient.status === 'completed' ? ' selected' : '') + '>Completed</option>';
-    html += '</select></div>';
+    if (section === 'personal') {
+      html += '<div class="form-group"><label>Full Name</label>';
+      html += '<input type="text" name="name" value="' + Utils.escapeHtml(patient.name || '') + '" required></div>';
+      html += '<div class="form-row">';
+      html += '<div class="form-group"><label>Date of Birth</label>';
+      html += Utils.dobPickerHtml(patient.dob || '');
+      html += '</div>';
+      html += '<div class="form-group"><label>Gender</label>';
+      html += '<select name="gender">';
+      html += '<option value="">Select...</option>';
+      html += '<option value="male"' + (patient.gender === 'male' ? ' selected' : '') + '>Male</option>';
+      html += '<option value="female"' + (patient.gender === 'female' ? ' selected' : '') + '>Female</option>';
+      html += '<option value="other"' + (patient.gender === 'other' ? ' selected' : '') + '>Other</option>';
+      html += '</select></div>';
+      html += '</div>';
+      html += '<div class="form-row">';
+      html += '<div class="form-group"><label>Phone</label>';
+      html += '<div class="phone-input-wrap">';
+      html += '<input type="text" name="phoneCode" class="phone-code-input" value="' + Utils.escapeHtml(patient.phoneCode || Utils.getPhoneCode()) + '" maxlength="5">';
+      html += '<input type="tel" name="phone" class="phone-number-input" value="' + Utils.escapeHtml(patient.phone || '') + '" maxlength="' + Utils.getPhoneDigits() + '" required>';
+      html += '</div></div>';
+      html += '<div class="form-group"><label>Email</label>';
+      html += '<input type="email" name="email" value="' + Utils.escapeHtml(patient.email || '') + '"></div>';
+      html += '</div>';
+      html += '<div class="form-row">';
+      html += '<div class="form-group"><label>Address</label>';
+      html += '<input type="text" name="address" value="' + Utils.escapeHtml(patient.address || '') + '"></div>';
+      html += '<div class="form-group"><label>Insurance</label>';
+      html += '<input type="text" name="insurance" value="' + Utils.escapeHtml(patient.insurance || '') + '"></div>';
+      html += '</div>';
+      html += '<div class="form-group"><label>Status</label>';
+      html += '<select name="status" style="max-width:200px;">';
+      html += '<option value="active"' + (patient.status === 'active' ? ' selected' : '') + '>Active</option>';
+      html += '<option value="completed"' + (patient.status === 'completed' ? ' selected' : '') + '>Completed</option>';
+      html += '</select></div>';
+      // Emergency contact (part of personal info)
+      html += '<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--gray-400);margin:1.25rem 0 0.5rem;padding-bottom:0.35rem;border-bottom:1px solid var(--border);">Emergency Contact</div>';
+      html += '<div class="form-row">';
+      html += '<div class="form-group"><label>Contact Name</label>';
+      html += '<input type="text" name="emergencyContact" value="' + Utils.escapeHtml(patient.emergencyContact || '') + '"></div>';
+      html += '<div class="form-group"><label>Contact Phone</label>';
+      html += '<div class="phone-input-wrap">';
+      html += '<input type="text" name="emergencyPhoneCode" class="phone-code-input" value="' + Utils.escapeHtml(patient.emergencyPhoneCode || Utils.getPhoneCode()) + '" maxlength="5">';
+      html += '<input type="tel" name="emergencyPhone" class="phone-number-input" value="' + Utils.escapeHtml(patient.emergencyPhone || '') + '" maxlength="' + Utils.getPhoneDigits() + '">';
+      html += '</div></div>';
+      html += '</div>';
+      // Tags (part of personal info)
+      if (Store.isFeatureEnabled('tags')) {
+        var formTags = Store.getTags();
+        var patientTags = patient.tags || [];
+        html += '<div class="form-group"><label>Tags</label><div class="tag-pill-group">';
+        for (var ti = 0; ti < formTags.length; ti++) {
+          var isChecked = patientTags.indexOf(formTags[ti].id) !== -1;
+          var tagColor = formTags[ti].color || '#6b7280';
+          html += '<button type="button" class="tag-pill' + (isChecked ? ' active' : '') + '" data-tag-id="' + formTags[ti].id + '" data-color="' + tagColor + '"' + (isChecked ? ' style="background:' + tagColor + ';color:#fff;border-color:' + tagColor + ';"' : '') + '>';
+          html += '<span class="tag-pill-dot" style="background:' + tagColor + ';"></span>';
+          html += Utils.escapeHtml(formTags[ti].name);
+          html += '</button>';
+        }
+        html += '</div></div>';
+      }
+    }
 
-    // -- Clinical --
-    html += editSectionLabel('Clinical');
-    html += '<div class="form-group"><label>Diagnosis ' + Utils.micHtml('ep-diagnosis') + '</label>';
-    html += '<textarea id="ep-diagnosis" name="diagnosis" rows="2" data-ac="diagnosis">' + Utils.escapeHtml(patient.diagnosis || '') + '</textarea></div>';
-    html += '<div class="form-group"><label>Treatment Plan ' + Utils.micHtml('ep-treatplan') + '</label>';
-    html += '<textarea id="ep-treatplan" name="treatmentPlan" rows="3" data-ac="treatmentPlan">' + Utils.escapeHtml(patient.treatmentPlan || '') + '</textarea></div>';
-    html += '<div class="form-group"><label>Notes ' + Utils.micHtml('ep-notes') + '</label>';
-    html += '<textarea id="ep-notes" name="notes" rows="2">' + Utils.escapeHtml(patient.notes || '') + '</textarea></div>';
+    if (section === 'clinical') {
+      html += '<div class="form-group"><label>Diagnosis ' + Utils.micHtml('ep-diagnosis') + '</label>';
+      html += '<textarea id="ep-diagnosis" name="diagnosis" rows="2" data-ac="diagnosis">' + Utils.escapeHtml(patient.diagnosis || '') + '</textarea></div>';
+      html += '<div class="form-group"><label>Treatment Plan ' + Utils.micHtml('ep-treatplan') + '</label>';
+      html += '<textarea id="ep-treatplan" name="treatmentPlan" rows="3" data-ac="treatmentPlan">' + Utils.escapeHtml(patient.treatmentPlan || '') + '</textarea></div>';
+      html += '<div class="form-group"><label>Notes ' + Utils.micHtml('ep-notes') + '</label>';
+      html += '<textarea id="ep-notes" name="notes" rows="2">' + Utils.escapeHtml(patient.notes || '') + '</textarea></div>';
+    }
 
-    // Body diagram
-    if (Store.isFeatureEnabled('bodyDiagram')) {
+    if (section === 'body') {
       html += '<div class="form-group"><label>Affected Body Areas</label>';
       html += '<div class="body-diagram-wrap"><div id="ep-body-diagram"></div></div></div>';
     }
-
-    // Tags
-    if (Store.isFeatureEnabled('tags')) {
-      var formTags = Store.getTags();
-      var patientTags = patient.tags || [];
-      html += '<div class="form-group"><label>Tags</label><div class="tag-pill-group">';
-      for (var ti = 0; ti < formTags.length; ti++) {
-        var isChecked = patientTags.indexOf(formTags[ti].id) !== -1;
-        var tagColor = formTags[ti].color || '#6b7280';
-        html += '<button type="button" class="tag-pill' + (isChecked ? ' active' : '') + '" data-tag-id="' + formTags[ti].id + '" data-color="' + tagColor + '"' + (isChecked ? ' style="background:' + tagColor + ';color:#fff;border-color:' + tagColor + ';"' : '') + '>';
-        html += '<span class="tag-pill-dot" style="background:' + tagColor + ';"></span>';
-        html += Utils.escapeHtml(formTags[ti].name);
-        html += '</button>';
-      }
-      html += '</div></div>';
-    }
-
-    // -- Emergency --
-    html += editSectionLabel('Emergency Contact');
-    html += '<div class="form-row">';
-    html += '<div class="form-group"><label>Contact Name</label>';
-    html += '<input type="text" name="emergencyContact" value="' + Utils.escapeHtml(patient.emergencyContact || '') + '"></div>';
-    html += '<div class="form-group"><label>Contact Phone</label>';
-    html += '<div class="phone-input-wrap">';
-    html += '<input type="text" name="emergencyPhoneCode" class="phone-code-input" value="' + Utils.escapeHtml(patient.emergencyPhoneCode || Utils.getPhoneCode()) + '" maxlength="5">';
-    html += '<input type="tel" name="emergencyPhone" class="phone-number-input" value="' + Utils.escapeHtml(patient.emergencyPhone || '') + '" maxlength="' + Utils.getPhoneDigits() + '">';
-    html += '</div></div>';
-    html += '</div>';
 
     html += '</form>';
     html += '</div>';
@@ -1500,16 +1488,10 @@ window.PatientDetailView = (function() {
         return;
       }
 
-      // === Edit Patient Info (any .edit-patient-info-btn on any card) ===
-      if (e.target.closest('.edit-patient-info-btn')) {
-        sub.editingPatient = true;
-        renderDetail(container, patient);
-        return;
-      }
-
-      // === Edit Progress Snapshot → switch to Treatment Notes tab ===
-      if (e.target.closest('.edit-progress-btn')) {
-        sub.activeTab = 'sessions';
+      // === Edit Patient Section (personal / clinical / body) ===
+      var editSectionBtn = e.target.closest('.edit-section-btn');
+      if (editSectionBtn) {
+        sub.editingPatient = editSectionBtn.getAttribute('data-section');
         renderDetail(container, patient);
         return;
       }
@@ -1729,37 +1711,62 @@ window.PatientDetailView = (function() {
     if (editPatientSave) {
       editPatientSave.onclick = function() {
         var form = document.getElementById('edit-patient-form');
-        var nameInput = form.querySelector('[name="name"]');
-        if (!nameInput.value.trim()) {
-          Utils.toast('Name is required', 'error');
-          return;
+        var section = sub.editingPatient;
+        var data = {};
+
+        if (section === 'personal') {
+          var nameInput = form.querySelector('[name="name"]');
+          if (!nameInput || !nameInput.value.trim()) {
+            Utils.toast('Name is required', 'error');
+            return;
+          }
+          var formData = Utils.getFormData(form);
+          data.name = formData.name;
+          data.dob = formData.dob;
+          data.gender = formData.gender;
+          data.phoneCode = formData.phoneCode;
+          data.phone = formData.phone;
+          data.email = formData.email;
+          data.address = formData.address;
+          data.insurance = formData.insurance;
+          data.status = formData.status;
+          data.emergencyContact = formData.emergencyContact;
+          data.emergencyPhoneCode = formData.emergencyPhoneCode;
+          data.emergencyPhone = formData.emergencyPhone;
+          // Collect tags
+          var activePills = form.querySelectorAll('.tag-pill.active');
+          data.tags = [];
+          for (var tc = 0; tc < activePills.length; tc++) {
+            data.tags.push(activePills[tc].getAttribute('data-tag-id'));
+          }
         }
-        var data = Utils.getFormData(form);
-        // Collect tags
-        var activePills = form.querySelectorAll('.tag-pill.active');
-        data.tags = [];
-        for (var tc = 0; tc < activePills.length; tc++) {
-          data.tags.push(activePills[tc].getAttribute('data-tag-id'));
+
+        if (section === 'clinical') {
+          var clinicalData = Utils.getFormData(form);
+          data.diagnosis = clinicalData.diagnosis;
+          data.treatmentPlan = clinicalData.treatmentPlan;
+          data.notes = clinicalData.notes;
         }
-        // Collect body regions
-        if (Store.isFeatureEnabled('bodyDiagram')) {
+
+        if (section === 'body') {
           data.bodyRegions = BodyDiagram.getSelected('ep-body-diagram');
         }
+
         Store.updatePatient(patient.id, data);
         Utils.toast('Patient updated', 'success');
         sub.editingPatient = false;
         renderDetail(container, Store.getPatient(patient.id));
       };
-      // Bind mic + autocomplete + DOB picker
+      // Bind mic + autocomplete + DOB picker (for personal/clinical sections)
       Utils.bindMicButtons(container);
       Utils.bindAllAutocomplete(container);
       Utils.bindDobPicker(container);
-      // Body diagram
-      if (Store.isFeatureEnabled('bodyDiagram')) {
+      // Body diagram (for body section)
+      if (sub.editingPatient === 'body') {
         var _bodyRegions = (patient.bodyRegions || []).slice();
         BodyDiagram.render('ep-body-diagram', _bodyRegions);
       }
-      // Tag pill toggles
+      // Tag pill toggles (for personal section)
       var tagPills = container.querySelectorAll('#edit-patient-form .tag-pill');
       for (var tp = 0; tp < tagPills.length; tp++) {
         tagPills[tp].addEventListener('click', function() {

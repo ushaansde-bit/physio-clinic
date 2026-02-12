@@ -13,10 +13,13 @@ window.MessagingView = (function() {
     selectedTemplate: '',
     waLinks: null,
     templateSubView: 'list',
-    templateEditId: null
+    templateEditId: null,
+    historyPage: 1,
+    historyPerPage: 10
   };
 
   function render(container) {
+    state.tab = 'compose';
     state.selectedTags = [];
     state.selectedPatients = [];
     state.messageText = '';
@@ -24,6 +27,7 @@ window.MessagingView = (function() {
     state.waLinks = null;
     state.templateSubView = 'list';
     state.templateEditId = null;
+    state.historyPage = 1;
     renderView(container);
   }
 
@@ -111,9 +115,10 @@ window.MessagingView = (function() {
         var isChecked = state.selectedPatients.indexOf(pt.id) !== -1;
         html += '<label class="patient-select-item">';
         html += '<input type="checkbox" class="patient-check" data-patient-id="' + pt.id + '"' + (isChecked ? ' checked' : '') + '>';
+        var noPhone = !hasValidPhone(pt);
         html += '<div>';
         html += '<div class="patient-select-name">' + Utils.escapeHtml(pt.name) + '</div>';
-        html += '<div class="patient-select-phone">' + Utils.escapeHtml(pt.phone || 'No phone') + '</div>';
+        html += '<div class="patient-select-phone"' + (noPhone ? ' style="color:var(--danger);"' : '') + '>' + Utils.escapeHtml(pt.phone || 'No phone') + (noPhone ? ' (invalid)' : '') + '</div>';
         html += '</div></label>';
       }
     }
@@ -259,17 +264,23 @@ window.MessagingView = (function() {
     var log = Store.getMessageLog();
     log.sort(function(a, b) { return a.createdAt > b.createdAt ? -1 : 1; });
 
-    var html = '<h3 style="font-size:1rem;margin-bottom:1rem;">Message History (' + log.length + ')</h3>';
+    var total = log.length;
+    var totalPages = Math.max(1, Math.ceil(total / state.historyPerPage));
+    if (state.historyPage > totalPages) state.historyPage = totalPages;
+    var start = (state.historyPage - 1) * state.historyPerPage;
+    var pageItems = log.slice(start, start + state.historyPerPage);
 
-    if (log.length === 0) {
+    var html = '<h3 style="font-size:1rem;margin-bottom:1rem;">Message History (' + total + ')</h3>';
+
+    if (total === 0) {
       html += '<div class="empty-state"><p>No messages sent yet</p></div>';
     } else {
       html += '<div class="card"><div class="table-wrapper">';
       html += '<table class="data-table"><thead><tr>';
       html += '<th>Date</th><th>Patient</th><th>Message</th>';
       html += '</tr></thead><tbody>';
-      for (var i = 0; i < log.length; i++) {
-        var entry = log[i];
+      for (var i = 0; i < pageItems.length; i++) {
+        var entry = pageItems[i];
         var truncMsg = (entry.message || '').length > 60 ? entry.message.substring(0, 60) + '...' : (entry.message || '');
         html += '<tr class="no-hover">';
         html += '<td>' + Utils.timeAgo(entry.createdAt) + '</td>';
@@ -277,7 +288,22 @@ window.MessagingView = (function() {
         html += '<td style="font-size:0.82rem;color:var(--gray-600);">' + Utils.escapeHtml(truncMsg) + '</td>';
         html += '</tr>';
       }
-      html += '</tbody></table></div></div>';
+      html += '</tbody></table></div>';
+
+      // Pagination
+      if (total > state.historyPerPage) {
+        html += '<div class="card-footer"><div class="pagination">';
+        html += '<span>Showing ' + (start + 1) + '-' + Math.min(start + state.historyPerPage, total) + ' of ' + total + '</span>';
+        html += '<div class="pagination-buttons">';
+        html += '<button class="page-btn history-page-btn" data-page="' + (state.historyPage - 1) + '"' + (state.historyPage <= 1 ? ' disabled' : '') + '>&laquo;</button>';
+        for (var pg = 1; pg <= totalPages; pg++) {
+          html += '<button class="page-btn history-page-btn' + (pg === state.historyPage ? ' active' : '') + '" data-page="' + pg + '">' + pg + '</button>';
+        }
+        html += '<button class="page-btn history-page-btn" data-page="' + (state.historyPage + 1) + '"' + (state.historyPage >= totalPages ? ' disabled' : '') + '>&raquo;</button>';
+        html += '</div></div></div>';
+      }
+
+      html += '</div>';
     }
     return html;
   }
@@ -292,6 +318,15 @@ window.MessagingView = (function() {
         state.tab = tabBtn.getAttribute('data-tab');
         state.templateSubView = 'list';
         state.templateEditId = null;
+        state.historyPage = 1;
+        renderView(container);
+        return;
+      }
+
+      // History pagination
+      var historyPageBtn = e.target.closest('.history-page-btn');
+      if (historyPageBtn && !historyPageBtn.disabled) {
+        state.historyPage = parseInt(historyPageBtn.getAttribute('data-page'), 10);
         renderView(container);
         return;
       }
@@ -333,19 +368,24 @@ window.MessagingView = (function() {
         return;
       }
 
-      // WhatsApp links: open all
+      // WhatsApp links: open all (staggered to avoid popup blocking)
       if (e.target.closest('#open-all-wa')) {
         if (state.waLinks) {
-          for (var w = 0; w < state.waLinks.length; w++) {
-            window.open(state.waLinks[w].url, '_blank');
+          var links = state.waLinks;
+          for (var w = 0; w < links.length; w++) {
+            (function(link, delay) {
+              setTimeout(function() {
+                window.open(link.url, '_blank');
+              }, delay);
+            })(links[w], w * 600);
             Store.createMessageLog({
-              patientId: state.waLinks[w].id,
-              patientName: state.waLinks[w].name,
-              message: state.waLinks[w].message
+              patientId: links[w].id,
+              patientName: links[w].name,
+              message: links[w].message
             });
           }
-          Store.logActivity('WhatsApp messages sent to ' + state.waLinks.length + ' patients');
-          Utils.toast('Opening WhatsApp for ' + state.waLinks.length + ' patients', 'success');
+          Store.logActivity('WhatsApp messages sent to ' + links.length + ' patients');
+          Utils.toast('Opening WhatsApp for ' + links.length + ' patients (one by one)', 'success');
           state.waLinks = null;
           renderView(container);
         }
@@ -458,15 +498,22 @@ window.MessagingView = (function() {
 
   function resolveVariables(text, patient) {
     var now = new Date();
+    var hh = ('0' + now.getHours()).slice(-2);
+    var mm = ('0' + now.getMinutes()).slice(-2);
     var result = text.replace(/\{name\}/g, patient.name || '');
     result = result.replace(/\{date\}/g, Utils.formatDate(Utils.today()));
-    result = result.replace(/\{time\}/g, Utils.formatTime(now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0')));
+    result = result.replace(/\{time\}/g, Utils.formatTime(hh + ':' + mm));
     return result;
   }
 
   function cleanPhone(phone) {
     if (!phone) return '';
     return phone.replace(/[^\d]/g, '');
+  }
+
+  function hasValidPhone(patient) {
+    var phone = cleanPhone(patient.phone);
+    return phone.length >= 7;
   }
 
   function sendWhatsApp(container) {
@@ -480,9 +527,25 @@ window.MessagingView = (function() {
     }
 
     var patients = [];
+    var skipped = [];
     for (var i = 0; i < state.selectedPatients.length; i++) {
       var p = Store.getPatient(state.selectedPatients[i]);
-      if (p) patients.push(p);
+      if (p) {
+        if (hasValidPhone(p)) {
+          patients.push(p);
+        } else {
+          skipped.push(p.name);
+        }
+      }
+    }
+
+    if (skipped.length > 0) {
+      Utils.toast(skipped.length + ' patient(s) skipped (no valid phone): ' + skipped.slice(0, 3).join(', ') + (skipped.length > 3 ? '...' : ''), 'warning');
+    }
+
+    if (patients.length === 0) {
+      Utils.toast('No patients with valid phone numbers', 'error');
+      return;
     }
 
     if (patients.length === 1) {

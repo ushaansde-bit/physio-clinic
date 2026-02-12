@@ -174,10 +174,10 @@ window.SettingsView = (function() {
 
     // Tabs
     html += '<div class="tabs">';
-    html += '<button class="tab-btn' + (state.tab === 'staff' ? ' active' : '') + '" data-tab="staff">Staff Management</button>';
+    html += '<button class="tab-btn' + (state.tab === 'staff' ? ' active' : '') + '" data-tab="staff">Staff</button>';
     html += '<button class="tab-btn' + (state.tab === 'roles' ? ' active' : '') + '" data-tab="roles">Roles</button>';
-    html += '<button class="tab-btn' + (state.tab === 'features' ? ' active' : '') + '" data-tab="features">Feature Toggles</button>';
-    html += '<button class="tab-btn' + (state.tab === 'clinic' ? ' active' : '') + '" data-tab="clinic">Clinic Info</button>';
+    html += '<button class="tab-btn' + (state.tab === 'features' ? ' active' : '') + '" data-tab="features">Features</button>';
+    html += '<button class="tab-btn' + (state.tab === 'clinic' ? ' active' : '') + '" data-tab="clinic">Clinic</button>';
     html += '<button class="tab-btn' + (state.tab === 'trash' ? ' active' : '') + '" data-tab="trash">Trash</button>';
     html += '<button class="tab-btn' + (state.tab === 'backup' ? ' active' : '') + '" data-tab="backup">Backup</button>';
     html += '</div>';
@@ -206,10 +206,9 @@ window.SettingsView = (function() {
     var currentUser = App.getCurrentUser();
     var html = '';
 
-    html += '<div class="card">';
-    html += '<div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">';
-    html += '<h3 style="margin:0;">Staff Members</h3>';
-    html += '<button class="btn btn-primary" id="add-staff-btn">';
+    html += '<div class="card mb-2">';
+    html += '<div class="card-header"><h3>Staff Members (' + users.length + ')</h3>';
+    html += '<button class="btn btn-primary btn-sm" id="add-staff-btn">';
     html += '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
     html += ' Add Staff</button>';
     html += '</div>';
@@ -227,49 +226,22 @@ window.SettingsView = (function() {
         var roleLabel = getRoleLabel(u.role);
         var isSelf = currentUser && u.id === currentUser.id;
 
-        var pagesDisplay = '';
-        if (u.role === 'admin') {
-          pagesDisplay = '<span style="color:var(--text-muted);font-size:0.8em;">All pages</span>';
-        } else if (u.allowedPages && u.allowedPages.length) {
-          pagesDisplay = '<span style="color:var(--text-muted);font-size:0.8em;">' + u.allowedPages.join(', ') + '</span>';
-        } else {
-          pagesDisplay = '<span style="color:var(--text-muted);font-size:0.8em;">All pages</span>';
-        }
-
         html += '<tr class="no-hover">';
-        html += '<td style="font-weight:500;">' + Utils.escapeHtml(u.name) + (isSelf ? ' <span style="color:var(--text-muted);font-weight:400;">(you)</span>' : '') + '</td>';
-        html += '<td><span class="badge ' + roleBadge + '">' + Utils.escapeHtml(roleLabel) + '</span><br>' + pagesDisplay + '</td>';
+        html += '<td style="font-weight:500;">' + Utils.escapeHtml(u.name) + (isSelf ? ' <span class="text-muted">(you)</span>' : '') + '</td>';
+        html += '<td><span class="badge ' + roleBadge + '">' + Utils.escapeHtml(roleLabel) + '</span></td>';
         html += '<td>' + Utils.escapeHtml(u.phone || '-') + '</td>';
         html += '<td>' + Utils.escapeHtml(u.email || '-') + '</td>';
-        html += '<td style="white-space:nowrap;">';
-        html += '<button class="btn btn-sm btn-secondary edit-staff-btn" data-id="' + u.id + '" style="margin-right:4px;">Edit</button>';
+        html += '<td><div class="btn-group">';
+        html += '<button class="btn btn-sm btn-secondary edit-staff-btn" data-id="' + u.id + '">Edit</button>';
         if (!isSelf) {
-          html += '<button class="btn btn-sm btn-danger delete-staff-btn" data-id="' + u.id + '" data-name="' + Utils.escapeHtml(u.name) + '">Delete</button>';
+          html += '<button class="btn btn-sm btn-ghost delete-staff-btn" data-id="' + u.id + '" data-name="' + Utils.escapeHtml(u.name) + '" style="color:var(--danger);">Delete</button>';
         }
-        html += '</td>';
+        html += '</div></td>';
         html += '</tr>';
       }
     }
 
     html += '</tbody></table></div></div></div>';
-
-    // Role guide
-    var allRolesGuide = getAllRoles();
-    html += '<div class="card" style="margin-top:16px;">';
-    html += '<div class="card-header"><h3 style="margin:0;">Role Guide</h3></div>';
-    html += '<div class="card-body">';
-    for (var r = 0; r < allRolesGuide.length; r++) {
-      var rg = allRolesGuide[r];
-      var defPages = (rg.defaultPages || []).join(', ') || 'dashboard';
-      html += '<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;' + (r < allRolesGuide.length - 1 ? 'border-bottom:1px solid var(--border);' : '') + '">';
-      html += '<span class="badge ' + rg.badge + '" style="min-width:110px;text-align:center;flex-shrink:0;">' + Utils.escapeHtml(rg.label) + '</span>';
-      html += '<div>';
-      html += '<div style="font-size:0.85em;color:var(--text-muted);">' + Utils.escapeHtml(rg.description) + '</div>';
-      html += '<div style="font-size:0.8em;color:var(--text-muted);margin-top:2px;">Default pages: ' + Utils.escapeHtml(defPages) + '</div>';
-      html += '</div>';
-      html += '</div>';
-    }
-    html += '</div></div>';
 
     return html;
   }
@@ -503,49 +475,44 @@ window.SettingsView = (function() {
     var custom = getCustomRoles();
 
     // Built-in roles
-    html += '<div class="card">';
-    html += '<div class="card-header"><h3 style="margin:0;">Built-in Roles</h3></div>';
+    html += '<div class="card mb-2">';
+    html += '<div class="card-header"><h3>Built-in Roles</h3></div>';
     html += '<div class="card-body">';
-    html += '<p style="color:var(--text-muted);font-size:0.85em;margin-bottom:12px;">These roles cannot be edited or deleted.</p>';
     for (var i = 0; i < BUILTIN_ROLES.length; i++) {
       var br = BUILTIN_ROLES[i];
-      html += '<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;' + (i < BUILTIN_ROLES.length - 1 ? 'border-bottom:1px solid var(--border);' : '') + '">';
-      html += '<span class="badge ' + br.badge + '" style="min-width:110px;text-align:center;flex-shrink:0;">' + Utils.escapeHtml(br.label) + '</span>';
+      html += '<div class="settings-toggle-row">';
       html += '<div>';
-      html += '<div style="font-size:0.85em;">' + Utils.escapeHtml(br.description) + '</div>';
-      html += '<div style="font-size:0.8em;color:var(--text-muted);margin-top:2px;">Default pages: ' + br.defaultPages.join(', ') + '</div>';
+      html += '<div style="font-weight:500;"><span class="badge ' + br.badge + '">' + Utils.escapeHtml(br.label) + '</span></div>';
+      html += '<div class="text-muted" style="font-size:0.85em;margin-top:0.25rem;">' + Utils.escapeHtml(br.description) + '</div>';
       html += '</div>';
       html += '</div>';
     }
     html += '</div></div>';
 
     // Custom roles
-    html += '<div class="card" style="margin-top:16px;">';
-    html += '<div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">';
-    html += '<h3 style="margin:0;">Custom Roles</h3>';
-    html += '<button class="btn btn-primary" id="add-role-btn">';
+    html += '<div class="card mb-2">';
+    html += '<div class="card-header"><h3>Custom Roles (' + custom.length + ')</h3>';
+    html += '<button class="btn btn-primary btn-sm" id="add-role-btn">';
     html += '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
-    html += ' Add Custom Role</button>';
+    html += ' Add Role</button>';
     html += '</div>';
     html += '<div class="card-body">';
 
     if (custom.length === 0) {
-      html += '<div class="empty-state"><p>No custom roles defined. Create one to customize access for your team.</p></div>';
+      html += '<div class="empty-state"><p>No custom roles yet</p></div>';
     } else {
       for (var c = 0; c < custom.length; c++) {
         var cr = custom[c];
         var defPages = (cr.defaultPages || []).join(', ') || 'dashboard';
-        html += '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:8px 0;' + (c < custom.length - 1 ? 'border-bottom:1px solid var(--border);' : '') + '">';
-        html += '<div style="display:flex;align-items:flex-start;gap:8px;">';
-        html += '<span class="badge ' + (cr.badge || 'badge-success') + '" style="min-width:110px;text-align:center;flex-shrink:0;">' + Utils.escapeHtml(cr.label) + '</span>';
+        html += '<div class="settings-toggle-row">';
         html += '<div>';
-        html += '<div style="font-size:0.85em;">' + Utils.escapeHtml(cr.description || '') + '</div>';
-        html += '<div style="font-size:0.8em;color:var(--text-muted);margin-top:2px;">Default pages: ' + Utils.escapeHtml(defPages) + '</div>';
+        html += '<div style="font-weight:500;"><span class="badge ' + (cr.badge || 'badge-success') + '">' + Utils.escapeHtml(cr.label) + '</span></div>';
+        html += '<div class="text-muted" style="font-size:0.85em;margin-top:0.25rem;">' + Utils.escapeHtml(cr.description || '') + '</div>';
+        html += '<div class="text-muted" style="font-size:0.8em;">Pages: ' + Utils.escapeHtml(defPages) + '</div>';
         html += '</div>';
-        html += '</div>';
-        html += '<div style="white-space:nowrap;flex-shrink:0;">';
-        html += '<button class="btn btn-sm btn-secondary edit-role-btn" data-role="' + Utils.escapeHtml(cr.value) + '" style="margin-right:4px;">Edit</button>';
-        html += '<button class="btn btn-sm btn-danger delete-role-btn" data-role="' + Utils.escapeHtml(cr.value) + '" data-label="' + Utils.escapeHtml(cr.label) + '">Delete</button>';
+        html += '<div class="btn-group">';
+        html += '<button class="btn btn-sm btn-secondary edit-role-btn" data-role="' + Utils.escapeHtml(cr.value) + '">Edit</button>';
+        html += '<button class="btn btn-sm btn-ghost delete-role-btn" data-role="' + Utils.escapeHtml(cr.value) + '" data-label="' + Utils.escapeHtml(cr.label) + '" style="color:var(--danger);">Delete</button>';
         html += '</div>';
         html += '</div>';
       }
@@ -608,7 +575,7 @@ window.SettingsView = (function() {
     html += '</div>';
     html += '<div class="form-group" id="page-access-group">';
     html += '<label>Default Page Access</label>';
-    html += buildPageCheckboxes(selectedPages, 'custom');
+    html += buildPageCheckboxes(selectedPages, isEdit ? role.value : '');
     html += '</div>';
     html += '<div class="form-group" id="billing-perms-group" style="' + (billingVisible ? '' : 'display:none;') + '">';
     html += '<label>Default Billing Permissions</label>';
@@ -751,21 +718,25 @@ window.SettingsView = (function() {
     }
 
     var featureList = [
-      { key: 'billing', label: 'Billing', description: 'Invoice management and payment tracking' },
-      { key: 'messaging', label: 'Messaging', description: 'WhatsApp messaging to patients' },
-      { key: 'prescriptions', label: 'Prescriptions', description: 'Medication prescriptions management' },
-      { key: 'exercises', label: 'Exercises', description: 'Exercise programs for patients' },
+      { key: 'billing', label: 'Billing', description: 'Invoice management and payment tracking', nav: true },
+      { key: 'messaging', label: 'Messaging', description: 'WhatsApp messaging to patients', nav: true },
+      { key: 'prescriptions', label: 'Prescriptions', description: 'Medication prescriptions in patient detail' },
+      { key: 'exercises', label: 'Exercises', description: 'Exercise programs in patient detail' },
       { key: 'soapNotes', label: 'SOAP Notes', description: 'Session documentation with SOAP format' },
       { key: 'bodyDiagram', label: 'Body Diagram', description: 'Visual body region marking for patients' },
       { key: 'onlineBooking', label: 'Online Booking', description: 'Allow patients to book appointments online' },
-      { key: 'tags', label: 'Tags', description: 'Patient categorization with tags' }
+      { key: 'tags', label: 'Tags', description: 'Patient categorization and filtering with tags' }
     ];
 
+    var enabledCount = 0;
+    for (var c = 0; c < featureList.length; c++) {
+      if (features[featureList[c].key] !== false) enabledCount++;
+    }
+
     var html = '';
-    html += '<div class="card">';
-    html += '<div class="card-header"><h3 style="margin:0;">Feature Toggles</h3></div>';
+    html += '<div class="card mb-2">';
+    html += '<div class="card-header"><h3>Feature Toggles</h3><span class="badge badge-teal">' + enabledCount + '/' + featureList.length + ' enabled</span></div>';
     html += '<div class="card-body">';
-    html += '<p style="color:var(--text-muted);margin-bottom:16px;">Enable or disable features for your clinic. Changes take effect immediately.</p>';
 
     for (var i = 0; i < featureList.length; i++) {
       var f = featureList[i];
@@ -773,8 +744,10 @@ window.SettingsView = (function() {
 
       html += '<div class="settings-toggle-row">';
       html += '<div>';
-      html += '<div style="font-weight:500;">' + Utils.escapeHtml(f.label) + '</div>';
-      html += '<div style="font-size:0.85em;color:var(--text-muted);">' + Utils.escapeHtml(f.description) + '</div>';
+      html += '<div style="font-weight:500;">' + Utils.escapeHtml(f.label);
+      if (f.nav) html += ' <span class="badge badge-gray" style="font-size:0.7em;vertical-align:middle;">Nav</span>';
+      html += '</div>';
+      html += '<div class="text-muted" style="font-size:0.85em;">' + Utils.escapeHtml(f.description) + '</div>';
       html += '</div>';
       html += '<label class="toggle-switch">';
       html += '<input type="checkbox" class="feature-toggle" data-feature="' + f.key + '"' + (isOn ? ' checked' : '') + '>';
@@ -799,49 +772,30 @@ window.SettingsView = (function() {
     var bookingUrl = slug ? (window.location.origin + window.location.pathname.replace('index.html', '') + 'book1/?c=' + slug) : '';
 
     var html = '';
-    html += '<div class="card">';
-    html += '<div class="card-header"><h3 style="margin:0;">Clinic Information</h3></div>';
+    html += '<div class="card mb-2">';
+    html += '<div class="card-header"><h3>Clinic Information</h3></div>';
     html += '<div class="card-body">';
-
-    html += '<div class="form-group">';
-    html += '<label style="font-weight:600;color:var(--text-muted);font-size:0.85em;text-transform:uppercase;">Clinic Name</label>';
-    html += '<p style="font-size:1.1em;margin:4px 0 16px;">' + Utils.escapeHtml(clinicName) + '</p>';
+    html += '<div class="info-grid">';
+    html += infoItem('Clinic Name', clinicName);
+    html += infoItem('Owner', ownerName);
+    html += infoItem('Email', ownerEmail);
+    html += infoItem('Phone', ownerPhone);
+    html += infoItem('Booking Slug', slug || 'Not configured');
     html += '</div>';
 
-    html += '<div class="form-group">';
-    html += '<label style="font-weight:600;color:var(--text-muted);font-size:0.85em;text-transform:uppercase;">Owner</label>';
-    html += '<p style="font-size:1.1em;margin:4px 0 16px;">' + Utils.escapeHtml(ownerName) + '</p>';
-    html += '</div>';
-
-    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px;">';
-    html += '<div class="form-group">';
-    html += '<label style="font-weight:600;color:var(--text-muted);font-size:0.85em;text-transform:uppercase;">Email</label>';
-    html += '<p style="font-size:1em;margin:4px 0 16px;">' + Utils.escapeHtml(ownerEmail) + '</p>';
-    html += '</div>';
-    html += '<div class="form-group">';
-    html += '<label style="font-weight:600;color:var(--text-muted);font-size:0.85em;text-transform:uppercase;">Phone</label>';
-    html += '<p style="font-size:1em;margin:4px 0 16px;">' + Utils.escapeHtml(ownerPhone) + '</p>';
-    html += '</div>';
-    html += '</div>';
-
-    html += '<div class="form-group">';
-    html += '<label style="font-weight:600;color:var(--text-muted);font-size:0.85em;text-transform:uppercase;">Booking Slug</label>';
-    html += '<p style="font-size:1.1em;margin:4px 0 16px;">' + (slug ? Utils.escapeHtml(slug) : '<span style="color:var(--text-muted);">Not configured</span>') + '</p>';
-    html += '</div>';
-
-    html += '<div class="form-group">';
-    html += '<label style="font-weight:600;color:var(--text-muted);font-size:0.85em;text-transform:uppercase;">Online Booking URL</label>';
-    html += '<p style="font-size:1em;margin:4px 0 16px;">';
     if (bookingUrl) {
-      html += '<code style="background:var(--bg-secondary);padding:4px 8px;border-radius:4px;font-size:0.9em;">' + Utils.escapeHtml(bookingUrl) + '</code>';
-    } else {
-      html += '<span style="color:var(--text-muted);">Set a booking slug to generate URL</span>';
+      html += '<div style="margin-top:1rem;padding:0.75rem;background:var(--bg-secondary);border-radius:var(--radius);font-size:0.85em;">';
+      html += '<strong>Online Booking URL</strong><br>';
+      html += '<code style="word-break:break-all;">' + Utils.escapeHtml(bookingUrl) + '</code>';
+      html += '</div>';
     }
-    html += '</p>';
-    html += '</div>';
 
     html += '</div></div>';
     return html;
+  }
+
+  function infoItem(label, value) {
+    return '<div class="info-item"><label>' + label + '</label><span>' + Utils.escapeHtml(value || '-') + '</span></div>';
   }
 
   // ==================== TRASH ====================
@@ -849,22 +803,19 @@ window.SettingsView = (function() {
     var trashed = Store.getAllTrash();
     var html = '';
 
-    html += '<div class="card">';
-    html += '<div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">';
-    html += '<h3 style="margin:0;">Trash <span style="color:var(--text-muted);font-weight:400;font-size:0.85em;">(' + trashed.length + ' item' + (trashed.length !== 1 ? 's' : '') + ')</span></h3>';
+    html += '<div class="card mb-2">';
+    html += '<div class="card-header"><h3>Trash (' + trashed.length + ')</h3>';
     if (trashed.length > 0) {
-      html += '<button class="btn btn-danger" id="empty-trash-btn">Empty Trash</button>';
+      html += '<button class="btn btn-sm btn-ghost" id="empty-trash-btn" style="color:var(--danger);">Empty Trash</button>';
     }
     html += '</div>';
     html += '<div class="card-body">';
 
     if (trashed.length === 0) {
-      html += '<div class="empty-state">';
-      html += '<p>Trash is empty. Deleted items will appear here for recovery.</p>';
-      html += '</div>';
+      html += '<div class="empty-state"><p>Trash is empty. Deleted items appear here for recovery.</p></div>';
     } else {
       html += '<div class="table-wrapper"><table class="data-table"><thead><tr>';
-      html += '<th>Type</th><th>Name / Description</th><th>Deleted</th><th>Actions</th>';
+      html += '<th>Type</th><th>Name</th><th>Deleted</th><th>Actions</th>';
       html += '</tr></thead><tbody>';
 
       for (var i = 0; i < trashed.length; i++) {
@@ -875,18 +826,16 @@ window.SettingsView = (function() {
 
         html += '<tr class="no-hover">';
         html += '<td><span class="badge badge-secondary">' + Utils.escapeHtml(item._type) + '</span></td>';
-        html += '<td>' + Utils.escapeHtml(name);
-        if (isCascade) {
-          html += ' <span style="font-size:0.8em;color:var(--text-muted);">(cascade)</span>';
-        }
+        html += '<td style="font-weight:500;">' + Utils.escapeHtml(name);
+        if (isCascade) html += ' <span class="text-muted">(cascade)</span>';
         html += '</td>';
-        html += '<td style="white-space:nowrap;">' + deletedDate + '</td>';
-        html += '<td style="white-space:nowrap;">';
+        html += '<td>' + deletedDate + '</td>';
+        html += '<td><div class="btn-group">';
         if (!isCascade) {
-          html += '<button class="btn btn-sm btn-secondary restore-trash-btn" data-key="' + Utils.escapeHtml(item._storeKey) + '" data-id="' + item.id + '" data-type="' + Utils.escapeHtml(item._type) + '" style="margin-right:4px;">Restore</button>';
+          html += '<button class="btn btn-sm btn-secondary restore-trash-btn" data-key="' + Utils.escapeHtml(item._storeKey) + '" data-id="' + item.id + '" data-type="' + Utils.escapeHtml(item._type) + '">Restore</button>';
         }
-        html += '<button class="btn btn-sm btn-danger delete-forever-btn" data-key="' + Utils.escapeHtml(item._storeKey) + '" data-id="' + item.id + '" data-name="' + Utils.escapeHtml(name) + '">Delete Forever</button>';
-        html += '</td>';
+        html += '<button class="btn btn-sm btn-ghost delete-forever-btn" data-key="' + Utils.escapeHtml(item._storeKey) + '" data-id="' + item.id + '" data-name="' + Utils.escapeHtml(name) + '" style="color:var(--danger);">Delete</button>';
+        html += '</div></td>';
         html += '</tr>';
       }
 
@@ -902,27 +851,27 @@ window.SettingsView = (function() {
     var html = '';
 
     // Export section
-    html += '<div class="card">';
-    html += '<div class="card-header"><h3 style="margin:0;">Export Backup</h3></div>';
+    html += '<div class="card mb-2">';
+    html += '<div class="card-header"><h3>Export Backup</h3></div>';
     html += '<div class="card-body">';
-    html += '<p style="color:var(--text-muted);margin-bottom:16px;">Download all clinic data as a JSON file. This includes patients, appointments, sessions, exercises, billing, prescriptions, staff, tags, messages, and activity log.</p>';
+    html += '<p class="text-muted" style="margin-bottom:1rem;">Download all clinic data as a JSON file.</p>';
     html += '<button class="btn btn-primary" id="export-backup-btn">';
     html += '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
     html += ' Export Backup</button>';
     html += '</div></div>';
 
     // Import section
-    html += '<div class="card" style="margin-top:16px;">';
-    html += '<div class="card-header"><h3 style="margin:0;">Import Backup</h3></div>';
+    html += '<div class="card mb-2">';
+    html += '<div class="card-header"><h3>Import Backup</h3></div>';
     html += '<div class="card-body">';
-    html += '<p style="color:var(--text-muted);margin-bottom:16px;">Restore data from a previously exported JSON backup file. New items are merged in \u2014 existing items (by ID) are not overwritten.</p>';
-    html += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">';
-    html += '<input type="file" id="import-file-input" accept=".json" style="flex:1;min-width:200px;">';
-    html += '<button class="btn btn-primary" id="import-backup-btn" disabled>';
+    html += '<p class="text-muted" style="margin-bottom:1rem;">Restore from a JSON backup. New items are merged \u2014 existing items are not overwritten.</p>';
+    html += '<div class="form-row">';
+    html += '<div class="form-group"><input type="file" id="import-file-input" accept=".json"></div>';
+    html += '<div class="form-group"><button class="btn btn-primary" id="import-backup-btn" disabled>';
     html += '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>';
-    html += ' Import Backup</button>';
+    html += ' Import</button></div>';
     html += '</div>';
-    html += '<div id="import-preview" style="margin-top:12px;display:none;"></div>';
+    html += '<div id="import-preview" style="display:none;"></div>';
     html += '</div></div>';
 
     return html;
@@ -976,6 +925,17 @@ window.SettingsView = (function() {
 
           if (window.App && window.App.applyFeatureToggles) {
             App.applyFeatureToggles();
+          }
+
+          // Update the enabled count badge
+          var badge = container.querySelector('.card-header .badge-teal');
+          if (badge) {
+            var allToggles = container.querySelectorAll('.feature-toggle');
+            var count = 0;
+            for (var ct = 0; ct < allToggles.length; ct++) {
+              if (allToggles[ct].checked) count++;
+            }
+            badge.textContent = count + '/' + allToggles.length + ' enabled';
           }
         });
       })(toggles[f]);
