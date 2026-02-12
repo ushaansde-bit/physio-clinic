@@ -375,16 +375,12 @@ window.PatientDetailView = (function() {
     html += '<div class="inline-form-body">';
     html += '<form id="edit-patient-form">';
 
-    // Basic info
-    html += '<div class="form-section-title">Basic Information</div>';
-    html += '<div class="form-row">';
     html += '<div class="form-group"><label>Full Name</label>';
     html += '<input type="text" name="name" value="' + Utils.escapeHtml(patient.name || '') + '" required></div>';
+    html += '<div class="form-row-3">';
     html += '<div class="form-group"><label>Date of Birth</label>';
     html += Utils.dobPickerHtml(patient.dob || '');
     html += '</div>';
-    html += '</div>';
-    html += '<div class="form-row">';
     html += '<div class="form-group"><label>Gender</label>';
     html += '<select name="gender">';
     html += '<option value="">Select...</option>';
@@ -399,8 +395,6 @@ window.PatientDetailView = (function() {
     html += '</select></div>';
     html += '</div>';
 
-    // Contact
-    html += '<div class="form-section-title">Contact</div>';
     html += '<div class="form-row">';
     html += '<div class="form-group"><label>Phone</label>';
     html += '<div class="phone-input-wrap">';
@@ -410,13 +404,13 @@ window.PatientDetailView = (function() {
     html += '<div class="form-group"><label>Email</label>';
     html += '<input type="email" name="email" value="' + Utils.escapeHtml(patient.email || '') + '"></div>';
     html += '</div>';
+    html += '<div class="form-row">';
     html += '<div class="form-group"><label>Address</label>';
     html += '<input type="text" name="address" value="' + Utils.escapeHtml(patient.address || '') + '"></div>';
     html += '<div class="form-group"><label>Insurance</label>';
     html += '<input type="text" name="insurance" value="' + Utils.escapeHtml(patient.insurance || '') + '"></div>';
+    html += '</div>';
 
-    // Clinical
-    html += '<div class="form-section-title">Clinical</div>';
     html += '<div class="form-group"><label>Diagnosis ' + Utils.micHtml('ep-diagnosis') + '</label>';
     html += '<textarea id="ep-diagnosis" name="diagnosis" rows="2" data-ac="diagnosis">' + Utils.escapeHtml(patient.diagnosis || '') + '</textarea></div>';
     html += '<div class="form-group"><label>Treatment Plan ' + Utils.micHtml('ep-treatplan') + '</label>';
@@ -424,12 +418,10 @@ window.PatientDetailView = (function() {
     html += '<div class="form-group"><label>Notes ' + Utils.micHtml('ep-notes') + '</label>';
     html += '<textarea id="ep-notes" name="notes" rows="2">' + Utils.escapeHtml(patient.notes || '') + '</textarea></div>';
 
-    // Emergency
-    html += '<div class="form-section-title">Emergency Contact</div>';
     html += '<div class="form-row">';
-    html += '<div class="form-group"><label>Contact Name</label>';
+    html += '<div class="form-group"><label>Emergency Contact</label>';
     html += '<input type="text" name="emergencyContact" value="' + Utils.escapeHtml(patient.emergencyContact || '') + '"></div>';
-    html += '<div class="form-group"><label>Contact Phone</label>';
+    html += '<div class="form-group"><label>Emergency Phone</label>';
     html += '<div class="phone-input-wrap">';
     html += '<input type="text" name="emergencyPhoneCode" class="phone-code-input" value="' + Utils.escapeHtml(patient.emergencyPhoneCode || Utils.getPhoneCode()) + '" maxlength="5">';
     html += '<input type="tel" name="emergencyPhone" class="phone-number-input" value="' + Utils.escapeHtml(patient.emergencyPhone || '') + '" maxlength="' + Utils.getPhoneDigits() + '">';
@@ -438,16 +430,15 @@ window.PatientDetailView = (function() {
 
     // Body diagram
     if (Store.isFeatureEnabled('bodyDiagram')) {
-      html += '<div class="form-section-title">Affected Body Areas</div>';
-      html += '<div class="form-group"><div class="body-diagram-wrap"><div id="ep-body-diagram"></div></div></div>';
+      html += '<div class="form-group"><label>Affected Body Areas</label>';
+      html += '<div class="body-diagram-wrap"><div id="ep-body-diagram"></div></div></div>';
     }
 
     // Tags
     if (Store.isFeatureEnabled('tags')) {
       var formTags = Store.getTags();
       var patientTags = patient.tags || [];
-      html += '<div class="form-section-title">Tags</div>';
-      html += '<div class="form-group"><div class="tag-pill-group">';
+      html += '<div class="form-group"><label>Tags</label><div class="tag-pill-group">';
       for (var ti = 0; ti < formTags.length; ti++) {
         var isChecked = patientTags.indexOf(formTags[ti].id) !== -1;
         var tagColor = formTags[ti].color || '#6b7280';
