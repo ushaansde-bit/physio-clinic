@@ -5,6 +5,7 @@ window.PatientDetailView = (function() {
 
   var activeTab = 'overview';
   var _clickHandler = null;
+  var _sessionDateParam = null; // set via query param from "Start Session Note"
 
   // Sub-view state for inline forms
   var sub = {
@@ -17,7 +18,8 @@ window.PatientDetailView = (function() {
     billingView: 'list',     // list | form
     bookingView: 'list',     // list | form
     printExpanded: false,
-    rxPrintExpanded: false
+    rxPrintExpanded: false,
+    editingPatient: false
   };
 
   function resetSub() {
@@ -31,9 +33,23 @@ window.PatientDetailView = (function() {
     sub.bookingView = 'list';
     sub.printExpanded = false;
     sub.rxPrintExpanded = false;
+    sub.editingPatient = false;
   }
 
   function render(container, patientId) {
+    // Parse query params from patientId (e.g., "abc123?tab=sessions&newSession=1&sessionDate=2026-02-10")
+    var params = {};
+    var qIdx = patientId.indexOf('?');
+    if (qIdx !== -1) {
+      var qs = patientId.substring(qIdx + 1);
+      patientId = patientId.substring(0, qIdx);
+      var pairs = qs.split('&');
+      for (var pi = 0; pi < pairs.length; pi++) {
+        var eqIdx = pairs[pi].indexOf('=');
+        if (eqIdx > 0) params[decodeURIComponent(pairs[pi].substring(0, eqIdx))] = decodeURIComponent(pairs[pi].substring(eqIdx + 1));
+      }
+    }
+
     var patient = Store.getPatient(patientId);
     if (!patient) {
       container.innerHTML = '<div class="empty-state"><p>Patient not found</p><a href="#/patients" class="btn btn-primary mt-2">Back to Patients</a></div>';
@@ -41,12 +57,21 @@ window.PatientDetailView = (function() {
     }
 
     App.setPageTitle(patient.name);
-    activeTab = activeTab || 'overview';
+    activeTab = params.tab || 'overview';
     var tabFeatureMap = { exercises: 'exercises', prescriptions: 'prescriptions', billing: 'billing' };
     if (tabFeatureMap[activeTab] && !Store.isFeatureEnabled(tabFeatureMap[activeTab])) {
       activeTab = 'overview';
     }
     resetSub();
+
+    // Auto-open new session form if requested via query param
+    if (params.newSession === '1') {
+      activeTab = 'sessions';
+      sub.sessionsView = 'form';
+      sub.sessionsEditId = null;
+      _sessionDateParam = params.sessionDate || null;
+    }
+
     renderDetail(container, patient);
   }
 
@@ -82,11 +107,12 @@ window.PatientDetailView = (function() {
     html += 'Print</button>';
     html += '</div></div>';
 
-    // Tabs (renamed per plan)
+    // Tabs
     html += '<div class="tabs">';
     html += tabBtn('overview', 'Overview');
+    html += tabBtn('history', 'History');
     html += tabBtn('sessions', 'Treatment Notes');
-    if (Store.isFeatureEnabled('exercises')) html += tabBtn('exercises', 'Home Exercise Program (HEP)');
+    if (Store.isFeatureEnabled('exercises')) html += tabBtn('exercises', 'HEP');
     if (Store.isFeatureEnabled('prescriptions')) html += tabBtn('prescriptions', 'Prescriptions');
     if (Store.isFeatureEnabled('billing')) html += tabBtn('billing', 'Billing');
     html += '</div>';
@@ -94,6 +120,10 @@ window.PatientDetailView = (function() {
     // Tab content
     html += '<div id="tab-overview" class="tab-content' + (activeTab === 'overview' ? ' active' : '') + '">';
     html += renderOverview(patient);
+    html += '</div>';
+
+    html += '<div id="tab-history" class="tab-content' + (activeTab === 'history' ? ' active' : '') + '">';
+    html += renderHistory(patient);
     html += '</div>';
 
     html += '<div id="tab-sessions" class="tab-content' + (activeTab === 'sessions' ? ' active' : '') + '">';
@@ -136,11 +166,62 @@ window.PatientDetailView = (function() {
       html += renderBookNextVisitForm(patient);
     }
 
+    // Edit Patient form (inline, shown when editing)
+    if (sub.editingPatient) {
+      html += renderEditPatientForm(patient);
+    }
+
+    // Next/Last Visit info cards
+    var allAppts = Store.getAppointmentsByPatient(patient.id);
+    var todayStr = Utils.today();
+    var nextAppt = null;
+    var lastVisit = null;
+    for (var vi = 0; vi < allAppts.length; vi++) {
+      var vap = allAppts[vi];
+      if (vap.status === 'scheduled' && vap.date >= todayStr) {
+        if (!nextAppt || vap.date < nextAppt.date || (vap.date === nextAppt.date && vap.time < nextAppt.time)) {
+          nextAppt = vap;
+        }
+      }
+      if (vap.status === 'completed') {
+        if (!lastVisit || vap.date > lastVisit.date || (vap.date === lastVisit.date && vap.time > lastVisit.time)) {
+          lastVisit = vap;
+        }
+      }
+    }
+
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:1rem;">';
+    html += '<div class="visit-info-card">';
+    html += '<div class="visit-info-icon next"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>';
+    html += '<div class="visit-info-detail">';
+    html += '<div class="visit-label">Next Appointment</div>';
+    if (nextAppt) {
+      html += '<div class="visit-value">' + Utils.formatDate(nextAppt.date) + ' at ' + Utils.formatTime(nextAppt.time) + '</div>';
+    } else {
+      html += '<div class="visit-value" style="color:var(--gray-400);">None scheduled</div>';
+    }
+    html += '</div></div>';
+    html += '<div class="visit-info-card">';
+    html += '<div class="visit-info-icon last"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div>';
+    html += '<div class="visit-info-detail">';
+    html += '<div class="visit-label">Last Visit</div>';
+    if (lastVisit) {
+      html += '<div class="visit-value">' + Utils.formatDate(lastVisit.date) + '</div>';
+    } else {
+      html += '<div class="visit-value" style="color:var(--gray-400);">No visits yet</div>';
+    }
+    html += '</div></div>';
+    html += '</div>';
+
     // Patient info
-    html += '<div class="card mb-2"><div class="card-header"><h3>Patient Information</h3></div><div class="card-body">';
+    html += '<div class="card mb-2"><div class="card-header"><h3>Patient Information</h3>';
+    if (!sub.editingPatient) {
+      html += '<button class="btn btn-sm btn-secondary edit-patient-info-btn" id="edit-patient-info-btn">Edit</button>';
+    }
+    html += '</div><div class="card-body">';
     html += '<div class="info-grid">';
     html += infoItem('Full Name', patient.name);
-    html += infoItem('Date of Birth', Utils.formatDate(patient.dob) + ' (Age ' + Utils.calculateAge(patient.dob) + ')');
+    html += infoItem('Date of Birth', Utils.formatDate(patient.dob) + (patient.dob ? ' (Age ' + Utils.calculateAge(patient.dob) + ')' : ''));
     html += infoItem('Gender', patient.gender ? patient.gender.charAt(0).toUpperCase() + patient.gender.slice(1) : '-');
     html += infoItem('Phone', (patient.phoneCode || Utils.getPhoneCode()) + ' ' + (patient.phone || '-'));
     html += infoItem('Email', patient.email);
@@ -199,31 +280,12 @@ window.PatientDetailView = (function() {
       html += '</div></div></div>';
     }
 
-    // Next Appointment card
-    var allAppts = Store.getAppointmentsByPatient(patient.id);
-    var todayStr = Utils.today();
-    var nextAppt = null;
-    for (var ai = 0; ai < allAppts.length; ai++) {
-      var ap = allAppts[ai];
-      if (ap.status === 'scheduled' && ap.date >= todayStr) {
-        if (!nextAppt || ap.date < nextAppt.date || (ap.date === nextAppt.date && ap.time < nextAppt.time)) {
-          nextAppt = ap;
-        }
-      }
-    }
-    html += '<div class="card mb-2"><div class="card-header"><h3>Next Appointment</h3>';
-    html += '<button class="btn btn-sm btn-primary" id="book-next-visit-btn">Book Next Visit</button>';
-    html += '</div><div class="card-body">';
-    if (nextAppt) {
-      html += '<div class="info-grid" style="grid-template-columns:1fr 1fr 1fr;">';
-      html += infoItem('Date', Utils.formatDate(nextAppt.date));
-      html += infoItem('Time', Utils.formatTime(nextAppt.time));
-      html += infoItem('Type', nextAppt.type);
-      html += '</div>';
-    } else {
-      html += '<p style="color:var(--gray-500);font-size:0.85rem;">No upcoming appointments scheduled.</p>';
-    }
-    html += '</div></div>';
+    // Book Next Visit button
+    html += '<div style="margin-bottom:1rem;">';
+    html += '<button class="btn btn-primary" id="book-next-visit-btn">';
+    html += '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
+    html += ' Book Next Visit</button>';
+    html += '</div>';
 
     // Emergency contact
     html += '<div class="card"><div class="card-header"><h3>Emergency Contact</h3></div><div class="card-body">';
@@ -297,6 +359,111 @@ window.PatientDetailView = (function() {
     return html;
   }
 
+  // ==================== EDIT PATIENT INFO (inline) ====================
+  function renderEditPatientForm(patient) {
+    var html = '<div class="inline-form-card mb-2">';
+    html += '<div class="inline-form-header">';
+    html += '<button class="back-btn" id="edit-patient-back">';
+    html += '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>';
+    html += '</button>';
+    html += '<h3>Edit Patient Info</h3>';
+    html += '</div>';
+    html += '<div class="inline-form-body">';
+    html += '<form id="edit-patient-form">';
+
+    // Basic info
+    html += '<div class="form-section-title">Basic Information</div>';
+    html += '<div class="form-row">';
+    html += '<div class="form-group"><label>Full Name</label>';
+    html += '<input type="text" name="name" value="' + Utils.escapeHtml(patient.name || '') + '" required></div>';
+    html += '<div class="form-group"><label>Date of Birth</label>';
+    html += Utils.dobPickerHtml(patient.dob || '');
+    html += '</div>';
+    html += '</div>';
+    html += '<div class="form-row">';
+    html += '<div class="form-group"><label>Gender</label>';
+    html += '<select name="gender">';
+    html += '<option value="">Select...</option>';
+    html += '<option value="male"' + (patient.gender === 'male' ? ' selected' : '') + '>Male</option>';
+    html += '<option value="female"' + (patient.gender === 'female' ? ' selected' : '') + '>Female</option>';
+    html += '<option value="other"' + (patient.gender === 'other' ? ' selected' : '') + '>Other</option>';
+    html += '</select></div>';
+    html += '<div class="form-group"><label>Status</label>';
+    html += '<select name="status">';
+    html += '<option value="active"' + (patient.status === 'active' ? ' selected' : '') + '>Active</option>';
+    html += '<option value="completed"' + (patient.status === 'completed' ? ' selected' : '') + '>Completed</option>';
+    html += '</select></div>';
+    html += '</div>';
+
+    // Contact
+    html += '<div class="form-section-title">Contact</div>';
+    html += '<div class="form-row">';
+    html += '<div class="form-group"><label>Phone</label>';
+    html += '<div class="phone-input-wrap">';
+    html += '<input type="text" name="phoneCode" class="phone-code-input" value="' + Utils.escapeHtml(patient.phoneCode || Utils.getPhoneCode()) + '" maxlength="5">';
+    html += '<input type="tel" name="phone" class="phone-number-input" value="' + Utils.escapeHtml(patient.phone || '') + '" maxlength="' + Utils.getPhoneDigits() + '">';
+    html += '</div></div>';
+    html += '<div class="form-group"><label>Email</label>';
+    html += '<input type="email" name="email" value="' + Utils.escapeHtml(patient.email || '') + '"></div>';
+    html += '</div>';
+    html += '<div class="form-group"><label>Address</label>';
+    html += '<input type="text" name="address" value="' + Utils.escapeHtml(patient.address || '') + '"></div>';
+    html += '<div class="form-group"><label>Insurance</label>';
+    html += '<input type="text" name="insurance" value="' + Utils.escapeHtml(patient.insurance || '') + '"></div>';
+
+    // Clinical
+    html += '<div class="form-section-title">Clinical</div>';
+    html += '<div class="form-group"><label>Diagnosis ' + Utils.micHtml('ep-diagnosis') + '</label>';
+    html += '<textarea id="ep-diagnosis" name="diagnosis" rows="2" data-ac="diagnosis">' + Utils.escapeHtml(patient.diagnosis || '') + '</textarea></div>';
+    html += '<div class="form-group"><label>Treatment Plan ' + Utils.micHtml('ep-treatplan') + '</label>';
+    html += '<textarea id="ep-treatplan" name="treatmentPlan" rows="3" data-ac="treatmentPlan">' + Utils.escapeHtml(patient.treatmentPlan || '') + '</textarea></div>';
+    html += '<div class="form-group"><label>Notes ' + Utils.micHtml('ep-notes') + '</label>';
+    html += '<textarea id="ep-notes" name="notes" rows="2">' + Utils.escapeHtml(patient.notes || '') + '</textarea></div>';
+
+    // Emergency
+    html += '<div class="form-section-title">Emergency Contact</div>';
+    html += '<div class="form-row">';
+    html += '<div class="form-group"><label>Contact Name</label>';
+    html += '<input type="text" name="emergencyContact" value="' + Utils.escapeHtml(patient.emergencyContact || '') + '"></div>';
+    html += '<div class="form-group"><label>Contact Phone</label>';
+    html += '<div class="phone-input-wrap">';
+    html += '<input type="text" name="emergencyPhoneCode" class="phone-code-input" value="' + Utils.escapeHtml(patient.emergencyPhoneCode || Utils.getPhoneCode()) + '" maxlength="5">';
+    html += '<input type="tel" name="emergencyPhone" class="phone-number-input" value="' + Utils.escapeHtml(patient.emergencyPhone || '') + '" maxlength="' + Utils.getPhoneDigits() + '">';
+    html += '</div></div>';
+    html += '</div>';
+
+    // Body diagram
+    if (Store.isFeatureEnabled('bodyDiagram')) {
+      html += '<div class="form-section-title">Affected Body Areas</div>';
+      html += '<div class="form-group"><div class="body-diagram-wrap"><div id="ep-body-diagram"></div></div></div>';
+    }
+
+    // Tags
+    if (Store.isFeatureEnabled('tags')) {
+      var formTags = Store.getTags();
+      var patientTags = patient.tags || [];
+      html += '<div class="form-section-title">Tags</div>';
+      html += '<div class="form-group"><div class="tag-pill-group">';
+      for (var ti = 0; ti < formTags.length; ti++) {
+        var isChecked = patientTags.indexOf(formTags[ti].id) !== -1;
+        var tagColor = formTags[ti].color || '#6b7280';
+        html += '<button type="button" class="tag-pill' + (isChecked ? ' active' : '') + '" data-tag-id="' + formTags[ti].id + '" data-color="' + tagColor + '"' + (isChecked ? ' style="background:' + tagColor + ';color:#fff;border-color:' + tagColor + ';"' : '') + '>';
+        html += '<span class="tag-pill-dot" style="background:' + tagColor + ';"></span>';
+        html += Utils.escapeHtml(formTags[ti].name);
+        html += '</button>';
+      }
+      html += '</div></div>';
+    }
+
+    html += '</form>';
+    html += '</div>';
+    html += '<div class="inline-form-actions">';
+    html += '<button class="btn btn-secondary" id="edit-patient-cancel">Cancel</button>';
+    html += '<button class="btn btn-primary" id="edit-patient-save">Save Changes</button>';
+    html += '</div></div>';
+    return html;
+  }
+
   // ==================== PRINT OPTIONS (inline collapsible) ====================
   function renderPrintOptions(patient) {
     var bills = Store.getBillingByPatient(patient.id);
@@ -360,6 +527,127 @@ window.PatientDetailView = (function() {
     return html;
   }
 
+  // ==================== HISTORY TAB ====================
+  function renderHistory(patient) {
+    var events = [];
+
+    // Appointments
+    var appts = Store.getAppointmentsByPatient(patient.id);
+    for (var a = 0; a < appts.length; a++) {
+      var ap = appts[a];
+      var apSummary = ap.type + ' - ' + Utils.formatTime(ap.time) + ' (' + ap.duration + ' min)';
+      if (ap.notes) apSummary += ' - ' + ap.notes.substring(0, 80);
+      events.push({
+        date: ap.date,
+        time: ap.time || '00:00',
+        type: 'appointment',
+        badge: 'badge-appointment',
+        label: 'Appt',
+        summary: '<strong>' + ap.status.charAt(0).toUpperCase() + ap.status.slice(1) + '</strong>: ' + Utils.escapeHtml(apSummary)
+      });
+    }
+
+    // Sessions/Treatment Notes
+    var sessions = Store.getSessionsByPatient(patient.id);
+    for (var s = 0; s < sessions.length; s++) {
+      var sn = sessions[s];
+      var snText = '';
+      if (sn.subjective) snText += 'S: ' + sn.subjective.substring(0, 60) + '... ';
+      if (sn.assessment) snText += 'A: ' + sn.assessment.substring(0, 60);
+      events.push({
+        date: sn.date,
+        time: '10:00',
+        type: 'session',
+        badge: 'badge-session',
+        label: 'Note',
+        summary: '<strong>Pain ' + (sn.painScore || 0) + '/10, Func ' + (sn.functionScore || 0) + '/10</strong> - ' + Utils.escapeHtml(snText || 'Treatment note recorded')
+      });
+    }
+
+    // Prescriptions
+    if (Store.isFeatureEnabled('prescriptions')) {
+      var rxs = Store.getPrescriptionsByPatient(patient.id);
+      for (var r = 0; r < rxs.length; r++) {
+        var rx = rxs[r];
+        events.push({
+          date: rx.date,
+          time: '12:00',
+          type: 'rx',
+          badge: 'badge-rx',
+          label: 'Rx',
+          summary: '<strong>' + Utils.escapeHtml(rx.medication) + '</strong> ' + Utils.escapeHtml(rx.dosage || '') + ' - ' + Utils.escapeHtml(rx.status)
+        });
+      }
+    }
+
+    // Billing
+    if (Store.isFeatureEnabled('billing')) {
+      var bills = Store.getBillingByPatient(patient.id);
+      for (var b = 0; b < bills.length; b++) {
+        var bill = bills[b];
+        events.push({
+          date: bill.date,
+          time: '14:00',
+          type: 'billing',
+          badge: 'badge-billing',
+          label: 'Bill',
+          summary: '<strong>' + Utils.formatCurrency(bill.amount) + '</strong> - ' + Utils.escapeHtml(bill.description) + ' (' + bill.status + ')'
+        });
+      }
+    }
+
+    // Exercises
+    if (Store.isFeatureEnabled('exercises')) {
+      var exs = Store.getExercisesByPatient(patient.id);
+      for (var e = 0; e < exs.length; e++) {
+        var ex = exs[e];
+        var exDate = ex.createdAt ? ex.createdAt.substring(0, 10) : Utils.today();
+        events.push({
+          date: exDate,
+          time: '11:00',
+          type: 'exercise',
+          badge: 'badge-exercise',
+          label: 'HEP',
+          summary: '<strong>' + Utils.escapeHtml(ex.name) + '</strong> - ' + ex.sets + ' x ' + ex.reps + ' (' + Utils.escapeHtml(ex.status) + ')'
+        });
+      }
+    }
+
+    // Sort by date desc, then time desc
+    events.sort(function(a, b) {
+      if (a.date !== b.date) return a.date > b.date ? -1 : 1;
+      return a.time > b.time ? -1 : 1;
+    });
+
+    var html = '<div class="flex-between mb-2">';
+    html += '<h3 style="font-size:1rem;">Patient History (' + events.length + ' events)</h3>';
+    html += '</div>';
+
+    if (events.length === 0) {
+      html += '<div class="empty-state"><p>No history yet</p></div>';
+      return html;
+    }
+
+    // Group by date
+    var currentDate = '';
+    for (var i = 0; i < events.length; i++) {
+      var ev = events[i];
+      if (ev.date !== currentDate) {
+        if (currentDate) html += '</div>'; // close previous group
+        currentDate = ev.date;
+        html += '<div class="timeline-group">';
+        html += '<div class="timeline-date">' + Utils.formatDate(ev.date) + '</div>';
+      }
+      html += '<div class="timeline-item">';
+      html += '<span class="timeline-badge ' + ev.badge + '">' + ev.label + '</span>';
+      html += '<div class="timeline-summary">' + ev.summary + '</div>';
+      html += '</div>';
+    }
+    if (currentDate) html += '</div>'; // close last group
+
+    return html;
+  }
+
   // ==================== SESSIONS TAB ====================
   function renderSessions(patient) {
     if (sub.sessionsView === 'form') {
@@ -412,9 +700,12 @@ window.PatientDetailView = (function() {
     html += '</div>';
     html += '<div class="inline-form-body">';
     html += '<form id="session-form">';
+    var defaultSessionDate = session ? session.date : (_sessionDateParam || Utils.today());
+    _sessionDateParam = null; // consume param
+
     html += '<div class="form-row-3">';
     html += '<div class="form-group"><label>Date</label>';
-    html += '<input type="date" name="date" value="' + (session ? session.date : Utils.today()) + '" required></div>';
+    html += '<input type="date" name="date" value="' + defaultSessionDate + '" required></div>';
     html += '<div class="form-group"><label>Pain Score (0-10)</label>';
     html += '<input type="number" name="painScore" min="0" max="10" value="' + (session ? session.painScore : '5') + '" required></div>';
     html += '<div class="form-group"><label>Function Score (0-10)</label>';
@@ -1211,6 +1502,13 @@ window.PatientDetailView = (function() {
         return;
       }
 
+      // === Edit Patient Info ===
+      if (e.target.closest('#edit-patient-info-btn')) {
+        sub.editingPatient = true;
+        renderDetail(container, patient);
+        return;
+      }
+
       // === Book Next Visit ===
       if (e.target.closest('#book-next-visit-btn')) {
         sub.bookingView = 'form';
@@ -1370,6 +1668,7 @@ window.PatientDetailView = (function() {
     if (bookBack) bookBack.onclick = function() { sub.bookingView = 'list'; renderDetail(container, patient); };
     if (bookCancel) bookCancel.onclick = function() { sub.bookingView = 'list'; renderDetail(container, patient); };
     if (bookSave) {
+      var _bookDupConfirmed = false;
       bookSave.onclick = function() {
         var form = document.getElementById('next-visit-form');
         var data = Utils.getFormData(form);
@@ -1384,14 +1683,94 @@ window.PatientDetailView = (function() {
           warningEl.style.display = 'block';
           return;
         }
+        // Duplicate check
+        if (!_bookDupConfirmed) {
+          var existing = Store.hasDuplicateFutureAppointment(patient.id, null);
+          if (existing) {
+            var warningEl2 = document.getElementById('conflict-warning-booking');
+            warningEl2.innerHTML = 'Patient already has appointment on <strong>' + Utils.formatDate(existing.date) + '</strong> at <strong>' + Utils.formatTime(existing.time) + '</strong>. ' +
+              '<br><button class="btn btn-sm btn-warning" id="book-dup-cancel" style="margin-top:0.4rem;">Cancel old & book new</button> ' +
+              '<button class="btn btn-sm btn-ghost" id="book-dup-keep" style="margin-top:0.4rem;">Keep both</button>';
+            warningEl2.style.display = 'block';
+            document.getElementById('book-dup-cancel').onclick = function() {
+              Store.updateAppointment(existing.id, { status: 'cancelled' });
+              _bookDupConfirmed = true;
+              bookSave.click();
+            };
+            document.getElementById('book-dup-keep').onclick = function() {
+              _bookDupConfirmed = true;
+              bookSave.click();
+            };
+            return;
+          }
+        }
         data.patientId = patient.id;
         data.patientName = patient.name;
         data.status = 'scheduled';
         Store.createAppointment(data);
         Utils.toast('Next visit booked', 'success');
+        _bookDupConfirmed = false;
         sub.bookingView = 'list';
         renderDetail(container, Store.getPatient(patient.id));
       };
+    }
+
+    // Edit Patient form
+    var editPatientBack = document.getElementById('edit-patient-back');
+    var editPatientCancel = document.getElementById('edit-patient-cancel');
+    var editPatientSave = document.getElementById('edit-patient-save');
+    if (editPatientBack) editPatientBack.onclick = function() { sub.editingPatient = false; renderDetail(container, patient); };
+    if (editPatientCancel) editPatientCancel.onclick = function() { sub.editingPatient = false; renderDetail(container, patient); };
+    if (editPatientSave) {
+      editPatientSave.onclick = function() {
+        var form = document.getElementById('edit-patient-form');
+        var nameInput = form.querySelector('[name="name"]');
+        if (!nameInput.value.trim()) {
+          Utils.toast('Name is required', 'error');
+          return;
+        }
+        var data = Utils.getFormData(form);
+        // Collect tags
+        var activePills = form.querySelectorAll('.tag-pill.active');
+        data.tags = [];
+        for (var tc = 0; tc < activePills.length; tc++) {
+          data.tags.push(activePills[tc].getAttribute('data-tag-id'));
+        }
+        // Collect body regions
+        if (Store.isFeatureEnabled('bodyDiagram')) {
+          data.bodyRegions = BodyDiagram.getSelected('ep-body-diagram');
+        }
+        Store.updatePatient(patient.id, data);
+        Utils.toast('Patient updated', 'success');
+        sub.editingPatient = false;
+        renderDetail(container, Store.getPatient(patient.id));
+      };
+      // Bind mic + autocomplete + DOB picker
+      Utils.bindMicButtons(container);
+      Utils.bindAllAutocomplete(container);
+      Utils.bindDobPicker(container);
+      // Body diagram
+      if (Store.isFeatureEnabled('bodyDiagram')) {
+        var _bodyRegions = (patient.bodyRegions || []).slice();
+        BodyDiagram.render('ep-body-diagram', _bodyRegions);
+      }
+      // Tag pill toggles
+      var tagPills = container.querySelectorAll('#edit-patient-form .tag-pill');
+      for (var tp = 0; tp < tagPills.length; tp++) {
+        tagPills[tp].addEventListener('click', function() {
+          var color = this.getAttribute('data-color');
+          this.classList.toggle('active');
+          if (this.classList.contains('active')) {
+            this.style.background = color;
+            this.style.color = '#fff';
+            this.style.borderColor = color;
+          } else {
+            this.style.background = '';
+            this.style.color = '';
+            this.style.borderColor = '';
+          }
+        });
+      }
     }
 
     // Print options panel

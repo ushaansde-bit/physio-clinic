@@ -480,8 +480,8 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
 .stat-info .stat-value { font-size: 1.75rem; font-weight: 700; color: var(--gray-900); line-height: 1.2; margin-top: 0.15rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
 
 /* --- Tables --- */
-.table-wrapper { overflow-x: auto; }
-table.data-table { width: 100%; }
+.table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table.data-table { width: 100%; table-layout: fixed; }
 .data-table th {
   text-align: left;
   padding: 0.65rem 0.75rem;
@@ -492,6 +492,9 @@ table.data-table { width: 100%; }
   letter-spacing: 0.04em;
   background: var(--gray-50);
   border-bottom: 1px solid var(--border);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .data-table td {
   padding: 0.7rem 0.75rem;
@@ -499,11 +502,58 @@ table.data-table { width: 100%; }
   font-size: 0.85rem;
   color: var(--gray-700);
   vertical-align: middle;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+.data-table td.wrap-cell { white-space: normal; }
 .data-table tbody tr:hover { background: var(--gray-50); }
 .data-table tbody tr { cursor: pointer; transition: background var(--transition); }
 .data-table .no-hover { cursor: default; }
 .data-table .no-hover:hover { background: transparent; }
+
+/* --- Scoped Table Column Widths --- */
+/* Patients table */
+.patients-table th:nth-child(1),
+.patients-table td:nth-child(1) { width: 25%; }
+.patients-table th:nth-child(2),
+.patients-table td:nth-child(2) { width: 18%; }
+.patients-table th:nth-child(3),
+.patients-table td:nth-child(3) { width: 22%; }
+.patients-table th:nth-child(4),
+.patients-table td:nth-child(4) { width: 15%; }
+.patients-table th:nth-child(5),
+.patients-table td:nth-child(5) { width: 8%; }
+.patients-table th:nth-child(6),
+.patients-table td:nth-child(6) { width: 12%; }
+
+/* Appointments table */
+.appointments-table th:nth-child(1),
+.appointments-table td:nth-child(1) { width: 15%; }
+.appointments-table th:nth-child(2),
+.appointments-table td:nth-child(2) { width: 22%; }
+.appointments-table th:nth-child(3),
+.appointments-table td:nth-child(3) { width: 14%; }
+.appointments-table th:nth-child(4),
+.appointments-table td:nth-child(4) { width: 10%; }
+.appointments-table th:nth-child(5),
+.appointments-table td:nth-child(5) { width: 10%; }
+.appointments-table th:nth-child(6),
+.appointments-table td:nth-child(6) { width: 29%; }
+
+/* Billing table */
+.billing-table th:nth-child(1),
+.billing-table td:nth-child(1) { width: 12%; }
+.billing-table th:nth-child(2),
+.billing-table td:nth-child(2) { width: 18%; }
+.billing-table th:nth-child(3),
+.billing-table td:nth-child(3) { width: 28%; }
+.billing-table th:nth-child(4),
+.billing-table td:nth-child(4) { width: 14%; }
+.billing-table th:nth-child(5),
+.billing-table td:nth-child(5) { width: 10%; }
+.billing-table th:nth-child(6),
+.billing-table td:nth-child(6) { width: 18%; }
 
 /* --- Badges / Status --- */
 .badge {
@@ -1086,6 +1136,15 @@ table.data-table { width: 100%; }
   .patient-header { flex-wrap: wrap; }
   .patient-header-actions { margin-left: 0; width: 100%; }
   .info-grid { grid-template-columns: 1fr 1fr; }
+  /* Table: hide less-important columns on mobile */
+  .patients-table th:nth-child(4),
+  .patients-table td:nth-child(4),
+  .patients-table th:nth-child(5),
+  .patients-table td:nth-child(5) { display: none; }
+  .appointments-table th:nth-child(4),
+  .appointments-table td:nth-child(4) { display: none; }
+  .billing-table th:nth-child(3),
+  .billing-table td:nth-child(3) { display: none; }
 }
 
 @media (max-width: 480px) {
@@ -1950,4 +2009,146 @@ table.data-table { width: 100%; }
 }
 .wa-link-item:last-child {
   border-bottom: none;
+}
+
+/* ============================================
+   Patient History Timeline
+   ============================================ */
+.timeline-group {
+  margin-bottom: 1.25rem;
+}
+.timeline-date {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--gray-600);
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.5rem;
+  position: sticky;
+  top: 0;
+  background: var(--white);
+  z-index: 1;
+}
+.timeline-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.5rem 0.75rem;
+  border-left: 3px solid var(--gray-200);
+  margin-left: 0.5rem;
+  margin-bottom: 0.35rem;
+  transition: background var(--transition);
+}
+.timeline-item:hover {
+  background: var(--gray-50);
+}
+.timeline-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 70px;
+  text-align: center;
+}
+.timeline-badge.badge-appointment { background: #dbeafe; color: #2563eb; }
+.timeline-badge.badge-session { background: #dcfce7; color: #15803d; }
+.timeline-badge.badge-rx { background: #faf5ff; color: #7c3aed; }
+.timeline-badge.badge-billing { background: #fef3c7; color: #b45309; }
+.timeline-badge.badge-exercise { background: #ecfeff; color: #0891b2; }
+.timeline-summary {
+  flex: 1;
+  font-size: 0.82rem;
+  color: var(--gray-700);
+  line-height: 1.5;
+}
+.timeline-summary strong {
+  font-weight: 600;
+  color: var(--gray-800);
+}
+.timeline-time {
+  font-size: 0.72rem;
+  color: var(--gray-400);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* --- Quick Date Buttons (Next Visit Prompt) --- */
+.quick-date-btns {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+.quick-date-btn {
+  padding: 0.3rem 0.65rem;
+  border: 1px solid var(--gray-300);
+  background: var(--white);
+  border-radius: 9999px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  color: var(--gray-600);
+  transition: all var(--transition);
+}
+.quick-date-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-50);
+}
+
+/* --- Next/Last Visit Info Cards --- */
+.visit-info-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 0.5rem;
+}
+.visit-info-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.visit-info-icon.next { background: var(--primary-100); color: var(--primary); }
+.visit-info-icon.last { background: var(--gray-100); color: var(--gray-500); }
+.visit-info-detail { flex: 1; }
+.visit-info-detail .visit-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--gray-400);
+  text-transform: uppercase;
+}
+.visit-info-detail .visit-value {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--gray-800);
+}
+
+/* --- Edit Patient Info Button --- */
+.edit-patient-info-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+}
+
+/* Inline edit form in overview */
+.patient-edit-section {
+  background: var(--gray-50);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  margin-bottom: 1rem;
 }

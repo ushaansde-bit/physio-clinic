@@ -53,7 +53,7 @@
     var defaultClinic = {
       id: clinicId,
       name: 'My Clinic',
-      ownerName: 'Dr. Admin',
+      ownerName: 'Dr. Priya Sharma',
       bookingSlug: 'default',
       features: Store.getDefaultFeatures(),
       createdAt: new Date().toISOString()
@@ -101,7 +101,7 @@
               var clinicData = {
                 id: 'default',
                 name: 'My Clinic',
-                ownerName: 'Dr. Admin',
+                ownerName: 'Dr. Priya Sharma',
                 bookingSlug: 'default',
                 features: Store.getDefaultFeatures(),
                 createdAt: new Date().toISOString()

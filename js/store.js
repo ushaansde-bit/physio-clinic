@@ -376,6 +376,19 @@ window.Store = (function() {
     getAppointmentsByPatient: function(pid) { return getByField(KEYS.appointments, 'patientId', pid); },
     getAppointmentsByDate: function(date) { return getByField(KEYS.appointments, 'date', date); },
 
+    // Check for duplicate future scheduled appointment for same patient
+    hasDuplicateFutureAppointment: function(patientId, excludeId) {
+      var today = Utils.today();
+      var appts = getAll(KEYS.appointments);
+      for (var i = 0; i < appts.length; i++) {
+        var a = appts[i];
+        if (a.patientId === patientId && a.status === 'scheduled' && a.date >= today && a.id !== excludeId) {
+          return a;
+        }
+      }
+      return null;
+    },
+
     // Check conflicts
     hasConflict: function(date, time, duration, excludeId) {
       var appts = getAll(KEYS.appointments);
@@ -527,38 +540,20 @@ window.Store = (function() {
       }
       saveAll(KEYS.tags, tags);
 
-      // Assign demo tags to seed patients
+      // Assign tags/bodyRegions to patients that don't already have them (from seed)
       patients = getAll(KEYS.patients, true);
-      var tagMap = {
-        'p1': ['tag1', 'tag4'],       // Sarah Johnson: Knee, Post-Surgery
-        'p2': ['tag2', 'tag7'],        // Robert Chen: Back Pain, Chronic Pain
-        'p3': ['tag3'],                // Emily Watson: Shoulder
-        'p4': ['tag1', 'tag4', 'tag5'],// James Miller: Knee, Post-Surgery, Senior
-        'p5': ['tag3', 'tag6'],        // Maria Garcia: Shoulder, Sports Injury
-        'p6': ['tag8', 'tag5'],        // William Taylor: Neurological, Senior
-        'p7': ['tag6'],                // Anna Kowalski: Sports Injury
-        'p8': ['tag2']                 // David Park: Back Pain
-      };
-      // Assign demo body regions to seed patients (new dual-view IDs)
-      var bodyMap = {
-        'p1': ['l-knee', 'l-thigh'],                                    // Sarah: ACL Reconstruction Left
-        'p2': ['lumbar', 'sacrum-sij', 'l-shin'],                       // Robert: Lower Back + L leg radiculopathy
-        'p3': ['r-shoulder-front', 'r-shoulder-back', 'r-scapula'],     // Emily: Frozen Shoulder Right
-        'p4': ['l-knee', 'l-thigh', 'l-hip'],                          // James: Total Knee Replacement Left
-        'p5': ['l-shoulder-front', 'l-shoulder-back', 'l-scapula'],     // Maria: Rotator Cuff Left
-        'p6': ['head', 'l-ankle', 'r-ankle', 'l-foot', 'r-foot'],      // William: Parkinson's balance
-        'p7': ['l-ankle', 'r-ankle', 'l-heel', 'r-heel', 'l-foot', 'r-foot'], // Anna: Plantar Fasciitis Bilateral
-        'p8': ['neck-back', 'neck-front', 'r-shoulder-back', 'r-upper-arm'] // David: Cervical Radiculopathy + R arm
-      };
+      var anyChanged = false;
       for (var j = 0; j < patients.length; j++) {
-        if (tagMap[patients[j].id]) {
-          patients[j].tags = tagMap[patients[j].id];
+        if (!patients[j].tags || patients[j].tags.length === 0) {
+          patients[j].tags = [];
+          anyChanged = true;
         }
-        if (bodyMap[patients[j].id]) {
-          patients[j].bodyRegions = bodyMap[patients[j].id];
+        if (!patients[j].bodyRegions || patients[j].bodyRegions.length === 0) {
+          patients[j].bodyRegions = [];
+          anyChanged = true;
         }
       }
-      saveAll(KEYS.patients, patients);
+      if (anyChanged) saveAll(KEYS.patients, patients);
     }
 
     // Seed message templates if not present
@@ -591,13 +586,13 @@ window.Store = (function() {
     return parseInt(parts[0],10) * 60 + parseInt(parts[1],10);
   }
 
-  // --- Seed Data ---
+  // --- Seed Data (70 Indian-named patients, 3 months of comprehensive data) ---
   function seed() {
     if (localStorage.getItem(KEYS.users)) return; // Already seeded
 
     // Users
     saveAll(KEYS.users, [
-      { id: 'u1', username: 'admin', password: 'admin123', name: 'Dr. Admin', role: 'admin' }
+      { id: 'u1', username: 'admin', password: 'admin123', name: 'Dr. Priya Sharma', role: 'admin' }
     ]);
 
     var todayStr = Utils.today();
@@ -609,494 +604,388 @@ window.Store = (function() {
       return Utils.toDateString(d);
     }
 
-    // Patients
-    var patients = [
-      { id: 'p1', name: 'Sarah Johnson', dob: '1985-03-15', gender: 'female', phone: '555-0101', email: 'sarah.j@email.com', address: '123 Oak Street, Springfield',
-        diagnosis: 'ACL Reconstruction - Post-operative', treatmentPlan: 'Progressive ROM and strengthening protocol. Phase 2: weeks 4-8. Focus on quad activation, hamstring curls, and proprioception.',
-        emergencyContact: 'Mark Johnson', emergencyPhone: '555-0102', status: 'active', insurance: 'Blue Cross', notes: 'Motivated patient. Athletic background.' },
-      { id: 'p2', name: 'Robert Chen', dob: '1972-08-22', gender: 'male', phone: '555-0201', email: 'r.chen@email.com', address: '456 Maple Ave, Springfield',
-        diagnosis: 'Chronic Lower Back Pain - L4/L5 disc herniation', treatmentPlan: 'McKenzie extension protocol. Core stabilization. Ergonomic assessment. Pain management with TENS and manual therapy.',
-        emergencyContact: 'Lisa Chen', emergencyPhone: '555-0202', status: 'active', insurance: 'Aetna', notes: 'Desk worker. Reports sitting 8+ hours/day.' },
-      { id: 'p3', name: 'Emily Watson', dob: '1990-11-08', gender: 'female', phone: '555-0301', email: 'e.watson@email.com', address: '789 Pine Road, Springfield',
-        diagnosis: 'Frozen Shoulder (Adhesive Capsulitis) - Right', treatmentPlan: 'Joint mobilization grades III-IV. Stretching protocol. Home exercise program with pulleys. NSAIDs as prescribed by MD.',
-        emergencyContact: 'David Watson', emergencyPhone: '555-0302', status: 'active', insurance: 'United Health', notes: 'Gradually improving ROM.' },
-      { id: 'p4', name: 'James Miller', dob: '1968-05-30', gender: 'male', phone: '555-0401', email: 'j.miller@email.com', address: '321 Elm Blvd, Springfield',
-        diagnosis: 'Total Knee Replacement - Left, Post-op Week 6', treatmentPlan: 'Achieve 0-120 degrees ROM. Progressive weight bearing. Gait training. Stair negotiation. Strengthening program.',
-        emergencyContact: 'Nancy Miller', emergencyPhone: '555-0402', status: 'active', insurance: 'Medicare', notes: 'Using walker, transitioning to cane.' },
-      { id: 'p5', name: 'Maria Garcia', dob: '1995-01-20', gender: 'female', phone: '555-0501', email: 'm.garcia@email.com', address: '654 Birch Lane, Springfield',
-        diagnosis: 'Rotator Cuff Tendinopathy - Left Shoulder', treatmentPlan: 'Eccentric strengthening protocol. Scapular stabilization exercises. Activity modification. Gradual return to overhead activities.',
-        emergencyContact: 'Carlos Garcia', emergencyPhone: '555-0502', status: 'active', insurance: 'Cigna', notes: 'Recreational volleyball player.' },
-      { id: 'p6', name: 'William Taylor', dob: '1958-12-03', gender: 'male', phone: '555-0601', email: 'w.taylor@email.com', address: '987 Cedar Court, Springfield',
-        diagnosis: 'Parkinson\'s Disease - Balance and gait training', treatmentPlan: 'LSVT BIG protocol. Balance training. Fall prevention. Dual-task activities. Caregiver education.',
-        emergencyContact: 'Dorothy Taylor', emergencyPhone: '555-0602', status: 'active', insurance: 'Medicare', notes: 'Stage 2 Hoehn & Yahr. Motivated.' },
-      { id: 'p7', name: 'Anna Kowalski', dob: '1988-07-14', gender: 'female', phone: '555-0701', email: 'a.kowalski@email.com', address: '147 Walnut Street, Springfield',
-        diagnosis: 'Plantar Fasciitis - Bilateral', treatmentPlan: 'Stretching program (calf, plantar fascia). Night splints. Custom orthotics fitting. Gradual return to running.',
-        emergencyContact: 'Peter Kowalski', emergencyPhone: '555-0702', status: 'completed', insurance: 'Blue Cross', notes: 'Runner. Completed treatment successfully.' },
-      { id: 'p8', name: 'David Park', dob: '1979-04-25', gender: 'male', phone: '555-0801', email: 'd.park@email.com', address: '258 Spruce Drive, Springfield',
-        diagnosis: 'Cervical Radiculopathy - C5/C6', treatmentPlan: 'Cervical traction. Neural gliding exercises. Postural correction. Ergonomic workstation setup. Strengthening deep neck flexors.',
-        emergencyContact: 'Sue Park', emergencyPhone: '555-0802', status: 'active', insurance: 'Aetna', notes: 'Software developer. Needs ergonomic education.' }
+    // Deterministic pseudo-random for reproducible seed data
+    var _seed = 42;
+    function rand() { _seed = (_seed * 16807 + 0) % 2147483647; return (_seed - 1) / 2147483646; }
+    function randInt(min, max) { return Math.floor(rand() * (max - min + 1)) + min; }
+    function pick(arr) { return arr[randInt(0, arr.length - 1)]; }
+
+    // ===== NAME POOLS =====
+    var maleFirst = ['Rajesh','Amit','Suresh','Vikram','Arjun','Ravi','Anil','Sanjay','Deepak','Manoj','Kiran','Rahul','Gaurav','Nitin','Ajay','Rohit','Vinod','Ashok','Prakash','Hemant','Sachin','Dinesh','Naveen','Mukesh','Pankaj','Vishal','Sandeep','Arun','Ramesh','Mohan','Harish','Vijay','Pradeep','Sunil'];
+    var femaleFirst = ['Priya','Neha','Anjali','Sunita','Kavita','Pooja','Rekha','Meena','Divya','Swati','Ritu','Anita','Seema','Geeta','Nisha','Pallavi','Shweta','Rashmi','Manisha','Aarti','Sushma','Vandana','Jyoti','Sarita','Deepa','Lakshmi','Kamala','Radha','Usha','Bhavana','Sneha','Manju','Padma','Archana'];
+    var lastNames = ['Sharma','Patel','Gupta','Singh','Kumar','Reddy','Nair','Pillai','Joshi','Verma','Rao','Iyer','Mishra','Desai','Mehta','Agarwal','Bhat','Saxena','Tiwari','Chauhan','Menon','Das','Roy','Chopra','Kulkarni','Hegde','Shetty','Thakur','Bose','Mukherjee','Banerjee','Chowdhury','Naidu','Patil'];
+    var streets = ['MG Road','Park Street','Anna Nagar','Banjara Hills','Koramangala','Sector 15','Civil Lines','Model Town','Indiranagar','Jubilee Hills','Malviya Nagar','Defence Colony','Salt Lake','Vasant Kunj','Aundh','Bandra West','Mylapore','Camp Area','Jayanagar','Andheri West'];
+    var cities = ['Mumbai','Delhi','Bangalore','Hyderabad','Chennai','Pune','Kolkata','Ahmedabad','Jaipur','Lucknow','Chandigarh','Bhopal','Kochi','Coimbatore','Nagpur','Indore','Mysore','Vadodara','Surat','Vizag'];
+
+    // ===== DIAGNOSIS TEMPLATES =====
+    var diagTemplates = [
+      { diag: 'Chronic Low Back Pain - Lumbar spondylosis', plan: 'Core strengthening. McKenzie protocol. Ergonomic education. TENS for pain management. Postural correction.', tags: ['tag2','tag7'], body: ['lumbar','sacrum-sij'] },
+      { diag: 'Knee Osteoarthritis - Bilateral', plan: 'Quadriceps strengthening. ROM exercises. Weight management counselling. Hot pack + US therapy. Activity modification.', tags: ['tag1','tag5'], body: ['l-knee','r-knee'] },
+      { diag: 'Frozen Shoulder (Adhesive Capsulitis) - Right', plan: 'Joint mobilization grades III-IV. Stretching protocol. Pendulum exercises. Pulley exercises at home.', tags: ['tag3'], body: ['r-shoulder-front','r-shoulder-back'] },
+      { diag: 'Cervical Spondylosis with Radiculopathy', plan: 'Cervical traction. Isometric neck exercises. Neural glides. Postural correction. Ergonomic workstation setup.', tags: ['tag7'], body: ['neck-back','neck-front'] },
+      { diag: 'ACL Reconstruction - Post-operative Rehab', plan: 'Progressive ROM protocol. Quad activation. Proprioception training. Sport-specific rehabilitation.', tags: ['tag1','tag4','tag6'], body: ['l-knee','l-thigh'] },
+      { diag: 'Rotator Cuff Tear - Post-surgical Repair', plan: 'Passive ROM progression. Scapular stabilization. Eccentric strengthening. Gradual return to overhead activities.', tags: ['tag3','tag4'], body: ['r-shoulder-front','r-shoulder-back','r-scapula'] },
+      { diag: 'Lumbar Disc Herniation - L5/S1', plan: 'McKenzie extension protocol. Core stabilization. Neural mobilization. Avoid flexion activities. Pain education.', tags: ['tag2','tag7'], body: ['lumbar','sacrum-sij','l-shin'] },
+      { diag: 'Plantar Fasciitis - Right Foot', plan: 'Calf stretching. Plantar fascia release. Night splint. Orthotics. Ice massage. Gradual activity progression.', tags: ['tag6'], body: ['r-heel','r-foot','r-ankle'] },
+      { diag: 'Tennis Elbow (Lateral Epicondylitis)', plan: 'Eccentric wrist extension exercises. Forearm stretching. Activity modification. Brace use during activities.', tags: ['tag6'], body: ['r-forearm','r-elbow'] },
+      { diag: 'Post-stroke Rehabilitation - Left Hemiparesis', plan: 'Neurodevelopmental approach. Task-specific training. Balance and gait training. Upper limb retraining.', tags: ['tag8','tag5'], body: ['l-shoulder-front','l-upper-arm','l-forearm','l-thigh','l-shin'] },
+      { diag: 'Total Knee Replacement - Right', plan: 'ROM restoration to 0-120 deg. Progressive weight bearing. Gait training. Stair negotiation. Quad strengthening.', tags: ['tag1','tag4','tag5'], body: ['r-knee','r-thigh'] },
+      { diag: 'Sciatica - Left Lower Extremity', plan: 'Neural mobilization. Core stabilization. McKenzie approach if centralizing. Avoid prolonged sitting. Pain education.', tags: ['tag2','tag7'], body: ['lumbar','l-hip','l-thigh','l-shin'] },
+      { diag: 'Ankle Sprain - Grade II Right', plan: 'RICE protocol. Progressive ankle strengthening. Proprioception training. Balance board exercises. Taping during activity.', tags: ['tag6'], body: ['r-ankle','r-foot'] },
+      { diag: 'Thoracic Outlet Syndrome', plan: 'Postural correction. Scalene stretching. First rib mobilization. Neural glides. Strengthening lower trapezius.', tags: ['tag7'], body: ['neck-front','r-shoulder-front','r-upper-arm'] },
+      { diag: 'Carpal Tunnel Syndrome - Bilateral', plan: 'Nerve gliding exercises. Wrist splinting at night. Ergonomic modifications. Tendon gliding. US therapy.', tags: ['tag7'], body: ['l-hand','r-hand'] },
+      { diag: 'Hip Osteoarthritis - Right', plan: 'Joint mobilization. Hip strengthening. Pool therapy. Weight management. Gait training with assistive device.', tags: ['tag5','tag7'], body: ['r-hip'] },
+      { diag: 'Fibromyalgia', plan: 'Graded exercise therapy. Pain education. Relaxation techniques. Aquatic therapy. Sleep hygiene counselling.', tags: ['tag7'], body: ['neck-back','lumbar','r-shoulder-back','l-shoulder-back'] },
+      { diag: 'Cervical Whiplash Injury', plan: 'Gentle ROM exercises. Deep neck flexor activation. Graduated return to activity. Pain management. Postural education.', tags: ['tag7'], body: ['neck-back','neck-front'] },
+      { diag: 'Patellofemoral Pain Syndrome - Left', plan: 'VMO strengthening. Patellar taping. Hip abductor exercises. Stretching IT band and quads. Activity modification.', tags: ['tag1','tag6'], body: ['l-knee'] },
+      { diag: 'Frozen Shoulder (Adhesive Capsulitis) - Left', plan: 'Joint mobilization. Stretching protocol. Wall walking exercises. Pulley exercises. Hot pack before mobilization.', tags: ['tag3'], body: ['l-shoulder-front','l-shoulder-back'] },
+      { diag: 'De Quervain Tenosynovitis - Right', plan: 'Thumb spica splint. Tendon gliding exercises. Ice massage. Activity modification. Gradual return to gripping activities.', tags: [], body: ['r-hand'] },
+      { diag: 'Piriformis Syndrome - Right', plan: 'Piriformis stretching. Hip rotator strengthening. Self-myofascial release. Core stability. Ergonomic sitting advice.', tags: ['tag2'], body: ['r-hip','lumbar'] },
+      { diag: 'Meniscus Tear - Right Knee (Conservative)', plan: 'Quad strengthening. Hamstring curls. ROM restoration. Proprioception. Gradual return to pivoting activities.', tags: ['tag1','tag6'], body: ['r-knee'] },
+      { diag: 'Post-fracture Rehab - Distal Radius Right', plan: 'ROM exercises wrist and forearm. Grip strengthening progression. Scar mobilization. Functional hand therapy.', tags: ['tag4'], body: ['r-hand','r-forearm'] },
+      { diag: 'Ankylosing Spondylitis', plan: 'Spinal extension exercises. Breathing exercises. Posture program. Aquatic therapy. Maintain mobility focus.', tags: ['tag7'], body: ['lumbar','thoracic','neck-back'] },
+      { diag: 'Achilles Tendinopathy - Left', plan: 'Eccentric heel drops. Calf stretching. Activity modification. Gradual loading progression. Footwear advice.', tags: ['tag6'], body: ['l-ankle','l-shin'] },
+      { diag: 'Total Hip Replacement - Left', plan: 'Hip precautions education. Progressive mobilization. Gait training. Strengthening program. Stair training.', tags: ['tag4','tag5'], body: ['l-hip','l-thigh'] },
+      { diag: 'Golfer\'s Elbow (Medial Epicondylitis)', plan: 'Eccentric wrist flexion exercises. Forearm stretching. Ice therapy. Gradual return to gripping. Brace use.', tags: ['tag6'], body: ['r-elbow','r-forearm'] },
+      { diag: 'Cervical Myelopathy', plan: 'Gentle cervical ROM. Balance training. Gait training. Upper limb dexterity exercises. Monitor for progression.', tags: ['tag8'], body: ['neck-back','neck-front'] },
+      { diag: 'IT Band Syndrome - Left', plan: 'IT band foam rolling. Hip strengthening (glut med). Stretching. Running gait correction. Gradual mileage increase.', tags: ['tag6'], body: ['l-knee','l-thigh'] }
     ];
-    for (var i = 0; i < patients.length; i++) {
-      patients[i].createdAt = new Date(td.getTime() - (30 - i) * 86400000).toISOString();
+
+    // ===== TIME SLOTS =====
+    var timeSlots = ['09:00','09:30','10:00','10:30','11:00','11:30','14:00','14:30','15:00','15:30','16:00','16:30','17:00'];
+    var durations = ['30','45','45','60'];
+    var apptTypes = ['Treatment','Treatment','Treatment','Follow-up','Follow-up'];
+
+    // ===== SOAP NOTE TEMPLATES =====
+    var subjectives = [
+      'Pain reducing gradually. Able to perform daily activities better. Compliance with home exercises.',
+      'Some improvement since last visit. Morning stiffness still present but shorter duration.',
+      'Feeling stronger. Pain only at end range. Can tolerate exercises well.',
+      'Mild flare-up after increased activity. Settled with rest and ice. Continuing exercises.',
+      'Significant improvement. No night pain. Can perform most functional tasks.',
+      'Slow progress. Pain intermittent. Some difficulty with prolonged activities.',
+      'Good response to treatment. Wants to increase activity level. Motivated.',
+      'Occasional discomfort with specific movements. Overall trend improving.',
+      'Much better compared to initial visit. Confidence increasing. Doing exercises regularly.',
+      'Slight setback from overdoing activities. Advised on activity pacing.'
+    ];
+    var objectives = [
+      'ROM improving. Strength gains noted. Gait pattern normalizing.',
+      'Active ROM 80% of normal. MMT 4/5 involved muscles. Mild tenderness on palpation.',
+      'Full PROM. Active ROM 90% normal. Special tests negative. Functional movements improved.',
+      'Moderate improvement in ROM. Strength 3+/5. Compensatory patterns reducing.',
+      'Near-normal ROM bilateral. Strength 4+/5. Functional tests within normal limits.',
+      'Slight improvement in ROM. Pain on resistance 4/10. Swelling minimal.',
+      'Good ROM gains. Strength improving 4/5. Balance and proprioception adequate.',
+      'Functional ROM achieved. Strength 4/5. Special tests negative. Good movement quality.',
+      'ROM within functional limits. MMT 4+/5. No instability. Good proprioception.',
+      'Modest gains in ROM. Strength 3/5. Still some guarding with end-range movements.'
+    ];
+    var assessments = [
+      'Progressing well. On track with rehabilitation goals. Continue current program.',
+      'Steady improvement. Responding to manual therapy and exercises. Advance program.',
+      'Good outcome expected. Compliance excellent. Ready to progress to next phase.',
+      'Moderate response. May need to adjust treatment approach. Consider additional modalities.',
+      'Excellent progress. Approaching discharge criteria. Transition to home program.',
+      'Satisfactory progress. Continue current plan with minor modifications.',
+      'Responding well to treatment. Functional goals being met. Continue progression.',
+      'Good rehabilitation trajectory. Self-management skills developing well.',
+      'Meeting expected milestones. Pain well controlled. Strength gains consistent.',
+      'Slower than expected progress. Reassess if no improvement in 2 weeks.'
+    ];
+    var plans = [
+      'Continue current exercise program. Progress resistance. Review in 1 week.',
+      'Advance strengthening protocol. Add functional exercises. Reduce to weekly visits.',
+      'Progress to sport-specific training. Home program updated. Follow-up in 2 weeks.',
+      'Modify exercise intensity. Add manual therapy component. Continue weekly.',
+      'Begin discharge planning. Home program finalized. Monthly follow-up.',
+      'Increase exercise complexity. Add balance training. Continue current frequency.',
+      'Progress loading parameters. Add endurance component. Review progress next visit.',
+      'Maintain current program. Focus on activity-specific rehabilitation. Weekly review.',
+      'Continue progression. Add proprioception challenges. Educate on self-management.',
+      'Reassess treatment approach. Consider additional modalities. Weekly visits.'
+    ];
+
+    // ===== BILLING DESCRIPTIONS =====
+    var billDescs = [
+      'Therapeutic Exercise + Manual Therapy', 'Joint Mobilization + Exercises', 'Strengthening + Balance Training',
+      'Manual Therapy + Modalities', 'Therapeutic Exercise + Gait Training', 'Assessment + Exercise Progression',
+      'Core Stabilization + Manual Therapy', 'Stretching + Strengthening Program', 'Functional Training + Exercises',
+      'Treatment Session + Home Program Update'
+    ];
+    var billAmounts = ['800','900','1000','1000','1200','1200','1500','1500','1800','2000'];
+
+    // ===== GENERATE 70 PATIENTS =====
+    var patients = [];
+    var usedPhones = {};
+    for (var i = 0; i < 70; i++) {
+      var isMale = rand() < 0.48;
+      var first = isMale ? pick(maleFirst) : pick(femaleFirst);
+      var last = pick(lastNames);
+      var name = first + ' ' + last;
+      var age = randInt(22, 75);
+      var birthYear = td.getFullYear() - age;
+      var bMonth = randInt(1, 12);
+      var bDay = randInt(1, 28);
+      var dob = birthYear + '-' + (bMonth < 10 ? '0' : '') + bMonth + '-' + (bDay < 10 ? '0' : '') + bDay;
+      var phone = '' + pick(['6','7','8','9']) + randInt(100000000, 999999999);
+      while (usedPhones[phone]) { phone = '' + pick(['6','7','8','9']) + randInt(100000000, 999999999); }
+      usedPhones[phone] = true;
+      var diagIdx = i % diagTemplates.length;
+      var dt = diagTemplates[diagIdx];
+      var isCompleted = i >= 60; // last 10 patients are completed
+      patients.push({
+        id: 'p' + (i + 1),
+        name: name,
+        dob: dob,
+        gender: isMale ? 'male' : 'female',
+        phone: phone,
+        phoneCode: '+91',
+        email: first.toLowerCase() + '.' + last.toLowerCase() + '@email.com',
+        address: randInt(1, 500) + ', ' + pick(streets) + ', ' + pick(cities),
+        diagnosis: dt.diag,
+        treatmentPlan: dt.plan,
+        emergencyContact: pick(isMale ? femaleFirst : maleFirst) + ' ' + last,
+        emergencyPhone: '' + pick(['6','7','8','9']) + randInt(100000000, 999999999),
+        emergencyPhoneCode: '+91',
+        status: isCompleted ? 'completed' : 'active',
+        insurance: pick(['Star Health','ICICI Lombard','Max Bupa','New India Assurance','HDFC Ergo','None','None','None']),
+        notes: '',
+        tags: dt.tags.slice(),
+        bodyRegions: dt.body.slice(),
+        createdAt: new Date(td.getTime() - randInt(30, 100) * 86400000).toISOString()
+      });
     }
     saveAll(KEYS.patients, patients);
 
-    // ===== 3-MONTH COMPREHENSIVE TEST DATA =====
-    // Appointments spanning 90 days back + upcoming
+    // ===== GENERATE APPOINTMENTS (3-5 per patient, spanning 3 months) =====
     var appts = [];
     var aId = 1;
 
-    // Helper: generate weekly appointments for a patient over a date range
-    function addWeeklyAppts(pid, pname, startDay, endDay, time, dur, type, skipDays) {
-      skipDays = skipDays || [];
-      for (var d = startDay; d <= endDay; d += 7) {
-        var skip = false;
-        for (var s = 0; s < skipDays.length; s++) { if (Math.abs(d - skipDays[s]) < 2) skip = true; }
-        if (skip) continue;
-        var st = d <= 0 ? 'completed' : 'scheduled';
-        if (d <= 0 && Math.random() < 0.08) st = 'no-show';
-        if (d <= 0 && Math.random() < 0.05) st = 'cancelled';
-        appts.push({ id: 'a' + (aId++), patientId: pid, patientName: pname, date: dayOffset(d), time: time, duration: dur, type: type, status: st, notes: '' });
+    for (var ai = 0; ai < patients.length; ai++) {
+      var pt = patients[ai];
+      var isComp = pt.status === 'completed';
+      var numAppts = randInt(3, 6);
+      var startOffset = isComp ? randInt(-85, -50) : randInt(-75, -20);
+      var interval = randInt(7, 14);
+      var ptTime = pick(timeSlots);
+      var ptDur = pick(durations);
+
+      for (var aj = 0; aj < numAppts; aj++) {
+        var apptDay = startOffset + (aj * interval);
+        var status;
+        if (apptDay < -1) {
+          status = 'completed';
+          if (rand() < 0.06) status = 'no-show';
+          if (rand() < 0.04) status = 'cancelled';
+        } else if (apptDay <= 0) {
+          status = 'scheduled';
+        } else {
+          status = 'scheduled';
+        }
+        if (isComp && apptDay > -10) continue; // completed patients don't have recent/future appts
+        appts.push({
+          id: 'a' + (aId++),
+          patientId: pt.id,
+          patientName: pt.name,
+          date: dayOffset(apptDay),
+          time: ptTime,
+          duration: ptDur,
+          type: aj === 0 ? 'Initial Evaluation' : pick(apptTypes),
+          status: status,
+          notes: aj === 0 ? 'Initial evaluation and assessment' : '',
+          createdAt: dayOffset(apptDay) + 'T08:00:00.000Z'
+        });
       }
     }
 
-    // P1 Sarah Johnson - ACL rehab, 2x/week for 3 months
-    addWeeklyAppts('p1', 'Sarah Johnson', -84, 7, '09:00', '45', 'Treatment', []);
-    addWeeklyAppts('p1', 'Sarah Johnson', -81, 7, '09:00', '45', 'Follow-up', []);
-    // P2 Robert Chen - Back pain, 1x/week for 3 months
-    addWeeklyAppts('p2', 'Robert Chen', -84, 7, '10:00', '30', 'Treatment', [-49]);
-    // P3 Emily Watson - Frozen shoulder, 2x/week
-    addWeeklyAppts('p3', 'Emily Watson', -70, 7, '11:00', '45', 'Treatment', []);
-    addWeeklyAppts('p3', 'Emily Watson', -67, 7, '11:00', '45', 'Treatment', []);
-    // P4 James Miller - TKR, 3x/week intensive for 2 months then 2x/week
-    addWeeklyAppts('p4', 'James Miller', -60, -21, '14:00', '60', 'Treatment', []);
-    addWeeklyAppts('p4', 'James Miller', -58, -21, '14:00', '60', 'Treatment', []);
-    addWeeklyAppts('p4', 'James Miller', -56, -21, '14:00', '45', 'Treatment', []);
-    addWeeklyAppts('p4', 'James Miller', -14, 7, '14:00', '45', 'Follow-up', []);
-    // P5 Maria Garcia - Rotator cuff, 1x/week for 6 weeks
-    addWeeklyAppts('p5', 'Maria Garcia', -42, 7, '15:30', '45', 'Treatment', []);
-    // P6 William Taylor - Parkinsons, 2x/week
-    addWeeklyAppts('p6', 'William Taylor', -84, 7, '09:30', '60', 'Treatment', []);
-    addWeeklyAppts('p6', 'William Taylor', -82, 7, '09:30', '60', 'Treatment', []);
-    // P7 Anna Kowalski - Plantar fasciitis, completed after 8 weeks
-    addWeeklyAppts('p7', 'Anna Kowalski', -84, -28, '16:00', '30', 'Treatment', []);
-    // P8 David Park - Cervical, 1x/week
-    addWeeklyAppts('p8', 'David Park', -56, 7, '10:30', '30', 'Treatment', [-35]);
-
-    // Add initial evaluations
-    appts.push({ id: 'a' + (aId++), patientId: 'p1', patientName: 'Sarah Johnson', date: dayOffset(-87), time: '09:00', duration: '60', type: 'Initial Evaluation', status: 'completed', notes: 'Post ACL reconstruction evaluation' });
-    appts.push({ id: 'a' + (aId++), patientId: 'p2', patientName: 'Robert Chen', date: dayOffset(-87), time: '10:00', duration: '45', type: 'Initial Evaluation', status: 'completed', notes: 'Chronic LBP assessment' });
-    appts.push({ id: 'a' + (aId++), patientId: 'p3', patientName: 'Emily Watson', date: dayOffset(-73), time: '11:00', duration: '45', type: 'Initial Evaluation', status: 'completed', notes: 'Frozen shoulder assessment' });
-    appts.push({ id: 'a' + (aId++), patientId: 'p4', patientName: 'James Miller', date: dayOffset(-63), time: '14:00', duration: '60', type: 'Initial Evaluation', status: 'completed', notes: 'Post TKR evaluation' });
-    appts.push({ id: 'a' + (aId++), patientId: 'p5', patientName: 'Maria Garcia', date: dayOffset(-45), time: '15:30', duration: '45', type: 'Initial Evaluation', status: 'completed', notes: 'Rotator cuff assessment' });
-    appts.push({ id: 'a' + (aId++), patientId: 'p6', patientName: 'William Taylor', date: dayOffset(-87), time: '09:30', duration: '60', type: 'Initial Evaluation', status: 'completed', notes: 'Balance and gait assessment' });
-    appts.push({ id: 'a' + (aId++), patientId: 'p7', patientName: 'Anna Kowalski', date: dayOffset(-87), time: '16:00', duration: '45', type: 'Initial Evaluation', status: 'completed', notes: 'Bilateral plantar fasciitis' });
-    appts.push({ id: 'a' + (aId++), patientId: 'p8', patientName: 'David Park', date: dayOffset(-59), time: '10:30', duration: '45', type: 'Initial Evaluation', status: 'completed', notes: 'Cervical radiculopathy eval' });
-
-    // Today's specific appointments
-    appts.push({ id: 'a' + (aId++), patientId: 'p1', patientName: 'Sarah Johnson', date: todayStr, time: '09:00', duration: '45', type: 'Follow-up', status: 'scheduled', notes: 'Check ROM progress, advance to Phase 3' });
-    appts.push({ id: 'a' + (aId++), patientId: 'p2', patientName: 'Robert Chen', date: todayStr, time: '10:00', duration: '30', type: 'Treatment', status: 'scheduled', notes: 'Core stabilization session' });
-    appts.push({ id: 'a' + (aId++), patientId: 'p3', patientName: 'Emily Watson', date: todayStr, time: '11:00', duration: '45', type: 'Treatment', status: 'scheduled', notes: 'Joint mobilization grade IV' });
-    appts.push({ id: 'a' + (aId++), patientId: 'p4', patientName: 'James Miller', date: todayStr, time: '14:00', duration: '45', type: 'Follow-up', status: 'scheduled', notes: 'Reassessment - discharge planning' });
-    appts.push({ id: 'a' + (aId++), patientId: 'p5', patientName: 'Maria Garcia', date: todayStr, time: '15:30', duration: '45', type: 'Treatment', status: 'scheduled', notes: 'Eccentric loading program' });
-
-    for (var j = 0; j < appts.length; j++) {
-      appts[j].createdAt = appts[j].date + 'T08:00:00.000Z';
+    // Add specific today appointments for visibility
+    var todayPatients = ['p1','p2','p3','p5','p8','p12','p15','p20'];
+    var todayTimes = ['09:00','09:30','10:00','10:30','11:00','14:00','14:30','15:00'];
+    for (var ti = 0; ti < todayPatients.length; ti++) {
+      var tp = null;
+      for (var tpi = 0; tpi < patients.length; tpi++) {
+        if (patients[tpi].id === todayPatients[ti]) { tp = patients[tpi]; break; }
+      }
+      if (tp) {
+        appts.push({
+          id: 'a' + (aId++),
+          patientId: tp.id,
+          patientName: tp.name,
+          date: todayStr,
+          time: todayTimes[ti],
+          duration: '45',
+          type: 'Treatment',
+          status: 'scheduled',
+          notes: 'Regular treatment session',
+          createdAt: todayStr + 'T08:00:00.000Z'
+        });
+      }
     }
     saveAll(KEYS.appointments, appts);
 
-    // Sessions (SOAP notes) - comprehensive 3-month notes
-    var sessions = [
-      // --- Sarah Johnson (p1) - ACL rehab journey ---
-      { id: 's1', patientId: 'p1', date: dayOffset(-84), painScore: 8, functionScore: 2,
-        subjective: 'First session post-surgery. Significant swelling and pain. Difficulty with any weight bearing.',
-        objective: 'ROM: Flexion 60 deg, Extension -10 deg. Quad lag present. Significant effusion. Non-weight bearing with crutches.',
-        assessment: 'Post-op day 14. Expected presentation. Phase 1 protocol initiated.',
-        plan: 'Quad sets, ankle pumps, ice elevation. Patellar mobilization. NMES for quad activation. See 2x/week.' },
-      { id: 's2', patientId: 'p1', date: dayOffset(-70), painScore: 6, functionScore: 3,
-        subjective: 'Swelling reducing. Can tolerate partial weight bearing. Pain mainly with stairs.',
-        objective: 'ROM: Flexion 80 deg, Extension -7 deg. Quad strength 2+/5. Mild effusion. PWB with crutches.',
-        assessment: 'Phase 1 progressing. ROM gains consistent. Need to focus on extension deficit.',
-        plan: 'Prone hang for extension. SLR 4-way. Stationary bike if tolerated. Continue 2x/week.' },
-      { id: 's3', patientId: 'p1', date: dayOffset(-56), painScore: 5, functionScore: 4,
-        subjective: 'Walking without crutches at home. Morning stiffness improving. Able to do light housework.',
-        objective: 'ROM: Flexion 95 deg, Extension -3 deg. Quad strength 3+/5. Trace effusion. Gait: mild antalgic.',
-        assessment: 'Good progress. Transitioning to Phase 2. Weight bearing as tolerated.',
-        plan: 'Mini squats, step-ups, leg press. Proprioception board. Pool therapy if available.' },
-      { id: 's4', patientId: 'p1', date: dayOffset(-42), painScore: 4, functionScore: 5,
-        subjective: 'Much better. Walking longer distances. Occasional ache after prolonged activity.',
-        objective: 'ROM: Flexion 110 deg, Extension 0 deg. Quad strength 4-/5. No effusion. Normal gait pattern.',
-        assessment: 'Phase 2 milestones met. ROM approaching functional levels. Ready for advanced strengthening.',
-        plan: 'Lunges, single leg squats. Agility ladder. Begin jogging prep exercises. Step-downs.' },
-      { id: 's5', patientId: 'p1', date: dayOffset(-28), painScore: 3, functionScore: 7,
-        subjective: 'Feeling strong. Wants to start light jogging. No significant pain with daily activities.',
-        objective: 'ROM: Flexion 125 deg, Extension 0 deg. Quad strength 4+/5. Hop test 75% of contralateral. Balance excellent.',
-        assessment: 'Phase 3 criteria met. Cleared for light jogging on flat surface. Excellent rehab compliance.',
-        plan: 'Walk-jog program. Plyometric prep. Sport-specific drills. Progress to 1x/week visits.' },
-      { id: 's6', patientId: 'p1', date: dayOffset(-14), painScore: 2, functionScore: 8,
-        subjective: 'Jogging 15 min without pain. Feeling confident. Wants to return to recreational sports.',
-        objective: 'ROM: Full symmetrical. Quad strength 5-/5. Hop test 85%. Single leg squat: good form.',
-        assessment: 'Progressing well through Phase 3. On track for return to sport at 6 months.',
-        plan: 'Continue jogging progression. Add cutting drills. Plyometrics. Monthly follow-up.' },
-      // --- Robert Chen (p2) - Chronic LBP ---
-      { id: 's7', patientId: 'p2', date: dayOffset(-84), painScore: 8, functionScore: 2,
-        subjective: 'Severe back pain radiating to left leg. Cannot sit more than 15 min. Sleep disturbed. Very anxious.',
-        objective: 'Lumbar flexion 30%. Extension limited 50%. SLR positive 30 deg left. Neuro intact. Core strength 1/5.',
-        assessment: 'Acute presentation of chronic L4/L5 herniation with radiculopathy. Needs McKenzie approach.',
-        plan: 'Prone lying progression. Repeated extensions. Pain education. Avoid prolonged flexion. 1x/week.' },
-      { id: 's8', patientId: 'p2', date: dayOffset(-70), painScore: 7, functionScore: 3,
-        subjective: 'Some improvement with extension exercises. Still cannot sit long. Leg pain intermittent now.',
-        objective: 'Lumbar flexion 45%. SLR positive 50 deg left. Centralization with repeated extension. Core 2/5.',
-        assessment: 'Centralization occurring. Positive sign. Continue directional preference approach.',
-        plan: 'Progress to standing extension. Begin gentle core activation. Ergonomic assessment scheduled.' },
-      { id: 's9', patientId: 'p2', date: dayOffset(-56), painScore: 6, functionScore: 4,
-        subjective: 'Back pain reducing. Leg symptoms mostly gone. Can sit 30 min with breaks. Using standing desk.',
-        objective: 'Lumbar flexion 60%. SLR negative bilateral. Core activation improving. Plank hold 10 sec.',
-        assessment: 'Significant improvement. Leg symptoms centralizing. Core program can advance.',
-        plan: 'Dead bugs, bird-dogs. Progress plank duration. Continue extension exercises. Ergonomic mods.' },
-      { id: 's10', patientId: 'p2', date: dayOffset(-42), painScore: 5, functionScore: 5,
-        subjective: 'Good improvement. Occasional flare-ups with heavy lifting. Doing exercises regularly.',
-        objective: 'Lumbar ROM 75% flexion, full extension. Core strength 3/5. Plank 30 sec. Good movement patterns.',
-        assessment: 'Responding well. Need to address lifting mechanics and continue core strengthening.',
-        plan: 'Add hip hinge training. Deadlift pattern. Progress core to pallof press. Lifting education.' },
-      { id: 's11', patientId: 'p2', date: dayOffset(-28), painScore: 4, functionScore: 6,
-        subjective: 'Much better overall. Able to work full day. Occasional mild stiffness. Exercises becoming routine.',
-        objective: 'Full lumbar ROM. Core strength 4/5. Plank 45 sec. Good lifting mechanics demonstrated.',
-        assessment: 'Approaching discharge criteria. Self-management skills developing well.',
-        plan: 'Gym-based program design. Self-management strategies. Reduce to fortnightly visits.' },
-      { id: 's12', patientId: 'p2', date: dayOffset(-7), painScore: 3, functionScore: 7,
-        subjective: 'Doing well. Back to all activities. Using gym regularly. Knows flare-up management.',
-        objective: 'Full ROM. Core 4+/5. Excellent movement patterns. Independent with exercise program.',
-        assessment: 'Excellent outcome. Ready for discharge with home program.',
-        plan: 'Discharge plan finalized. Home program provided. Follow-up PRN.' },
-      // --- Emily Watson (p3) - Frozen shoulder ---
-      { id: 's13', patientId: 'p3', date: dayOffset(-70), painScore: 7, functionScore: 3,
-        subjective: 'Cannot reach overhead or behind back. Significant night pain. Difficulty dressing.',
-        objective: 'AROM: Flexion 100 deg, ABD 70 deg, ER 10 deg, IR hand to buttock. Capsular end-feel.',
-        assessment: 'Adhesive capsulitis - freezing stage. ER most restricted. Night pain management needed.',
-        plan: 'Grade II-III mobilizations. Pendulum exercises. Sleep positioning. Pulley flexion at home.' },
-      { id: 's14', patientId: 'p3', date: dayOffset(-56), painScore: 6, functionScore: 3,
-        subjective: 'Night pain slightly better. Still cannot reach overhead. Using other arm to compensate.',
-        objective: 'AROM: Flexion 110 deg, ABD 80 deg, ER 15 deg. Less pain with mobilization. Scapular dyskinesis.',
-        assessment: 'Slow progress expected with frozen shoulder. Slight gains in flexion. Scapular work needed.',
-        plan: 'Progress to grade III-IV mobilizations. Scapular stabilization exercises. Continue home program.' },
-      { id: 's15', patientId: 'p3', date: dayOffset(-42), painScore: 5, functionScore: 4,
-        subjective: 'Gradual improvement. Can reach shelf height now. Night pain only occasional.',
-        objective: 'AROM: Flexion 130 deg, ABD 100 deg, ER 25 deg, IR hand to L3. Good scapular control.',
-        assessment: 'Transitioning from freezing to thawing stage. ROM gains accelerating.',
-        plan: 'Aggressive mobilization. Stretching program. Add strengthening as ROM allows.' },
-      { id: 's16', patientId: 'p3', date: dayOffset(-21), painScore: 3, functionScore: 6,
-        subjective: 'Much better. Can wash hair and dress normally. Only stiff in mornings.',
-        objective: 'AROM: Flexion 155 deg, ABD 140 deg, ER 40 deg. Strength 4/5 all planes.',
-        assessment: 'Excellent progress in thawing phase. Near-functional ROM achieved.',
-        plan: 'Continue stretching and strengthening. Functional activities. Reduce to 1x/week.' },
-      // --- James Miller (p4) - TKR ---
-      { id: 's17', patientId: 'p4', date: dayOffset(-60), painScore: 6, functionScore: 3,
-        subjective: 'Post-op week 2. Significant swelling and stiffness. Using walker for all mobility.',
-        objective: 'ROM: Flexion 70 deg, Extension -8 deg. Quad strength 2/5. Moderate effusion. FWB with walker.',
-        assessment: 'Expected post-TKR presentation. Focus on ROM and quad activation.',
-        plan: 'CPM supplement. Quad sets, SLR. Ankle pumps. Ice and elevation. 3x/week.' },
-      { id: 's18', patientId: 'p4', date: dayOffset(-46), painScore: 4, functionScore: 5,
-        subjective: 'Improving steadily. Walking better with walker. Less swelling. Starting to feel stronger.',
-        objective: 'ROM: Flexion 95 deg, Extension -3 deg. Quad strength 3+/5. Trace effusion. Gait improving.',
-        assessment: 'Good progress for 4 weeks post-op. ROM gains on track.',
-        plan: 'Add step-ups, stationary bike. Begin cane transition assessment. Progressive strengthening.' },
-      { id: 's19', patientId: 'p4', date: dayOffset(-32), painScore: 3, functionScore: 6,
-        subjective: 'Using cane outdoors, independent at home. Can do stairs with rail. Feeling much more confident.',
-        objective: 'ROM: Flexion 115 deg, Extension 0 deg. Quad strength 4/5. Gait: normalized cadence.',
-        assessment: 'Exceeding milestones. ROM excellent. Ready to progress to community activities.',
-        plan: 'Community walking. Stairs without rail. Balance exercises. Reduce to 2x/week.' },
-      { id: 's20', patientId: 'p4', date: dayOffset(-14), painScore: 2, functionScore: 7,
-        subjective: 'Walking without any aid. Returned to driving. Only mild ache after long walks.',
-        objective: 'ROM: Flexion 120 deg, Extension 0 deg. Quad strength 4+/5. TUG test: 10 sec. Excellent balance.',
-        assessment: 'Outstanding recovery. Approaching discharge criteria. Independent with all ADLs.',
-        plan: 'Gym-based program. Continue ROM maintenance. Discharge planning. Monthly follow-up.' },
-      // --- Maria Garcia (p5) - Rotator cuff ---
-      { id: 's21', patientId: 'p5', date: dayOffset(-42), painScore: 6, functionScore: 4,
-        subjective: 'Pain with overhead activities. Cannot serve in volleyball. Pain at rest improving.',
-        objective: 'Shoulder flexion 160 deg, ABD 150 deg with painful arc 60-120. Supraspinatus 3+/5. Positive Neer test.',
-        assessment: 'Rotator cuff tendinopathy. Subacromial impingement pattern. Activity modification needed.',
-        plan: 'Eccentric cuff strengthening. Scapular stabilization. Avoid overhead activities temporarily.' },
-      { id: 's22', patientId: 'p5', date: dayOffset(-28), painScore: 4, functionScore: 5,
-        subjective: 'Pain reducing with exercises. Less painful arc. Still avoiding volleyball.',
-        objective: 'Painful arc reduced (80-110 deg). Supraspinatus 4/5. Scapular control improving.',
-        assessment: 'Good response to eccentric loading. Impingement signs reducing.',
-        plan: 'Progress eccentric load. Add kinetic chain exercises. Begin overhead reaching.' },
-      { id: 's23', patientId: 'p5', date: dayOffset(-14), painScore: 3, functionScore: 7,
-        subjective: 'Significant improvement. Tried light hitting - no pain. Wants to return to volleyball.',
-        objective: 'Full ROM pain-free. Cuff strength 4+/5. No impingement signs. Good scapulohumeral rhythm.',
-        assessment: 'Excellent progress. Ready for graded return to sport.',
-        plan: 'Graduated return to volleyball protocol. Plyometric throwing program. Continue strengthening.' },
-      // --- William Taylor (p6) - Parkinsons ---
-      { id: 's24', patientId: 'p6', date: dayOffset(-84), painScore: 2, functionScore: 3,
-        subjective: 'Balance deteriorating over past 6 months. Two near-falls last month. Shuffling gait worsening.',
-        objective: 'BBS: 38/56. TUG: 16 sec. Gait: reduced step length, reduced arm swing. Festinating pattern. Rigidity bilateral.',
-        assessment: 'Parkinsons Hoehn & Yahr Stage 2. Fall risk moderate. LSVT BIG appropriate.',
-        plan: 'LSVT BIG protocol 4x/week for 4 weeks. Balance training. Fall prevention education.' },
-      { id: 's25', patientId: 'p6', date: dayOffset(-56), painScore: 2, functionScore: 4,
-        subjective: 'Feeling more confident walking. Using BIG movements regularly. Caregiver reports improvement.',
-        objective: 'BBS: 44/56. TUG: 13 sec. Gait: improved step length and arm swing. Less festination.',
-        assessment: 'Good response to LSVT BIG. Balance improving. Continue maintenance program.',
-        plan: 'Transition to maintenance LSVT. Dual-task training. Community walking. Tai chi recommended.' },
-      { id: 's26', patientId: 'p6', date: dayOffset(-28), painScore: 1, functionScore: 5,
-        subjective: 'Most confident in months. Walking in community. Doing tai chi group class.',
-        objective: 'BBS: 48/56. TUG: 11 sec. Dual-task: maintained gait speed with cognitive task.',
-        assessment: 'Excellent response. Maintaining gains. Dual-task performance good.',
-        plan: 'Continue 2x/week. Progressive dual-task challenges. Caregiver education refresher.' },
-      // --- David Park (p8) - Cervical ---
-      { id: 's27', patientId: 'p8', date: dayOffset(-56), painScore: 7, functionScore: 3,
-        subjective: 'Neck pain radiating to right arm. Numbness in thumb and index finger. Worse with computer work.',
-        objective: 'Cervical ROM: flexion 30 deg, rotation right 40 deg. Spurling positive right. Grip strength reduced right. DTF 1/5.',
-        assessment: 'C5/C6 radiculopathy. Neural tension positive. Ergonomic issues contributing.',
-        plan: 'Cervical traction 10 min. Neural glides. Postural correction. Workstation assessment.' },
-      { id: 's28', patientId: 'p8', date: dayOffset(-42), painScore: 5, functionScore: 4,
-        subjective: 'Arm pain reducing. Numbness less frequent. New ergonomic setup helping.',
-        objective: 'Cervical ROM improved: flexion 40 deg, rotation right 55 deg. Spurling negative. DTF 2/5.',
-        assessment: 'Responding to traction and neural mobilization. Ergonomic changes positive.',
-        plan: 'Continue traction. Progress neural glides. Strengthen DTF. Add scapular exercises.' },
-      { id: 's29', patientId: 'p8', date: dayOffset(-21), painScore: 3, functionScore: 6,
-        subjective: 'Much better. Can work full day. Only mild neck tension end of day. No arm symptoms.',
-        objective: 'Cervical ROM 90% normal. Neural tension negative. DTF 3+/5. Good posture awareness.',
-        assessment: 'Excellent progress. Radiculopathy resolved. Focus on prevention.',
-        plan: 'Progress strengthening. Workplace wellness exercises. Reduce to fortnightly.' }
-    ];
-    for (var k = 0; k < sessions.length; k++) {
-      sessions[k].createdAt = sessions[k].date + 'T10:00:00.000Z';
+    // ===== GENERATE SESSIONS (1 per completed appointment) =====
+    var sessions = [];
+    var sId = 1;
+    for (var si = 0; si < appts.length; si++) {
+      var ap = appts[si];
+      if (ap.status !== 'completed') continue;
+      var painStart = randInt(5, 8);
+      var painDelta = Math.min(sId % 3, painStart - 2);
+      sessions.push({
+        id: 's' + (sId++),
+        patientId: ap.patientId,
+        date: ap.date,
+        painScore: Math.max(2, painStart - painDelta),
+        functionScore: Math.min(8, randInt(3, 7)),
+        subjective: pick(subjectives),
+        objective: pick(objectives),
+        assessment: pick(assessments),
+        plan: pick(plans),
+        createdAt: ap.date + 'T10:00:00.000Z'
+      });
     }
     saveAll(KEYS.sessions, sessions);
 
-    // Exercises
-    var exercises = [
-      { id: 'e1', patientId: 'p1', name: 'Quad Sets', sets: '3', reps: '10', hold: '5 sec', frequency: '3x daily',
-        instructions: 'Sit or lie with leg extended. Tighten thigh muscle pressing knee down. Hold 5 seconds, release.', status: 'active' },
-      { id: 'e2', patientId: 'p1', name: 'Heel Slides', sets: '3', reps: '15', hold: '-', frequency: '2x daily',
-        instructions: 'Lie on back. Slowly slide heel toward buttock bending knee. Hold briefly at end range. Return slowly.', status: 'active' },
-      { id: 'e3', patientId: 'p1', name: 'Straight Leg Raises', sets: '3', reps: '10', hold: '3 sec', frequency: '2x daily',
-        instructions: 'Lie on back, one knee bent. Tighten quad on straight leg, lift 12 inches. Hold 3 seconds. Lower slowly.', status: 'active' },
-      { id: 'e4', patientId: 'p2', name: 'Prone Press-ups', sets: '3', reps: '10', hold: '3 sec', frequency: 'Every 2 hours',
-        instructions: 'Lie face down. Place hands by shoulders. Press upper body up keeping hips on surface. Hold at top, lower slowly.', status: 'active' },
-      { id: 'e5', patientId: 'p2', name: 'Bird Dog', sets: '3', reps: '8 each side', hold: '5 sec', frequency: '2x daily',
-        instructions: 'Start on hands and knees. Extend opposite arm and leg. Hold 5 seconds maintaining level pelvis. Alternate sides.', status: 'active' },
-      { id: 'e6', patientId: 'p3', name: 'Pendulum Exercises', sets: '2', reps: '20 circles', hold: '-', frequency: '3x daily',
-        instructions: 'Lean forward supporting yourself with good arm. Let affected arm hang. Make small circles. Increase size gradually.', status: 'active' },
-      { id: 'e7', patientId: 'p3', name: 'Pulley Flexion', sets: '3', reps: '15', hold: '2 sec', frequency: '2x daily',
-        instructions: 'Sit facing pulley. Hold handles. Use good arm to assist affected arm overhead. Hold at comfortable end range.', status: 'active' },
-      { id: 'e8', patientId: 'p4', name: 'Seated Knee Extension', sets: '3', reps: '12', hold: '3 sec', frequency: '2x daily',
-        instructions: 'Sit in firm chair. Slowly straighten knee fully. Hold 3 seconds at top. Lower slowly. Add ankle weight as tolerated.', status: 'active' },
-      { id: 'e9', patientId: 'p5', name: 'Eccentric Shoulder ER', sets: '3', reps: '12', hold: '-', frequency: '1x daily',
-        instructions: 'Stand with elbow at side, band attached. Slowly rotate forearm outward against resistance. Return slowly taking 4 seconds.', status: 'active' },
-      { id: 'e10', patientId: 'p6', name: 'LSVT BIG Sit-to-Stand', sets: '3', reps: '10', hold: '-', frequency: '2x daily',
-        instructions: 'Sit at edge of chair. Stand up using BIG exaggerated movements. Reach arms forward and up. Sit slowly.', status: 'active' },
-      { id: 'e11', patientId: 'p6', name: 'Tandem Walking', sets: '1', reps: '20 steps', hold: '-', frequency: '2x daily',
-        instructions: 'Walk heel-to-toe in a straight line. Use BIG steps. Focus on arm swing. Use wall for safety initially.', status: 'active' },
-      { id: 'e12', patientId: 'p8', name: 'Chin Tucks', sets: '3', reps: '10', hold: '5 sec', frequency: '3x daily',
-        instructions: 'Sit tall. Gently tuck chin making a double chin. Hold 5 seconds. Should feel stretch at base of skull.', status: 'active' },
-      { id: 'e13', patientId: 'p8', name: 'Median Nerve Glides', sets: '2', reps: '10', hold: '2 sec', frequency: '3x daily',
-        instructions: 'Stand with arm at side. Extend wrist back, then slowly straighten elbow and abduct arm. Hold gently. Return slowly.', status: 'active' }
+    // ===== GENERATE EXERCISES (~50% of patients, 1-3 per patient) =====
+    var exercises = [];
+    var eId = 1;
+    var exercisePool = [
+      { name: 'Quad Sets', sets: '3', reps: '10', hold: '5 sec', freq: '3x daily', instr: 'Tighten thigh muscle pressing knee down. Hold 5 seconds, release.' },
+      { name: 'Heel Slides', sets: '3', reps: '15', hold: '-', freq: '2x daily', instr: 'Slide heel toward buttock bending knee. Hold briefly at end range. Return slowly.' },
+      { name: 'Straight Leg Raises', sets: '3', reps: '10', hold: '3 sec', freq: '2x daily', instr: 'Lie on back, tighten quad, lift leg 12 inches. Hold 3 seconds. Lower slowly.' },
+      { name: 'Prone Press-ups', sets: '3', reps: '10', hold: '3 sec', freq: 'Every 2 hours', instr: 'Lie face down. Press upper body up keeping hips on surface. Hold at top.' },
+      { name: 'Bird Dog', sets: '3', reps: '8 each side', hold: '5 sec', freq: '2x daily', instr: 'Hands and knees. Extend opposite arm and leg. Hold 5 seconds. Alternate.' },
+      { name: 'Pendulum Exercises', sets: '2', reps: '20 circles', hold: '-', freq: '3x daily', instr: 'Lean forward, let affected arm hang. Make small circles. Increase gradually.' },
+      { name: 'Wall Push-ups', sets: '3', reps: '12', hold: '-', freq: '2x daily', instr: 'Stand arm length from wall. Place hands on wall. Do push-ups. Keep body straight.' },
+      { name: 'Calf Raises', sets: '3', reps: '15', hold: '2 sec', freq: '2x daily', instr: 'Stand on edge of step. Rise up on toes. Hold 2 seconds. Lower slowly below step level.' },
+      { name: 'Chin Tucks', sets: '3', reps: '10', hold: '5 sec', freq: '3x daily', instr: 'Sit tall. Gently tuck chin making a double chin. Hold 5 seconds.' },
+      { name: 'Ankle Pumps', sets: '3', reps: '20', hold: '-', freq: '3x daily', instr: 'Point toes down then pull toes up. Repeat rhythmically. Good for circulation.' },
+      { name: 'Hamstring Stretches', sets: '3', reps: '3', hold: '30 sec', freq: '2x daily', instr: 'Lie on back. Loop towel around foot. Straighten leg. Hold stretch 30 seconds.' },
+      { name: 'Bridging', sets: '3', reps: '10', hold: '5 sec', freq: '2x daily', instr: 'Lie on back, knees bent. Lift hips to form straight line. Hold 5 seconds. Lower slowly.' },
+      { name: 'Side-lying Hip Abduction', sets: '3', reps: '12', hold: '2 sec', freq: '2x daily', instr: 'Lie on side. Lift top leg keeping knee straight. Hold 2 seconds. Lower slowly.' },
+      { name: 'Scapular Squeezes', sets: '3', reps: '10', hold: '5 sec', freq: '3x daily', instr: 'Sit or stand tall. Squeeze shoulder blades together. Hold 5 seconds. Release.' },
+      { name: 'Wrist Curls', sets: '3', reps: '12', hold: '-', freq: '2x daily', instr: 'Rest forearm on table, wrist over edge. Curl weight up and down slowly. Both directions.' }
     ];
-    for (var l = 0; l < exercises.length; l++) {
-      exercises[l].createdAt = new Date().toISOString();
+
+    for (var ei = 0; ei < patients.length; ei++) {
+      if (rand() < 0.5) continue; // ~50% get exercises
+      var numEx = randInt(1, 3);
+      var usedEx = {};
+      for (var ej = 0; ej < numEx; ej++) {
+        var exIdx = randInt(0, exercisePool.length - 1);
+        if (usedEx[exIdx]) continue;
+        usedEx[exIdx] = true;
+        var ex = exercisePool[exIdx];
+        exercises.push({
+          id: 'e' + (eId++),
+          patientId: patients[ei].id,
+          name: ex.name,
+          sets: ex.sets,
+          reps: ex.reps,
+          hold: ex.hold,
+          frequency: ex.freq,
+          instructions: ex.instr,
+          status: patients[ei].status === 'completed' ? 'discontinued' : 'active',
+          createdAt: new Date(td.getTime() - randInt(10, 60) * 86400000).toISOString()
+        });
+      }
     }
     saveAll(KEYS.exercises, exercises);
 
-    // Billing - 3 months of INR billing data
+    // ===== GENERATE BILLING (1 per appointment) =====
     var billing = [];
     var bId = 1;
-
-    function addBill(pid, dayOff, desc, amt, status, paidDayOff) {
+    for (var bi = 0; bi < appts.length; bi++) {
+      var ba = appts[bi];
+      if (ba.status === 'cancelled') continue;
+      var bAmt = ba.type === 'Initial Evaluation' ? pick(['2000','2500']) : pick(billAmounts);
+      var bDesc = ba.type === 'Initial Evaluation' ? 'Initial Evaluation' : pick(billDescs);
+      var bStatus = 'pending';
+      var bPaidDate = '';
+      if (ba.status === 'completed') {
+        bStatus = rand() < 0.85 ? 'paid' : 'pending';
+        if (bStatus === 'paid') bPaidDate = dayOffset(Math.min(0, parseInt(ba.date.substring(8), 10) - parseInt(todayStr.substring(8), 10) + 2));
+      }
+      if (ba.status === 'no-show') {
+        bAmt = '500';
+        bDesc = 'No-show fee';
+        bStatus = 'pending';
+      }
       billing.push({
-        id: 'b' + (bId++), patientId: pid, date: dayOffset(dayOff), description: desc,
-        amount: amt, status: status, paidDate: status === 'paid' ? dayOffset(paidDayOff) : '',
-        createdAt: dayOffset(dayOff) + 'T12:00:00.000Z'
+        id: 'b' + (bId++),
+        patientId: ba.patientId,
+        date: ba.date,
+        description: bDesc,
+        amount: bAmt,
+        status: bStatus,
+        paidDate: bPaidDate,
+        createdAt: ba.date + 'T12:00:00.000Z'
       });
     }
-
-    // Sarah Johnson (p1) - 12 sessions over 3 months
-    addBill('p1', -87, 'Initial Evaluation', '2000', 'paid', -85);
-    addBill('p1', -84, 'Therapeutic Exercise + NMES', '1200', 'paid', -82);
-    addBill('p1', -77, 'Manual Therapy + Therapeutic Exercise', '1200', 'paid', -75);
-    addBill('p1', -70, 'Therapeutic Exercise + Gait Training', '1000', 'paid', -68);
-    addBill('p1', -63, 'Therapeutic Exercise + Balance', '1000', 'paid', -60);
-    addBill('p1', -56, 'Therapeutic Exercise + Proprioception', '1000', 'paid', -54);
-    addBill('p1', -49, 'Manual Therapy + Strengthening', '1200', 'paid', -47);
-    addBill('p1', -42, 'Therapeutic Exercise + Agility', '1000', 'paid', -40);
-    addBill('p1', -35, 'Therapeutic Exercise + Plyometric', '1000', 'paid', -33);
-    addBill('p1', -28, 'Reassessment + Exercise Progression', '1500', 'paid', -26);
-    addBill('p1', -14, 'Therapeutic Exercise + Sport-specific', '1000', 'pending', 0);
-    addBill('p1', -7, 'Follow-up + Exercise Update', '800', 'pending', 0);
-
-    // Robert Chen (p2) - 12 sessions
-    addBill('p2', -87, 'Initial Evaluation (Complex)', '2500', 'paid', -84);
-    addBill('p2', -84, 'McKenzie Protocol + Manual Therapy', '1500', 'paid', -81);
-    addBill('p2', -77, 'Manual Therapy + Neural Glides', '1500', 'paid', -74);
-    addBill('p2', -70, 'Therapeutic Exercise + Ergonomic Assessment', '1800', 'paid', -67);
-    addBill('p2', -63, 'Core Stabilization + Manual Therapy', '1200', 'paid', -60);
-    addBill('p2', -56, 'Therapeutic Exercise + Core Program', '1000', 'paid', -53);
-    addBill('p2', -49, 'No-show fee', '500', 'pending', 0);
-    addBill('p2', -42, 'Manual Therapy + Lifting Education', '1200', 'paid', -39);
-    addBill('p2', -35, 'Therapeutic Exercise + Functional Training', '1000', 'paid', -32);
-    addBill('p2', -28, 'Reassessment + Core Progression', '1500', 'paid', -25);
-    addBill('p2', -14, 'Gym Program Design + Discharge', '1200', 'paid', -12);
-    addBill('p2', -7, 'Follow-up Session', '800', 'pending', 0);
-
-    // Emily Watson (p3) - 10 sessions
-    addBill('p3', -73, 'Initial Evaluation', '2000', 'paid', -70);
-    addBill('p3', -70, 'Joint Mobilization + Pendulums', '1500', 'paid', -67);
-    addBill('p3', -63, 'Joint Mobilization Grade III', '1500', 'paid', -60);
-    addBill('p3', -56, 'Joint Mobilization + Scapular Work', '1500', 'paid', -53);
-    addBill('p3', -49, 'Joint Mobilization Grade IV', '1500', 'paid', -46);
-    addBill('p3', -42, 'Manual Therapy + Stretching', '1200', 'paid', -39);
-    addBill('p3', -35, 'Therapeutic Exercise + Mobilization', '1200', 'paid', -32);
-    addBill('p3', -28, 'Strengthening + ROM', '1000', 'paid', -25);
-    addBill('p3', -21, 'Reassessment + Exercise Progression', '1500', 'pending', 0);
-    addBill('p3', -14, 'Therapeutic Exercise + Functional', '1000', 'pending', 0);
-
-    // James Miller (p4) - 15 sessions (intensive TKR rehab)
-    addBill('p4', -63, 'Initial Evaluation (Complex)', '2500', 'paid', -60);
-    addBill('p4', -60, 'Therapeutic Exercise + CPM', '1200', 'paid', -57);
-    addBill('p4', -58, 'Therapeutic Exercise + Gait', '1200', 'paid', -55);
-    addBill('p4', -56, 'Therapeutic Exercise + ROM', '1000', 'paid', -53);
-    addBill('p4', -53, 'Manual Therapy + Strengthening', '1500', 'paid', -50);
-    addBill('p4', -51, 'Therapeutic Exercise + Balance', '1000', 'paid', -48);
-    addBill('p4', -49, 'Therapeutic Exercise + Gait Training', '1200', 'paid', -46);
-    addBill('p4', -46, 'Therapeutic Exercise + Stairs', '1000', 'paid', -43);
-    addBill('p4', -42, 'Reassessment + Cane Training', '1500', 'paid', -39);
-    addBill('p4', -39, 'Therapeutic Exercise + Community Walk', '1000', 'paid', -36);
-    addBill('p4', -35, 'Balance Training + Strengthening', '1000', 'paid', -32);
-    addBill('p4', -32, 'Therapeutic Exercise + Functional', '1000', 'paid', -29);
-    addBill('p4', -21, 'Follow-up + Gym Program', '1200', 'pending', 0);
-    addBill('p4', -14, 'Therapeutic Exercise + ADL', '1000', 'pending', 0);
-    addBill('p4', -7, 'Reassessment + Discharge Plan', '1500', 'pending', 0);
-
-    // Maria Garcia (p5) - 7 sessions
-    addBill('p5', -45, 'Initial Evaluation', '2000', 'paid', -42);
-    addBill('p5', -42, 'Eccentric Loading + Scapular', '1200', 'paid', -39);
-    addBill('p5', -35, 'Therapeutic Exercise + Manual Therapy', '1200', 'paid', -32);
-    addBill('p5', -28, 'Eccentric Progression + Kinetic Chain', '1000', 'paid', -25);
-    addBill('p5', -21, 'Therapeutic Exercise + Overhead Prep', '1000', 'paid', -18);
-    addBill('p5', -14, 'Reassessment + Sport Return Protocol', '1500', 'pending', 0);
-    addBill('p5', -7, 'Plyometric + Sport-specific', '1200', 'pending', 0);
-
-    // William Taylor (p6) - 14 sessions (2x/week for 3 months)
-    addBill('p6', -87, 'Initial Evaluation (Complex)', '2500', 'paid', -84);
-    addBill('p6', -84, 'LSVT BIG Session 1 + Balance', '1500', 'paid', -81);
-    addBill('p6', -77, 'LSVT BIG + Gait Training', '1500', 'paid', -74);
-    addBill('p6', -70, 'LSVT BIG + Dual-task', '1500', 'paid', -67);
-    addBill('p6', -63, 'Balance Training + Fall Prevention', '1200', 'paid', -60);
-    addBill('p6', -56, 'LSVT Maintenance + Balance', '1200', 'paid', -53);
-    addBill('p6', -49, 'Gait Training + Community Walk', '1200', 'paid', -46);
-    addBill('p6', -42, 'Balance + Dual-task Challenge', '1200', 'paid', -39);
-    addBill('p6', -35, 'Therapeutic Exercise + Balance', '1000', 'paid', -32);
-    addBill('p6', -28, 'Reassessment + Program Update', '1500', 'paid', -25);
-    addBill('p6', -21, 'Balance + Tai Chi Prep', '1000', 'paid', -18);
-    addBill('p6', -14, 'Therapeutic Exercise + Dual-task', '1000', 'pending', 0);
-    addBill('p6', -7, 'Balance Training + Gait', '1000', 'pending', 0);
-
-    // Anna Kowalski (p7) - 8 sessions (completed)
-    addBill('p7', -87, 'Initial Evaluation', '2000', 'paid', -84);
-    addBill('p7', -84, 'Stretching Protocol + Night Splint Fit', '1200', 'paid', -81);
-    addBill('p7', -77, 'Manual Therapy + Stretching', '1200', 'paid', -74);
-    addBill('p7', -70, 'Therapeutic Exercise + Orthotics Review', '1500', 'paid', -67);
-    addBill('p7', -63, 'Stretching + Gait Analysis', '1200', 'paid', -60);
-    addBill('p7', -56, 'Therapeutic Exercise + Running Prep', '1000', 'paid', -53);
-    addBill('p7', -42, 'Running Assessment + Progression', '1500', 'paid', -39);
-    addBill('p7', -28, 'Discharge Assessment + Home Program', '1200', 'paid', -25);
-
-    // David Park (p8) - 8 sessions
-    addBill('p8', -59, 'Initial Evaluation', '2000', 'paid', -56);
-    addBill('p8', -56, 'Cervical Traction + Neural Glides', '1500', 'paid', -53);
-    addBill('p8', -49, 'Traction + Postural Correction', '1500', 'paid', -46);
-    addBill('p8', -42, 'Manual Therapy + Ergonomic Education', '1800', 'paid', -39);
-    addBill('p8', -35, 'Traction + DTF Strengthening', '1200', 'paid', -32);
-    addBill('p8', -28, 'Therapeutic Exercise + Neural Mob', '1000', 'paid', -25);
-    addBill('p8', -21, 'Reassessment + Strengthening', '1500', 'pending', 0);
-    addBill('p8', -14, 'Therapeutic Exercise + Workplace Wellness', '1000', 'pending', 0);
-
     saveAll(KEYS.billing, billing);
 
-    // Prescriptions - realistic physio prescriptions
-    var prescriptions = [
-      // Sarah Johnson (p1) - ACL rehab
-      { id: 'rx1', patientId: 'p1', date: dayOffset(-84), medication: 'Aceclofenac', dosage: '100mg', route: 'Oral', frequency: 'Twice daily (after meals)', duration: '7 days',
-        instructions: 'Take after food. Avoid on empty stomach. Stop if gastric irritation occurs.', prescribedBy: 'Dr. Admin', status: 'discontinued' },
-      { id: 'rx2', patientId: 'p1', date: dayOffset(-84), medication: 'Pantoprazole', dosage: '40mg', route: 'Oral', frequency: 'Once daily (before breakfast)', duration: '7 days',
-        instructions: 'Take 30 minutes before breakfast. Gastric protection while on NSAIDs.', prescribedBy: 'Dr. Admin', status: 'discontinued' },
-      { id: 'rx3', patientId: 'p1', date: dayOffset(-56), medication: 'Calcium + Vitamin D3', dosage: '500mg + 250IU', route: 'Oral', frequency: 'Once daily', duration: '90 days',
-        instructions: 'Take with meals for better absorption. Continue for bone health during recovery.', prescribedBy: 'Dr. Admin', status: 'active' },
-      { id: 'rx4', patientId: 'p1', date: dayOffset(-14), medication: 'Thiocolchicoside', dosage: '4mg', route: 'Oral', frequency: 'Twice daily', duration: '5 days',
-        instructions: 'Muscle relaxant for post-exercise stiffness. Take after meals. May cause drowsiness.', prescribedBy: 'Dr. Admin', status: 'active' },
-
-      // Robert Chen (p2) - Chronic LBP
-      { id: 'rx5', patientId: 'p2', date: dayOffset(-84), medication: 'Pregabalin', dosage: '75mg', route: 'Oral', frequency: 'Twice daily', duration: '30 days',
-        instructions: 'For neuropathic pain. May cause dizziness/drowsiness. Do not drive initially. Taper before stopping.', prescribedBy: 'Dr. Admin', status: 'discontinued' },
-      { id: 'rx6', patientId: 'p2', date: dayOffset(-84), medication: 'Etoricoxib', dosage: '60mg', route: 'Oral', frequency: 'Once daily', duration: '14 days',
-        instructions: 'Take after food. For acute pain relief. Monitor BP. Stop if any gastric issues.', prescribedBy: 'Dr. Admin', status: 'discontinued' },
-      { id: 'rx7', patientId: 'p2', date: dayOffset(-56), medication: 'Methylcobalamin', dosage: '1500mcg', route: 'Oral', frequency: 'Once daily', duration: '60 days',
-        instructions: 'For nerve health and repair. Take with breakfast.', prescribedBy: 'Dr. Admin', status: 'active' },
-      { id: 'rx8', patientId: 'p2', date: dayOffset(-28), medication: 'Diclofenac Gel', dosage: '1%', route: 'Topical', frequency: 'Three times daily', duration: '14 days',
-        instructions: 'Apply thin layer on lower back. Massage gently. Wash hands after application. Do not cover with bandage.', prescribedBy: 'Dr. Admin', status: 'active' },
-
-      // Emily Watson (p3) - Frozen shoulder
-      { id: 'rx9', patientId: 'p3', date: dayOffset(-70), medication: 'Tramadol', dosage: '50mg', route: 'Oral', frequency: 'As needed (max 3/day)', duration: '7 days',
-        instructions: 'For severe pain. Take only when pain is unbearable. May cause nausea. Do not drive.', prescribedBy: 'Dr. Admin', status: 'discontinued' },
-      { id: 'rx10', patientId: 'p3', date: dayOffset(-70), medication: 'Amitriptyline', dosage: '10mg', route: 'Oral', frequency: 'Once daily at bedtime', duration: '30 days',
-        instructions: 'Low-dose for night pain and sleep. Take at bedtime. May cause dry mouth.', prescribedBy: 'Dr. Admin', status: 'discontinued' },
-      { id: 'rx11', patientId: 'p3', date: dayOffset(-42), medication: 'Capsaicin Cream', dosage: '0.025%', route: 'Topical', frequency: 'Three times daily', duration: '30 days',
-        instructions: 'Apply to shoulder area. Initial burning sensation is normal and will decrease. Avoid eyes and broken skin.', prescribedBy: 'Dr. Admin', status: 'active' },
-
-      // James Miller (p4) - TKR
-      { id: 'rx12', patientId: 'p4', date: dayOffset(-60), medication: 'Paracetamol', dosage: '650mg', route: 'Oral', frequency: 'Three times daily', duration: '14 days',
-        instructions: 'For post-operative pain. Do not exceed 3 tablets per day. Take after meals.', prescribedBy: 'Dr. Admin', status: 'discontinued' },
-      { id: 'rx13', patientId: 'p4', date: dayOffset(-60), medication: 'Enoxaparin', dosage: '40mg', route: 'Subcutaneous', frequency: 'Once daily', duration: '14 days',
-        instructions: 'DVT prophylaxis post-surgery. Inject in abdomen. Rotate injection sites. Monitor for bruising.', prescribedBy: 'Dr. Admin', status: 'discontinued' },
-      { id: 'rx14', patientId: 'p4', date: dayOffset(-60), medication: 'Ferrous Sulphate', dosage: '200mg', route: 'Oral', frequency: 'Once daily', duration: '30 days',
-        instructions: 'Iron supplement post-surgery. Take with Vitamin C for better absorption. May cause dark stools.', prescribedBy: 'Dr. Admin', status: 'discontinued' },
-      { id: 'rx15', patientId: 'p4', date: dayOffset(-32), medication: 'Glucosamine + Chondroitin', dosage: '500mg + 400mg', route: 'Oral', frequency: 'Twice daily', duration: '90 days',
-        instructions: 'Joint supplement. Take with meals. Long-term use recommended for joint health.', prescribedBy: 'Dr. Admin', status: 'active' },
-
-      // Maria Garcia (p5) - Rotator cuff
-      { id: 'rx16', patientId: 'p5', date: dayOffset(-42), medication: 'Aceclofenac + Paracetamol', dosage: '100mg + 325mg', route: 'Oral', frequency: 'Twice daily (after meals)', duration: '7 days',
-        instructions: 'For pain and inflammation. Take strictly after food. Do not take on empty stomach.', prescribedBy: 'Dr. Admin', status: 'discontinued' },
-      { id: 'rx17', patientId: 'p5', date: dayOffset(-28), medication: 'Piroxicam Gel', dosage: '0.5%', route: 'Topical', frequency: 'Three times daily', duration: '21 days',
-        instructions: 'Apply on shoulder joint area. Massage gently for 2-3 minutes. Wash hands after use.', prescribedBy: 'Dr. Admin', status: 'active' },
-
-      // William Taylor (p6) - Parkinsons
-      { id: 'rx18', patientId: 'p6', date: dayOffset(-84), medication: 'Levodopa/Carbidopa', dosage: '100/25mg', route: 'Oral', frequency: 'Three times daily', duration: 'Ongoing',
-        instructions: 'Take 30 min before meals. Do not crush. Report any dyskinesia or wearing-off symptoms.', prescribedBy: 'Dr. Admin (Neurology referral)', status: 'active' },
-      { id: 'rx19', patientId: 'p6', date: dayOffset(-56), medication: 'Vitamin D3', dosage: '60000IU', route: 'Oral', frequency: 'Once weekly', duration: '8 weeks',
-        instructions: 'Fall prevention supplement. Take with fatty meal for absorption. Recheck levels after 8 weeks.', prescribedBy: 'Dr. Admin', status: 'active' },
-
-      // David Park (p8) - Cervical
-      { id: 'rx20', patientId: 'p8', date: dayOffset(-56), medication: 'Tizanidine', dosage: '2mg', route: 'Oral', frequency: 'Twice daily', duration: '10 days',
-        instructions: 'Muscle relaxant for cervical spasm. May cause drowsiness. Avoid driving. Take at bedtime if drowsy.', prescribedBy: 'Dr. Admin', status: 'discontinued' },
-      { id: 'rx21', patientId: 'p8', date: dayOffset(-42), medication: 'Gabapentin', dosage: '300mg', route: 'Oral', frequency: 'Once daily at bedtime', duration: '30 days',
-        instructions: 'For radicular arm pain. Titrate: 300mg x 3 days, then 300mg BD if needed. Report any dizziness.', prescribedBy: 'Dr. Admin', status: 'discontinued' },
-      { id: 'rx22', patientId: 'p8', date: dayOffset(-21), medication: 'Methylcobalamin + Alpha Lipoic Acid', dosage: '1500mcg + 100mg', route: 'Oral', frequency: 'Once daily', duration: '60 days',
-        instructions: 'Nerve supplement. Take with breakfast. For nerve regeneration and neuropathic symptom relief.', prescribedBy: 'Dr. Admin', status: 'active' }
+    // ===== GENERATE PRESCRIPTIONS (~30% of patients) =====
+    var prescriptions = [];
+    var rxId = 1;
+    var rxPool = [
+      { med: 'Aceclofenac', dose: '100mg', route: 'Oral', freq: 'Twice daily (after meals)', dur: '7 days', instr: 'Take after food. Avoid on empty stomach.', active: false },
+      { med: 'Paracetamol', dose: '650mg', route: 'Oral', freq: 'Three times daily', dur: '5 days', instr: 'For pain relief. Do not exceed 3 tablets per day.', active: false },
+      { med: 'Thiocolchicoside', dose: '4mg', route: 'Oral', freq: 'Twice daily', dur: '5 days', instr: 'Muscle relaxant. Take after meals. May cause drowsiness.', active: false },
+      { med: 'Calcium + Vitamin D3', dose: '500mg + 250IU', route: 'Oral', freq: 'Once daily', dur: '90 days', instr: 'Take with meals for better absorption. For bone health.', active: true },
+      { med: 'Methylcobalamin', dose: '1500mcg', route: 'Oral', freq: 'Once daily', dur: '60 days', instr: 'Nerve health supplement. Take with breakfast.', active: true },
+      { med: 'Diclofenac Gel', dose: '1%', route: 'Topical', freq: 'Three times daily', dur: '14 days', instr: 'Apply thin layer. Massage gently. Wash hands after.', active: true },
+      { med: 'Pregabalin', dose: '75mg', route: 'Oral', freq: 'Twice daily', dur: '30 days', instr: 'For neuropathic pain. May cause dizziness. Taper before stopping.', active: false },
+      { med: 'Etoricoxib', dose: '60mg', route: 'Oral', freq: 'Once daily', dur: '14 days', instr: 'Take after food. Monitor BP. Stop if gastric issues.', active: false },
+      { med: 'Glucosamine + Chondroitin', dose: '500mg + 400mg', route: 'Oral', freq: 'Twice daily', dur: '90 days', instr: 'Joint supplement. Take with meals. Long-term use recommended.', active: true },
+      { med: 'Pantoprazole', dose: '40mg', route: 'Oral', freq: 'Once daily (before breakfast)', dur: '14 days', instr: 'Take 30 min before breakfast. Gastric protection.', active: false },
+      { med: 'Tizanidine', dose: '2mg', route: 'Oral', freq: 'Twice daily', dur: '10 days', instr: 'Muscle relaxant. May cause drowsiness. Avoid driving.', active: false },
+      { med: 'Capsaicin Cream', dose: '0.025%', route: 'Topical', freq: 'Three times daily', dur: '30 days', instr: 'Apply to affected area. Initial burning is normal. Avoid eyes.', active: true },
+      { med: 'Vitamin D3', dose: '60000IU', route: 'Oral', freq: 'Once weekly', dur: '8 weeks', instr: 'Take with fatty meal. Recheck levels after 8 weeks.', active: true },
+      { med: 'Piroxicam Gel', dose: '0.5%', route: 'Topical', freq: 'Three times daily', dur: '21 days', instr: 'Apply on affected joint. Massage 2-3 minutes. Wash hands after.', active: true }
     ];
-    for (var rx = 0; rx < prescriptions.length; rx++) {
-      prescriptions[rx].createdAt = prescriptions[rx].date + 'T10:00:00.000Z';
+
+    for (var ri = 0; ri < patients.length; ri++) {
+      if (rand() < 0.7) continue; // ~30% get prescriptions
+      var numRx = randInt(1, 3);
+      for (var rj = 0; rj < numRx; rj++) {
+        var rxT = pick(rxPool);
+        prescriptions.push({
+          id: 'rx' + (rxId++),
+          patientId: patients[ri].id,
+          date: dayOffset(randInt(-70, -7)),
+          medication: rxT.med,
+          dosage: rxT.dose,
+          route: rxT.route,
+          frequency: rxT.freq,
+          duration: rxT.dur,
+          instructions: rxT.instr,
+          prescribedBy: 'Dr. Priya Sharma',
+          status: rxT.active ? 'active' : 'discontinued',
+          createdAt: new Date(td.getTime() - randInt(7, 70) * 86400000).toISOString()
+        });
+      }
     }
     saveAll(KEYS.prescriptions, prescriptions);
 
-    // Activity log - recent activities with INR
-    var activities = [
-      { text: 'Appointment completed: Robert Chen', time: new Date(td.getTime() - 3600000).toISOString() },
-      { text: 'Session note added for Sarah Johnson', time: new Date(td.getTime() - 7200000).toISOString() },
-      { text: 'Payment received: \u20B91,500 from Emily Watson', time: new Date(td.getTime() - 14400000).toISOString() },
-      { text: 'Invoice created: \u20B91,000 for James Miller', time: new Date(td.getTime() - 86400000).toISOString() },
-      { text: 'Exercise prescribed for William Taylor', time: new Date(td.getTime() - 86400000).toISOString() },
-      { text: 'Appointment booked for Maria Garcia', time: new Date(td.getTime() - 86400000 * 2).toISOString() },
-      { text: 'Payment received: \u20B92,500 from Robert Chen', time: new Date(td.getTime() - 86400000 * 2).toISOString() },
-      { text: 'Invoice created: \u20B91,200 for David Park', time: new Date(td.getTime() - 86400000 * 3).toISOString() },
-      { text: 'Session note added for James Miller', time: new Date(td.getTime() - 86400000 * 3).toISOString() },
-      { text: 'Appointment completed: Emily Watson', time: new Date(td.getTime() - 86400000 * 4).toISOString() },
-      { text: 'Payment received: \u20B91,200 from Anna Kowalski', time: new Date(td.getTime() - 86400000 * 4).toISOString() },
-      { text: 'Treatment completed: Anna Kowalski', time: new Date(td.getTime() - 86400000 * 5).toISOString() },
-      { text: 'New patient added: David Park', time: new Date(td.getTime() - 86400000 * 7).toISOString() },
-      { text: 'Reassessment completed: William Taylor', time: new Date(td.getTime() - 86400000 * 7).toISOString() },
-      { text: 'Payment received: \u20B91,500 from James Miller', time: new Date(td.getTime() - 86400000 * 10).toISOString() }
-    ];
+    // ===== ACTIVITY LOG =====
+    var activities = [];
+    var recentPatients = patients.slice(0, 15);
+    for (var ali = 0; ali < 20; ali++) {
+      var alp = pick(recentPatients);
+      var msgs = [
+        'Appointment completed: ' + alp.name,
+        'Session note added for ' + alp.name,
+        'Payment received from ' + alp.name,
+        'Invoice created for ' + alp.name,
+        'Exercise prescribed for ' + alp.name,
+        'Appointment booked for ' + alp.name
+      ];
+      activities.push({
+        text: pick(msgs),
+        time: new Date(td.getTime() - ali * 3600000 * randInt(2, 8)).toISOString()
+      });
+    }
     saveAll(KEYS.activity, activities);
   }
 

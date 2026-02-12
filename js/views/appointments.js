@@ -88,10 +88,24 @@ window.AppointmentsView = (function() {
   // ==================== NEXT VISIT PROMPT (inline) ====================
   function renderNextVisitPrompt() {
     var appt = state.nextVisitAppt;
-    var html = '<div class="inline-confirm-bar" id="next-visit-prompt">';
-    html += '<span class="confirm-msg">Appointment for <strong>' + Utils.escapeHtml(appt.patientName) + '</strong> completed. Schedule next visit?</span>';
-    html += '<button class="btn btn-sm btn-secondary" data-nv-no>No, Thanks</button>';
-    html += '<button class="btn btn-sm btn-primary" data-nv-yes>Schedule Next Visit</button>';
+    var html = '<div class="inline-form-card mb-2" id="next-visit-prompt">';
+    html += '<div class="inline-form-header">';
+    html += '<h3>Appointment Completed - ' + Utils.escapeHtml(appt.patientName) + '</h3>';
+    html += '</div>';
+    html += '<div class="inline-form-body">';
+    html += '<p style="font-size:0.9rem;color:var(--gray-700);margin-bottom:0.75rem;">Schedule the next visit?</p>';
+    html += '<div class="quick-date-btns">';
+    html += '<button class="quick-date-btn" data-nv-quick="1">Tomorrow</button>';
+    html += '<button class="quick-date-btn" data-nv-quick="3">+3 Days</button>';
+    html += '<button class="quick-date-btn" data-nv-quick="7">+1 Week</button>';
+    html += '<button class="quick-date-btn" data-nv-quick="14">+2 Weeks</button>';
+    html += '<button class="quick-date-btn" data-nv-quick="30">+1 Month</button>';
+    html += '</div>';
+    html += '</div>';
+    html += '<div class="inline-form-actions">';
+    html += '<button class="btn btn-secondary" data-nv-no>No, Thanks</button>';
+    html += '<button class="btn btn-primary" data-nv-yes>Custom Date</button>';
+    html += '</div>';
     html += '</div>';
     return html;
   }
@@ -144,7 +158,7 @@ window.AppointmentsView = (function() {
 
     // Table
     html += '<div class="card"><div class="table-wrapper">';
-    html += '<table class="data-table"><thead><tr>';
+    html += '<table class="data-table appointments-table"><thead><tr>';
     html += '<th>Date & Time</th><th>Patient</th><th>Type</th><th>Duration</th><th>Status</th><th>Actions</th>';
     html += '</tr></thead><tbody>';
 
@@ -428,6 +442,7 @@ window.AppointmentsView = (function() {
     };
 
     // Save
+    var _duplicateConfirmed = false;
     document.getElementById('appt-form-save').onclick = function() {
       var form = document.getElementById('appt-form');
       var data = Utils.getFormData(form);
@@ -446,6 +461,28 @@ window.AppointmentsView = (function() {
         return;
       }
 
+      // Duplicate future appointment check
+      if (!appt && !_duplicateConfirmed) {
+        var existing = Store.hasDuplicateFutureAppointment(data.patientId, null);
+        if (existing) {
+          var warningEl2 = document.getElementById('conflict-warning');
+          warningEl2.innerHTML = 'Patient already has a scheduled appointment on <strong>' + Utils.formatDate(existing.date) + '</strong> at <strong>' + Utils.formatTime(existing.time) + '</strong>. ' +
+            '<br><button class="btn btn-sm btn-warning" id="dup-cancel-old" style="margin-top:0.4rem;">Cancel old & create new</button> ' +
+            '<button class="btn btn-sm btn-ghost" id="dup-keep-both" style="margin-top:0.4rem;">Keep both</button>';
+          warningEl2.style.display = 'block';
+          document.getElementById('dup-cancel-old').onclick = function() {
+            Store.updateAppointment(existing.id, { status: 'cancelled' });
+            _duplicateConfirmed = true;
+            document.getElementById('appt-form-save').click();
+          };
+          document.getElementById('dup-keep-both').onclick = function() {
+            _duplicateConfirmed = true;
+            document.getElementById('appt-form-save').click();
+          };
+          return;
+        }
+      }
+
       var patient = Store.getPatient(data.patientId);
       data.patientName = patient ? patient.name : 'Unknown';
       data.status = appt ? appt.status : 'scheduled';
@@ -457,6 +494,7 @@ window.AppointmentsView = (function() {
         Store.createAppointment(data);
         Utils.toast('Appointment booked', 'success');
       }
+      _duplicateConfirmed = false;
       goBackToList(container);
     };
   }
@@ -503,6 +541,11 @@ window.AppointmentsView = (function() {
       html += '<button class="btn btn-warning" id="detail-cancel-appt">Cancel Appt</button>';
       html += '<button class="btn btn-ghost" id="detail-noshow">No-Show</button>';
     }
+    if (appt.status === 'completed') {
+      html += '<button class="btn btn-primary" id="detail-start-session">';
+      html += '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>';
+      html += ' Start Session Note</button>';
+    }
     html += '<button class="btn btn-secondary" id="detail-back-btn">Back</button>';
     html += '</div>';
     html += '</div>';
@@ -540,6 +583,12 @@ window.AppointmentsView = (function() {
       Utils.toast('Marked as no-show', 'warning');
       goBackToList(container);
     };
+
+    // Start Session → navigate to patient detail Treatment Notes tab
+    var startSessionBtn = document.getElementById('detail-start-session');
+    if (startSessionBtn) startSessionBtn.onclick = function() {
+      App.navigate('/patients/' + appt.patientId + '?tab=sessions&newSession=1&sessionDate=' + appt.date);
+    };
   }
 
   // ==================== HELPERS ====================
@@ -563,6 +612,28 @@ window.AppointmentsView = (function() {
         state.nextVisitAppt = null;
         var bar = document.getElementById('next-visit-prompt');
         if (bar) bar.remove();
+        return;
+      }
+      // Quick date buttons for next visit
+      var quickBtn = e.target.closest('[data-nv-quick]');
+      if (quickBtn) {
+        var days = parseInt(quickBtn.getAttribute('data-nv-quick'), 10);
+        var nvApptQ = state.nextVisitAppt;
+        state.nextVisitAppt = null;
+        var quickDate = Utils.toDateString(Utils.addDays(new Date(), days));
+        var apptData = {
+          patientId: nvApptQ.patientId,
+          patientName: nvApptQ.patientName,
+          date: quickDate,
+          time: nvApptQ.time,
+          type: nvApptQ.type || 'Follow-up',
+          duration: nvApptQ.duration || '30',
+          status: 'scheduled',
+          notes: ''
+        };
+        Store.createAppointment(apptData);
+        Utils.toast('Next visit booked for ' + Utils.formatDate(quickDate), 'success');
+        renderView(container);
         return;
       }
       if (e.target.closest('[data-nv-yes]')) {

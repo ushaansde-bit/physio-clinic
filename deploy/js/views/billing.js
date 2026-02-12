@@ -127,8 +127,8 @@ window.BillingView = (function() {
 
     // Table
     html += '<div class="card"><div class="table-wrapper">';
-    html += '<table class="data-table"><thead><tr>';
-    html += '<th>Date</th><th>Patient</th><th>Description</th><th style="min-width:110px;">Amount</th><th>Status</th><th>Actions</th>';
+    html += '<table class="data-table billing-table"><thead><tr>';
+    html += '<th>Date</th><th>Patient</th><th>Description</th><th>Amount</th><th>Status</th><th>Actions</th>';
     html += '</tr></thead><tbody>';
 
     if (pageItems.length === 0) {

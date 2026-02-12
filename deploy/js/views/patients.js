@@ -97,7 +97,7 @@ window.PatientsView = (function() {
 
     // Table
     html += '<div class="card"><div class="table-wrapper">';
-    html += '<table class="data-table"><thead><tr>';
+    html += '<table class="data-table patients-table"><thead><tr>';
     html += '<th>Patient</th><th>Contact</th><th>Diagnosis</th><th>Tags</th><th>Status</th><th>Actions</th>';
     html += '</tr></thead><tbody>';
 
@@ -115,7 +115,7 @@ window.PatientsView = (function() {
         html += '</div></div></td>';
         html += '<td><div style="font-size:0.82rem;">' + Utils.escapeHtml((pt.phoneCode || Utils.getPhoneCode()) + ' ' + (pt.phone || '-')) + '</div>';
         html += '<div style="font-size:0.75rem;color:var(--gray-500);">' + Utils.escapeHtml(pt.email || '') + '</div></td>';
-        html += '<td style="max-width:200px;"><div style="font-size:0.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + Utils.escapeHtml(pt.diagnosis || '-') + '</div></td>';
+        html += '<td title="' + Utils.escapeHtml(pt.diagnosis || '') + '">' + Utils.escapeHtml(pt.diagnosis || '-') + '</td>';
         html += '<td>';
         if (pt.tags && pt.tags.length > 0) {
           for (var tIdx = 0; tIdx < pt.tags.length; tIdx++) {
@@ -130,7 +130,7 @@ window.PatientsView = (function() {
         html += '</td>';
         html += '<td><span class="badge ' + statusCls + '">' + (pt.status || 'active') + '</span></td>';
         html += '<td><div class="btn-group">';
-        html += '<button class="btn btn-sm btn-ghost edit-patient-btn" data-id="' + pt.id + '" title="Edit">Edit</button>';
+        html += '<button class="btn btn-sm btn-ghost view-patient-btn" data-id="' + pt.id + '" title="View">View</button>';
         html += '<button class="btn btn-sm btn-ghost delete-patient-btn" data-id="' + pt.id + '" title="Delete" style="color:var(--danger);">Delete</button>';
         html += '</div></td>';
         html += '</tr>';
@@ -159,106 +159,42 @@ window.PatientsView = (function() {
   }
 
   function renderForm(container) {
-    var patient = state.editId ? Store.getPatient(state.editId) : null;
-    var title = patient ? 'Edit Patient' : 'New Patient';
-
+    // Quick Add: 4 fields only (Name, DOB, Gender, Phone)
+    // Full editing is done in the Patient Detail Overview tab.
     var html = '<div class="inline-form-card">';
     html += '<div class="inline-form-header">';
     html += '<button class="back-btn" id="form-back-btn"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button>';
-    html += '<h3>' + title + '</h3>';
+    html += '<h3>Quick Add Patient</h3>';
     html += '</div>';
     html += '<div class="inline-form-body">';
     html += '<form id="patient-form">';
+    html += formField('Full Name', 'name', 'text', '', true);
     html += '<div class="form-row">';
-    html += formField('Full Name', 'name', 'text', patient ? patient.name : '', true);
     html += '<div class="form-group"><label>Date of Birth</label>';
-    html += Utils.dobPickerHtml(patient ? patient.dob : '');
-    html += '<div class="dob-age" style="font-size:0.8em;color:var(--text-muted);margin-top:4px;">' + (patient && patient.dob ? 'Age: ' + Utils.calculateAge(patient.dob) : '') + '</div>';
+    html += Utils.dobPickerHtml('');
     html += '</div>';
-    html += '</div>';
-    html += '<div class="form-row">';
     html += '<div class="form-group"><label>Gender</label>';
-    html += '<select name="gender" required>';
+    html += '<select name="gender">';
     html += '<option value="">Select...</option>';
-    html += '<option value="male"' + (patient && patient.gender === 'male' ? ' selected' : '') + '>Male</option>';
-    html += '<option value="female"' + (patient && patient.gender === 'female' ? ' selected' : '') + '>Female</option>';
-    html += '<option value="other"' + (patient && patient.gender === 'other' ? ' selected' : '') + '>Other</option>';
-    html += '</select></div>';
-    html += '<div class="form-group"><label>Status</label>';
-    html += '<select name="status">';
-    html += '<option value="active"' + (patient && patient.status === 'active' ? ' selected' : '') + '>Active</option>';
-    html += '<option value="completed"' + (patient && patient.status === 'completed' ? ' selected' : '') + '>Completed</option>';
+    html += '<option value="male">Male</option>';
+    html += '<option value="female">Female</option>';
+    html += '<option value="other">Other</option>';
     html += '</select></div>';
     html += '</div>';
-    html += '<div class="form-row">';
-    html += phoneField('Phone', 'phone', 'phoneCode', patient ? patient.phone : '', patient ? patient.phoneCode : '');
-    html += formField('Email', 'email', 'email', patient ? patient.email : '');
-    html += '</div>';
-    html += formField('Address', 'address', 'text', patient ? patient.address : '');
-    html += formField('Insurance', 'insurance', 'text', patient ? patient.insurance : '');
-    html += '<div class="form-group"><label>Diagnosis ' + Utils.micHtml('pf-diagnosis') + '</label>';
-    html += '<textarea id="pf-diagnosis" name="diagnosis" rows="2" data-ac="diagnosis" placeholder="Start typing for suggestions...">' + Utils.escapeHtml(patient ? patient.diagnosis || '' : '') + '</textarea></div>';
-    html += '<div class="form-group"><label>Treatment Plan ' + Utils.micHtml('pf-treatplan') + '</label>';
-    html += '<textarea id="pf-treatplan" name="treatmentPlan" rows="3" data-ac="treatmentPlan" placeholder="Start typing for suggestions...">' + Utils.escapeHtml(patient ? patient.treatmentPlan || '' : '') + '</textarea></div>';
-    html += '<div class="form-row">';
-    html += formField('Emergency Contact', 'emergencyContact', 'text', patient ? patient.emergencyContact : '');
-    html += phoneField('Emergency Phone', 'emergencyPhone', 'emergencyPhoneCode', patient ? patient.emergencyPhone : '', patient ? patient.emergencyPhoneCode : '');
-    html += '</div>';
-    html += '<div class="form-group"><label>Notes ' + Utils.micHtml('pf-notes') + '</label>';
-    html += '<textarea id="pf-notes" name="notes" rows="2">' + Utils.escapeHtml(patient ? patient.notes || '' : '') + '</textarea></div>';
-    // Body diagram
-    html += '<div class="form-group"><label>Affected Body Areas</label>';
-    html += '<div class="body-diagram-wrap"><div id="pf-body-diagram"></div></div></div>';
-    // Tag pill buttons
-    var formTags = Store.getTags();
-    var patientTags = (patient && patient.tags) ? patient.tags : [];
-    html += '<div class="form-group"><label>Tags</label>';
-    html += '<div class="tag-pill-group">';
-    for (var ti = 0; ti < formTags.length; ti++) {
-      var isChecked = patientTags.indexOf(formTags[ti].id) !== -1;
-      var tagColor = formTags[ti].color || '#6b7280';
-      html += '<button type="button" class="tag-pill' + (isChecked ? ' active' : '') + '" data-tag-id="' + formTags[ti].id + '" data-color="' + tagColor + '"' + (isChecked ? ' style="background:' + tagColor + ';color:#fff;border-color:' + tagColor + ';"' : '') + '>';
-      html += '<span class="tag-pill-dot" style="background:' + tagColor + ';"></span>';
-      html += Utils.escapeHtml(formTags[ti].name);
-      html += '</button>';
-    }
-    html += '</div></div>';
+    html += phoneField('Phone', 'phone', 'phoneCode', '', '');
     html += '</form>';
+    html += '<p style="font-size:0.78rem;color:var(--gray-400);margin-top:0.5rem;">You can add diagnosis, tags, and other details after saving.</p>';
     html += '</div>';
     html += '<div class="inline-form-actions">';
     html += '<button class="btn btn-secondary" id="form-cancel-btn">Cancel</button>';
-    html += '<button class="btn btn-primary" id="form-save-btn">Save Patient</button>';
+    html += '<button class="btn btn-primary" id="form-save-btn">Save & Open Profile</button>';
     html += '</div>';
     html += '</div>';
 
     container.innerHTML = html;
 
-    // Bind mic buttons, autocomplete, and DOB picker
-    Utils.bindMicButtons(container);
-    Utils.bindAllAutocomplete(container);
+    // Bind DOB picker
     Utils.bindDobPicker(container);
-
-    // Tag pill toggle
-    var tagPills = container.querySelectorAll('.tag-pill');
-    for (var tp = 0; tp < tagPills.length; tp++) {
-      tagPills[tp].addEventListener('click', function() {
-        var color = this.getAttribute('data-color');
-        this.classList.toggle('active');
-        if (this.classList.contains('active')) {
-          this.style.background = color;
-          this.style.color = '#fff';
-          this.style.borderColor = color;
-        } else {
-          this.style.background = '';
-          this.style.color = '';
-          this.style.borderColor = '';
-        }
-      });
-    }
-
-    // Render body diagram
-    var _bodyRegions = (patient && patient.bodyRegions) ? patient.bodyRegions.slice() : [];
-    BodyDiagram.render('pf-body-diagram', _bodyRegions);
 
     // Phone digit enforcement
     var phoneWraps = container.querySelectorAll('.phone-input-wrap');
@@ -309,7 +245,7 @@ window.PatientsView = (function() {
       state.subView = 'list'; state.editId = null; renderView(container);
     };
 
-    // Save
+    // Save → create patient → navigate to detail page
     document.getElementById('form-save-btn').onclick = function() {
       var form = document.getElementById('patient-form');
       var nameInput = form.querySelector('[name="name"]');
@@ -318,23 +254,13 @@ window.PatientsView = (function() {
         return;
       }
       var data = Utils.getFormData(form);
-      // Collect tags from pill buttons
-      var activePills = form.querySelectorAll('.tag-pill.active');
+      data.status = 'active';
       data.tags = [];
-      for (var tc = 0; tc < activePills.length; tc++) {
-        data.tags.push(activePills[tc].getAttribute('data-tag-id'));
-      }
-      // Collect body diagram selections
-      data.bodyRegions = BodyDiagram.getSelected('pf-body-diagram');
-      if (patient) {
-        Store.updatePatient(patient.id, data);
-        Utils.toast('Patient updated', 'success');
-      } else {
-        Store.createPatient(data);
-        Utils.toast('Patient created', 'success');
-      }
-      state.subView = 'list'; state.editId = null;
-      renderView(container);
+      data.bodyRegions = [];
+      var created = Store.createPatient(data);
+      Utils.toast('Patient created', 'success');
+      // Navigate to the patient detail page for full profile editing
+      App.navigate('/patients/' + created.id);
     };
   }
 
@@ -398,12 +324,11 @@ window.PatientsView = (function() {
         return;
       }
 
-      // Edit patient
-      var editBtn = e.target.closest('.edit-patient-btn');
-      if (editBtn) {
+      // View patient detail
+      var viewBtn = e.target.closest('.view-patient-btn');
+      if (viewBtn) {
         e.stopPropagation();
-        state.subView = 'form'; state.editId = editBtn.getAttribute('data-id');
-        renderView(container);
+        App.navigate('/patients/' + viewBtn.getAttribute('data-id'));
         return;
       }
 
