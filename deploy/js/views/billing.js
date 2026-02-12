@@ -11,14 +11,15 @@ window.BillingView = (function() {
     dateFrom: '',
     dateTo: '',
     page: 1,
-    perPage: 10
+    perPage: 10,
+    subView: 'list'
   };
 
   function hasBillingPerm(permKey) {
     var user = App.getCurrentUser();
     if (!user) return false;
     if (user.role === 'admin') return true;
-    if (!user.billingPermissions) return true; // backward compat
+    if (!user.billingPermissions) return true;
     return user.billingPermissions.indexOf(permKey) !== -1;
   }
 
@@ -28,25 +29,31 @@ window.BillingView = (function() {
     state.dateFrom = '';
     state.dateTo = '';
     state.page = 1;
+    state.subView = 'list';
     renderView(container);
   }
 
   function renderView(container) {
+    if (state.subView === 'form') {
+      renderForm(container);
+      return;
+    }
+    renderList(container);
+  }
+
+  function renderList(container) {
     var billing = Store.getBilling();
     var patients = Store.getPatients();
 
-    // Build patient name lookup
     var patientMap = {};
     for (var i = 0; i < patients.length; i++) {
       patientMap[patients[i].id] = patients[i].name;
     }
 
-    // Filter
     var filtered = [];
     for (var j = 0; j < billing.length; j++) {
       var b = billing[j];
       var patientName = patientMap[b.patientId] || 'Unknown';
-
       if (state.search) {
         var q = state.search.toLowerCase();
         if (patientName.toLowerCase().indexOf(q) === -1 &&
@@ -58,7 +65,6 @@ window.BillingView = (function() {
       filtered.push(b);
     }
 
-    // Sort by date desc
     filtered.sort(function(a, b) { return a.date > b.date ? -1 : 1; });
 
     // Summary stats
@@ -166,11 +172,74 @@ window.BillingView = (function() {
 
     html += '</div>';
     container.innerHTML = html;
-    bindEvents(container);
+    bindListEvents(container);
   }
 
-  function bindEvents(container) {
-    // Search
+  function renderForm(container) {
+    var patients = Store.getPatients();
+    patients.sort(function(a, b) { return a.name.localeCompare(b.name); });
+
+    var html = '<div class="inline-form-card">';
+    html += '<div class="inline-form-header">';
+    html += '<button class="back-btn" id="form-back">';
+    html += '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>';
+    html += '</button>';
+    html += '<h3>New Invoice</h3>';
+    html += '</div>';
+    html += '<div class="inline-form-body">';
+
+    html += '<form id="invoice-form">';
+    html += '<div class="form-group"><label>Patient</label>';
+    html += '<select name="patientId" required>';
+    html += '<option value="">Select patient...</option>';
+    for (var i = 0; i < patients.length; i++) {
+      html += '<option value="' + patients[i].id + '">' + Utils.escapeHtml(patients[i].name) + '</option>';
+    }
+    html += '</select></div>';
+    html += '<div class="form-row">';
+    html += '<div class="form-group"><label>Date</label>';
+    html += '<input type="date" name="date" value="' + Utils.today() + '" required></div>';
+    html += '<div class="form-group"><label>Amount (\u20B9)</label>';
+    html += '<input type="number" name="amount" step="0.01" min="0" required placeholder="0.00"></div>';
+    html += '</div>';
+    html += '<div class="form-group"><label>Description ' + Utils.micHtml('inv-description') + '</label>';
+    html += '<input type="text" id="inv-description" name="description" required placeholder="e.g., Therapeutic Exercise + Manual Therapy"></div>';
+    html += '<div class="form-group"><label>Status</label>';
+    html += '<select name="status">';
+    html += '<option value="pending">Pending</option>';
+    html += '<option value="paid">Paid</option>';
+    html += '</select></div>';
+    html += '</form>';
+
+    html += '</div>';
+    html += '<div class="inline-form-actions">';
+    html += '<button class="btn btn-secondary" id="form-cancel">Cancel</button>';
+    html += '<button class="btn btn-primary" id="form-save">Create Invoice</button>';
+    html += '</div>';
+    html += '</div>';
+
+    container.innerHTML = html;
+    Utils.bindMicButtons(container);
+
+    var goBack = function() { state.subView = 'list'; renderView(container); };
+    document.getElementById('form-back').onclick = goBack;
+    document.getElementById('form-cancel').onclick = goBack;
+    document.getElementById('form-save').onclick = function() {
+      var form = document.getElementById('invoice-form');
+      var data = Utils.getFormData(form);
+      if (!data.patientId || !data.description || !data.amount) {
+        Utils.toast('Please fill in all required fields', 'error');
+        return;
+      }
+      if (data.status === 'paid') data.paidDate = Utils.today();
+      Store.createBilling(data);
+      Utils.toast('Invoice created', 'success');
+      state.subView = 'list';
+      renderView(container);
+    };
+  }
+
+  function bindListEvents(container) {
     var searchInput = document.getElementById('billing-search');
     var searchTimeout;
     if (searchInput) {
@@ -184,7 +253,6 @@ window.BillingView = (function() {
       });
     }
 
-    // Filters
     var statusFilter = document.getElementById('billing-status-filter');
     if (statusFilter) {
       statusFilter.addEventListener('change', function() {
@@ -210,11 +278,9 @@ window.BillingView = (function() {
       });
     }
 
-    // Remove old click handler to prevent duplicates
     if (_clickHandler) container.removeEventListener('click', _clickHandler);
 
     _clickHandler = function(e) {
-      // Pagination
       var pageBtn = e.target.closest('.page-btn');
       if (pageBtn && !pageBtn.disabled) {
         state.page = parseInt(pageBtn.getAttribute('data-page'), 10);
@@ -222,7 +288,6 @@ window.BillingView = (function() {
         return;
       }
 
-      // Mark paid
       var markPaidBtn = e.target.closest('.mark-paid-btn');
       if (markPaidBtn) {
         if (!hasBillingPerm('billing_recordPayment')) return;
@@ -234,76 +299,25 @@ window.BillingView = (function() {
         return;
       }
 
-      // Delete
       var deleteBtn = e.target.closest('.delete-billing-btn');
       if (deleteBtn) {
         if (!hasBillingPerm('billing_delete')) return;
-        Utils.confirm('Delete this billing record?', function() {
+        Utils.inlineConfirm(container, 'Delete this billing record?', function() {
           Store.deleteBilling(deleteBtn.getAttribute('data-id'));
           Utils.toast('Billing record deleted', 'success');
           renderView(container);
-        });
+        }, { danger: true });
         return;
       }
 
-      // Create invoice
       if (e.target.closest('#create-invoice-btn')) {
         if (!hasBillingPerm('billing_create')) return;
-        showCreateInvoice(container);
+        state.subView = 'form';
+        renderView(container);
         return;
       }
     };
     container.addEventListener('click', _clickHandler);
-  }
-
-  function showCreateInvoice(container) {
-    var patients = Store.getPatients();
-    patients.sort(function(a, b) { return a.name.localeCompare(b.name); });
-
-    var body = '<form id="invoice-form">';
-    body += '<div class="form-group"><label>Patient</label>';
-    body += '<select name="patientId" required>';
-    body += '<option value="">Select patient...</option>';
-    for (var i = 0; i < patients.length; i++) {
-      body += '<option value="' + patients[i].id + '">' + Utils.escapeHtml(patients[i].name) + '</option>';
-    }
-    body += '</select></div>';
-    body += '<div class="form-row">';
-    body += '<div class="form-group"><label>Date</label>';
-    body += '<input type="date" name="date" value="' + Utils.today() + '" required></div>';
-    body += '<div class="form-group"><label>Amount (' + Utils.getCurrencySymbol() + ')</label>';
-    body += '<input type="number" name="amount" step="0.01" min="0" required placeholder="0.00"></div>';
-    body += '</div>';
-    body += '<div class="form-group"><label>Description ' + Utils.micHtml('inv-description') + '</label>';
-    body += '<input type="text" id="inv-description" name="description" required placeholder="e.g., Therapeutic Exercise + Manual Therapy"></div>';
-    body += '<div class="form-group"><label>Status</label>';
-    body += '<select name="status">';
-    body += '<option value="pending">Pending</option>';
-    body += '<option value="paid">Paid</option>';
-    body += '</select></div>';
-    body += '</form>';
-
-    var footer = '<button class="btn btn-secondary" id="modal-cancel">Cancel</button>';
-    footer += '<button class="btn btn-primary" id="modal-save">Create Invoice</button>';
-
-    Utils.showModal('New Invoice', body, footer);
-
-    Utils.bindMicButtons(document.getElementById('modal-body'));
-
-    document.getElementById('modal-cancel').onclick = Utils.closeModal;
-    document.getElementById('modal-save').onclick = function() {
-      var form = document.getElementById('invoice-form');
-      var data = Utils.getFormData(form);
-      if (!data.patientId || !data.description || !data.amount) {
-        Utils.toast('Please fill in all required fields', 'error');
-        return;
-      }
-      if (data.status === 'paid') data.paidDate = Utils.today();
-      Store.createBilling(data);
-      Utils.toast('Invoice created', 'success');
-      Utils.closeModal();
-      renderView(container);
-    };
   }
 
   return { render: render };

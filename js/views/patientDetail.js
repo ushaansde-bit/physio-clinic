@@ -1,10 +1,37 @@
 /* ============================================
-   Patient Detail View - 5 Tabs
+   Patient Detail View - 5 Tabs (Inline Forms)
    ============================================ */
 window.PatientDetailView = (function() {
 
   var activeTab = 'overview';
   var _clickHandler = null;
+
+  // Sub-view state for inline forms
+  var sub = {
+    sessionsView: 'list',    // list | form
+    sessionsEditId: null,
+    exercisesView: 'list',   // list | form
+    exercisesEditId: null,
+    rxView: 'list',          // list | form
+    rxEditId: null,
+    billingView: 'list',     // list | form
+    bookingView: 'list',     // list | form
+    printExpanded: false,
+    rxPrintExpanded: false
+  };
+
+  function resetSub() {
+    sub.sessionsView = 'list';
+    sub.sessionsEditId = null;
+    sub.exercisesView = 'list';
+    sub.exercisesEditId = null;
+    sub.rxView = 'list';
+    sub.rxEditId = null;
+    sub.billingView = 'list';
+    sub.bookingView = 'list';
+    sub.printExpanded = false;
+    sub.rxPrintExpanded = false;
+  }
 
   function render(container, patientId) {
     var patient = Store.getPatient(patientId);
@@ -15,11 +42,11 @@ window.PatientDetailView = (function() {
 
     App.setPageTitle(patient.name);
     activeTab = activeTab || 'overview';
-    // Reset to overview if the active tab's feature is disabled
     var tabFeatureMap = { exercises: 'exercises', prescriptions: 'prescriptions', billing: 'billing' };
     if (tabFeatureMap[activeTab] && !Store.isFeatureEnabled(tabFeatureMap[activeTab])) {
       activeTab = 'overview';
     }
+    resetSub();
     renderDetail(container, patient);
   }
 
@@ -55,11 +82,11 @@ window.PatientDetailView = (function() {
     html += 'Print</button>';
     html += '</div></div>';
 
-    // Tabs (filtered by feature toggles)
+    // Tabs (renamed per plan)
     html += '<div class="tabs">';
     html += tabBtn('overview', 'Overview');
-    html += tabBtn('sessions', 'Sessions');
-    if (Store.isFeatureEnabled('exercises')) html += tabBtn('exercises', 'Exercises');
+    html += tabBtn('sessions', 'Treatment Notes');
+    if (Store.isFeatureEnabled('exercises')) html += tabBtn('exercises', 'Home Exercise Program (HEP)');
     if (Store.isFeatureEnabled('prescriptions')) html += tabBtn('prescriptions', 'Prescriptions');
     if (Store.isFeatureEnabled('billing')) html += tabBtn('billing', 'Billing');
     html += '</div>';
@@ -93,6 +120,7 @@ window.PatientDetailView = (function() {
 
     container.innerHTML = html;
     bindEvents(container, patient);
+    bindInlineForms(container, patient);
   }
 
   function tabBtn(id, label) {
@@ -102,6 +130,11 @@ window.PatientDetailView = (function() {
   // ==================== OVERVIEW TAB ====================
   function renderOverview(patient) {
     var html = '';
+
+    // Book Next Visit inline form (when active)
+    if (sub.bookingView === 'form') {
+      html += renderBookNextVisitForm(patient);
+    }
 
     // Patient info
     html += '<div class="card mb-2"><div class="card-header"><h3>Patient Information</h3></div><div class="card-body">';
@@ -124,24 +157,22 @@ window.PatientDetailView = (function() {
     html += infoItem('Notes', patient.notes);
     html += '</div></div></div>';
 
-    // Affected Body Areas (body diagram) - only if feature enabled
+    // Affected Body Areas
     if (Store.isFeatureEnabled('bodyDiagram')) {
-    html += '<div class="card mb-2"><div class="card-header"><h3>Affected Body Areas</h3></div><div class="card-body body-diagram-card">';
-    if (patient.bodyRegions && patient.bodyRegions.length > 0) {
-      // Color version (screen only)
-      html += '<div class="body-diagram-screen">';
-      html += BodyDiagram.renderHtml(patient.bodyRegions, { readOnly: true });
-      html += '<div class="body-region-badges">' + BodyDiagram.renderBadges(patient.bodyRegions) + '</div>';
-      html += '</div>';
-      // B&W version (print only)
-      html += '<div class="body-diagram-print-only">';
-      html += BodyDiagram.renderPrintHtml(patient.bodyRegions);
-      html += '</div>';
-    } else {
-      html += '<p style="color:var(--gray-400);font-size:0.85rem;">No areas marked</p>';
+      html += '<div class="card mb-2"><div class="card-header"><h3>Affected Body Areas</h3></div><div class="card-body body-diagram-card">';
+      if (patient.bodyRegions && patient.bodyRegions.length > 0) {
+        html += '<div class="body-diagram-screen">';
+        html += BodyDiagram.renderHtml(patient.bodyRegions, { readOnly: true });
+        html += '<div class="body-region-badges">' + BodyDiagram.renderBadges(patient.bodyRegions) + '</div>';
+        html += '</div>';
+        html += '<div class="body-diagram-print-only">';
+        html += BodyDiagram.renderPrintHtml(patient.bodyRegions);
+        html += '</div>';
+      } else {
+        html += '<p style="color:var(--gray-400);font-size:0.85rem;">No areas marked</p>';
+      }
+      html += '</div></div>';
     }
-    html += '</div></div>';
-    } // end bodyDiagram feature check
 
     // Progress snapshot
     var sessions = Store.getSessionsByPatient(patient.id);
@@ -149,8 +180,6 @@ window.PatientDetailView = (function() {
       sessions.sort(function(a, b) { return a.date < b.date ? -1 : 1; });
       html += '<div class="card mb-2"><div class="card-header"><h3>Progress Snapshot</h3></div><div class="card-body">';
       html += '<div class="progress-chart">';
-
-      // Build data points
       for (var i = 0; i < sessions.length; i++) {
         var s = sessions[i];
         var painPct = ((s.painScore || 0) / 10 * 100);
@@ -203,6 +232,11 @@ window.PatientDetailView = (function() {
     html += infoItem('Contact Phone', patient.emergencyPhone);
     html += '</div></div></div>';
 
+    // Print options (inline collapsible)
+    if (sub.printExpanded) {
+      html += renderPrintOptions(patient);
+    }
+
     return html;
   }
 
@@ -210,18 +244,138 @@ window.PatientDetailView = (function() {
     return '<div class="info-item"><label>' + label + '</label><span>' + Utils.escapeHtml(value || '-') + '</span></div>';
   }
 
+  // ==================== BOOK NEXT VISIT (inline) ====================
+  function renderBookNextVisitForm(patient) {
+    var appts = Store.getAppointmentsByPatient(patient.id);
+    appts.sort(function(a, b) { return a.date > b.date ? -1 : 1; });
+    var lastAppt = appts.length > 0 ? appts[0] : null;
+
+    var defaultDate = Utils.toDateString(Utils.addDays(new Date(), 7));
+    var defaultTime = lastAppt ? lastAppt.time : '09:00';
+    var defaultType = lastAppt ? lastAppt.type : 'Follow-up';
+    var defaultDuration = lastAppt ? lastAppt.duration : '30';
+
+    var html = '<div class="inline-form-card mb-2">';
+    html += '<div class="inline-form-header">';
+    html += '<button class="back-btn" id="booking-form-back">';
+    html += '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>';
+    html += '</button>';
+    html += '<h3>Book Next Visit - ' + Utils.escapeHtml(patient.name) + '</h3>';
+    html += '</div>';
+    html += '<div class="inline-form-body">';
+    html += '<form id="next-visit-form">';
+    html += '<div class="form-row">';
+    html += '<div class="form-group"><label>Date</label>';
+    html += '<input type="date" name="date" value="' + defaultDate + '" required></div>';
+    html += '<div class="form-group"><label>Time</label>';
+    html += '<input type="time" name="time" value="' + defaultTime + '" required></div>';
+    html += '</div>';
+    html += '<div class="form-row">';
+    html += '<div class="form-group"><label>Type</label>';
+    html += '<select name="type">';
+    html += '<option value="Initial Evaluation"' + (defaultType === 'Initial Evaluation' ? ' selected' : '') + '>Initial Evaluation</option>';
+    html += '<option value="Treatment"' + (defaultType === 'Treatment' ? ' selected' : '') + '>Treatment</option>';
+    html += '<option value="Follow-up"' + (defaultType === 'Follow-up' ? ' selected' : '') + '>Follow-up</option>';
+    html += '</select></div>';
+    html += '<div class="form-group"><label>Duration (min)</label>';
+    html += '<select name="duration">';
+    var durations = ['15','30','45','60','90'];
+    for (var d = 0; d < durations.length; d++) {
+      html += '<option value="' + durations[d] + '"' + (durations[d] === String(defaultDuration) ? ' selected' : '') + '>' + durations[d] + ' min</option>';
+    }
+    html += '</select></div>';
+    html += '</div>';
+    html += '<div class="form-group"><label>Notes</label>';
+    html += '<textarea name="notes" rows="2"></textarea></div>';
+    html += '<div id="conflict-warning-booking" style="display:none;" class="login-error"></div>';
+    html += '</form>';
+    html += '</div>';
+    html += '<div class="inline-form-actions">';
+    html += '<button class="btn btn-secondary" id="booking-form-cancel">Cancel</button>';
+    html += '<button class="btn btn-primary" id="booking-form-save">Book Appointment</button>';
+    html += '</div></div>';
+    return html;
+  }
+
+  // ==================== PRINT OPTIONS (inline collapsible) ====================
+  function renderPrintOptions(patient) {
+    var bills = Store.getBillingByPatient(patient.id);
+    bills.sort(function(a, b) { return a.date > b.date ? -1 : 1; });
+
+    var html = '<div class="inline-form-card mb-2" id="print-options-panel">';
+    html += '<div class="inline-form-header">';
+    html += '<button class="back-btn" id="print-options-close">';
+    html += '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>';
+    html += '</button>';
+    html += '<h3>Print Report</h3>';
+    html += '</div>';
+    html += '<div class="inline-form-body">';
+
+    html += '<div style="margin-bottom:1rem;">';
+    html += '<h4 style="margin-bottom:0.75rem;">Report Type</h4>';
+    html += '<div style="display:flex;gap:0.5rem;flex-wrap:wrap;">';
+    html += '<button class="btn btn-primary print-type-btn active" data-type="patient">Patient Report</button>';
+    html += '<button class="btn btn-secondary print-type-btn" data-type="billing">Billing Report</button>';
+    html += '<button class="btn btn-secondary print-type-btn" data-type="combined">Combined Report</button>';
+    html += '</div></div>';
+
+    html += '<div id="print-patient-opts">';
+    html += '<h4 style="margin-bottom:0.5rem;">Select Sections</h4>';
+    html += '<div class="tag-checkboxes">';
+    html += '<label class="tag-checkbox-item checked"><input type="checkbox" class="print-section" value="info" checked> Patient Info</label>';
+    html += '<label class="tag-checkbox-item checked"><input type="checkbox" class="print-section" value="diagnosis" checked> Diagnosis & Plan</label>';
+    html += '<label class="tag-checkbox-item checked"><input type="checkbox" class="print-section" value="body" checked> Body Diagram</label>';
+    html += '<label class="tag-checkbox-item checked"><input type="checkbox" class="print-section" value="sessions" checked> Sessions</label>';
+    html += '<label class="tag-checkbox-item checked"><input type="checkbox" class="print-section" value="exercises" checked> Exercises</label>';
+    html += '<label class="tag-checkbox-item checked"><input type="checkbox" class="print-section" value="prescriptions" checked> Prescriptions</label>';
+    html += '</div>';
+    html += '<h4 style="margin:0.75rem 0 0.5rem;">Signatures</h4>';
+    html += '<div class="tag-checkboxes">';
+    html += '<label class="tag-checkbox-item checked"><input type="checkbox" class="print-sig" value="doctor" checked> Doctor Signature</label>';
+    html += '<label class="tag-checkbox-item"><input type="checkbox" class="print-sig" value="patient"> Patient Signature</label>';
+    html += '</div></div>';
+
+    html += '<div id="print-billing-opts" style="display:none;">';
+    html += '<h4 style="margin-bottom:0.5rem;">Billing Type</h4>';
+    html += '<div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem;">';
+    html += '<label class="tag-checkbox-item checked"><input type="radio" name="bill-type" value="statement" checked> Full Statement</label>';
+    html += '<label class="tag-checkbox-item"><input type="radio" name="bill-type" value="single"> Single Invoice</label>';
+    html += '</div>';
+    html += '<div id="print-invoice-picker" style="display:none;margin-top:0.75rem;">';
+    html += '<label style="font-size:0.82rem;font-weight:600;margin-bottom:0.4rem;display:block;">Select Invoice</label>';
+    html += '<select id="print-invoice-select" style="width:100%;padding:0.55rem 0.75rem;border:1px solid #d1d5db;border-radius:8px;background:#fff;font-size:0.85rem;">';
+    for (var i = 0; i < bills.length; i++) {
+      html += '<option value="' + bills[i].id + '">' + Utils.formatDate(bills[i].date) + ' - ' + Utils.escapeHtml(bills[i].description) + ' - ' + Utils.formatCurrency(bills[i].amount) + '</option>';
+    }
+    html += '</select></div>';
+    html += '</div>';
+
+    html += '</div>';
+    html += '<div class="inline-form-actions">';
+    html += '<button class="btn btn-secondary" id="print-cancel-btn">Cancel</button>';
+    html += '<button class="btn btn-primary" id="print-go-btn">';
+    html += '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>';
+    html += ' Print</button>';
+    html += '</div></div>';
+    return html;
+  }
+
   // ==================== SESSIONS TAB ====================
   function renderSessions(patient) {
+    if (sub.sessionsView === 'form') {
+      return renderSessionForm(patient);
+    }
+
     var sessions = Store.getSessionsByPatient(patient.id);
     sessions.sort(function(a, b) { return a.date > b.date ? -1 : 1; });
 
     var html = '<div class="flex-between mb-2">';
-    html += '<h3 style="font-size:1rem;">Session Notes (' + sessions.length + ')</h3>';
-    html += '<button class="btn btn-primary btn-sm" id="add-session-btn">Add Session Note</button>';
+    html += '<h3 style="font-size:1rem;">Treatment Notes (' + sessions.length + ')</h3>';
+    html += '<button class="btn btn-primary btn-sm" id="add-session-btn">Add Treatment Note</button>';
     html += '</div>';
 
     if (sessions.length === 0) {
-      html += '<div class="empty-state"><p>No session notes yet</p><p class="empty-sub">Click "Add Session Note" to record the first session.</p></div>';
+      html += '<div class="empty-state"><p>No treatment notes yet</p><p class="empty-sub">Click "Add Treatment Note" to record the first session.</p></div>';
     } else {
       for (var i = 0; i < sessions.length; i++) {
         var s = sessions[i];
@@ -245,6 +399,44 @@ window.PatientDetailView = (function() {
     return html;
   }
 
+  function renderSessionForm(patient) {
+    var session = sub.sessionsEditId ? Store.getSession(sub.sessionsEditId) : null;
+    var title = session ? 'Edit Treatment Note' : 'New Treatment Note';
+
+    var html = '<div class="inline-form-card">';
+    html += '<div class="inline-form-header">';
+    html += '<button class="back-btn" id="session-form-back">';
+    html += '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>';
+    html += '</button>';
+    html += '<h3>' + title + '</h3>';
+    html += '</div>';
+    html += '<div class="inline-form-body">';
+    html += '<form id="session-form">';
+    html += '<div class="form-row-3">';
+    html += '<div class="form-group"><label>Date</label>';
+    html += '<input type="date" name="date" value="' + (session ? session.date : Utils.today()) + '" required></div>';
+    html += '<div class="form-group"><label>Pain Score (0-10)</label>';
+    html += '<input type="number" name="painScore" min="0" max="10" value="' + (session ? session.painScore : '5') + '" required></div>';
+    html += '<div class="form-group"><label>Function Score (0-10)</label>';
+    html += '<input type="number" name="functionScore" min="0" max="10" value="' + (session ? session.functionScore : '5') + '" required></div>';
+    html += '</div>';
+    html += '<div class="form-group"><label>Subjective ' + Utils.micHtml('sf-subjective') + '</label>';
+    html += '<textarea id="sf-subjective" name="subjective" rows="3" data-ac="subjective" placeholder="Patient report, symptoms, functional status...">' + Utils.escapeHtml(session ? session.subjective || '' : '') + '</textarea></div>';
+    html += '<div class="form-group"><label>Objective ' + Utils.micHtml('sf-objective') + '</label>';
+    html += '<textarea id="sf-objective" name="objective" rows="3" data-ac="objective" placeholder="Measurements, ROM, strength, observations...">' + Utils.escapeHtml(session ? session.objective || '' : '') + '</textarea></div>';
+    html += '<div class="form-group"><label>Assessment ' + Utils.micHtml('sf-assessment') + '</label>';
+    html += '<textarea id="sf-assessment" name="assessment" rows="3" data-ac="assessment" placeholder="Clinical reasoning, progress, prognosis...">' + Utils.escapeHtml(session ? session.assessment || '' : '') + '</textarea></div>';
+    html += '<div class="form-group"><label>Plan ' + Utils.micHtml('sf-plan') + '</label>';
+    html += '<textarea id="sf-plan" name="plan" rows="3" data-ac="plan" placeholder="Treatment plan, goals, next steps...">' + Utils.escapeHtml(session ? session.plan || '' : '') + '</textarea></div>';
+    html += '</form>';
+    html += '</div>';
+    html += '<div class="inline-form-actions">';
+    html += '<button class="btn btn-secondary" id="session-form-cancel">Cancel</button>';
+    html += '<button class="btn btn-primary" id="session-form-save">Save Treatment Note</button>';
+    html += '</div></div>';
+    return html;
+  }
+
   function soapSection(label, prefix, text) {
     return '<div class="soap-section"><div class="soap-label ' + prefix + '-label">' + label + '</div>' +
       '<div class="soap-text">' + Utils.escapeHtml(text || '-') + '</div></div>';
@@ -252,6 +444,10 @@ window.PatientDetailView = (function() {
 
   // ==================== EXERCISES TAB ====================
   function renderExercises(patient) {
+    if (sub.exercisesView === 'form') {
+      return renderExerciseForm(patient);
+    }
+
     var exercises = Store.getExercisesByPatient(patient.id);
     var active = [];
     var inactive = [];
@@ -305,6 +501,47 @@ window.PatientDetailView = (function() {
     return html;
   }
 
+  function renderExerciseForm(patient) {
+    var exercise = sub.exercisesEditId ? Store.getExercises().filter(function(e) { return e.id === sub.exercisesEditId; })[0] : null;
+    var title = exercise ? 'Edit Exercise' : 'New Exercise';
+
+    var html = '<div class="inline-form-card">';
+    html += '<div class="inline-form-header">';
+    html += '<button class="back-btn" id="exercise-form-back">';
+    html += '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>';
+    html += '</button>';
+    html += '<h3>' + title + '</h3>';
+    html += '</div>';
+    html += '<div class="inline-form-body">';
+    html += '<form id="exercise-form">';
+    html += '<div class="form-group"><label>Exercise Name</label>';
+    html += '<input type="text" name="name" value="' + Utils.escapeHtml(exercise ? exercise.name : '') + '" required placeholder="e.g., Quad Sets"></div>';
+    html += '<div class="form-row-4">';
+    html += '<div class="form-group"><label>Sets</label>';
+    html += '<input type="text" name="sets" value="' + Utils.escapeHtml(exercise ? exercise.sets : '3') + '" placeholder="3"></div>';
+    html += '<div class="form-group"><label>Reps</label>';
+    html += '<input type="text" name="reps" value="' + Utils.escapeHtml(exercise ? exercise.reps : '10') + '" placeholder="10"></div>';
+    html += '<div class="form-group"><label>Hold</label>';
+    html += '<input type="text" name="hold" value="' + Utils.escapeHtml(exercise ? exercise.hold : '') + '" placeholder="5 sec"></div>';
+    html += '<div class="form-group"><label>Frequency</label>';
+    html += '<input type="text" name="frequency" value="' + Utils.escapeHtml(exercise ? exercise.frequency : '') + '" placeholder="2x daily"></div>';
+    html += '</div>';
+    html += '<div class="form-group"><label>Instructions ' + Utils.micHtml('ef-instructions') + '</label>';
+    html += '<textarea id="ef-instructions" name="instructions" rows="4" placeholder="Step-by-step instructions for the patient...">' + Utils.escapeHtml(exercise ? exercise.instructions || '' : '') + '</textarea></div>';
+    html += '<div class="form-group"><label>Status</label>';
+    html += '<select name="status">';
+    html += '<option value="active"' + (exercise && exercise.status === 'active' ? ' selected' : '') + '>Active</option>';
+    html += '<option value="discontinued"' + (exercise && exercise.status === 'discontinued' ? ' selected' : '') + '>Discontinued</option>';
+    html += '</select></div>';
+    html += '</form>';
+    html += '</div>';
+    html += '<div class="inline-form-actions">';
+    html += '<button class="btn btn-secondary" id="exercise-form-cancel">Cancel</button>';
+    html += '<button class="btn btn-primary" id="exercise-form-save">Save Exercise</button>';
+    html += '</div></div>';
+    return html;
+  }
+
   function exerciseCard(ex) {
     var html = '<div class="exercise-card">';
     html += '<div class="exercise-info">';
@@ -326,6 +563,10 @@ window.PatientDetailView = (function() {
 
   // ==================== PRESCRIPTIONS TAB ====================
   function renderPrescriptions(patient) {
+    if (sub.rxView === 'form') {
+      return renderPrescriptionForm(patient);
+    }
+
     var prescriptions = Store.getPrescriptionsByPatient(patient.id);
     var active = [];
     var discontinued = [];
@@ -345,6 +586,11 @@ window.PatientDetailView = (function() {
     html += '<button class="btn btn-primary btn-sm" id="add-rx-btn">Add Prescription</button>';
     html += '</div></div>';
 
+    // Rx print options (inline collapsible)
+    if (sub.rxPrintExpanded) {
+      html += renderRxPrintOptions(patient);
+    }
+
     if (prescriptions.length === 0) {
       html += '<div class="empty-state"><p>No prescriptions yet</p><p class="empty-sub">Click "Add Prescription" to add medication details.</p></div>';
     } else {
@@ -362,6 +608,86 @@ window.PatientDetailView = (function() {
       }
     }
 
+    return html;
+  }
+
+  function renderPrescriptionForm(patient) {
+    var rx = sub.rxEditId ? Store.getPrescription(sub.rxEditId) : null;
+    var title = rx ? 'Edit Prescription' : 'New Prescription';
+    var user = App.getCurrentUser();
+    var doctorName = user ? user.name : 'Dr. Admin';
+
+    var html = '<div class="inline-form-card">';
+    html += '<div class="inline-form-header">';
+    html += '<button class="back-btn" id="rx-form-back">';
+    html += '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>';
+    html += '</button>';
+    html += '<h3>' + title + '</h3>';
+    html += '</div>';
+    html += '<div class="inline-form-body">';
+    html += '<form id="rx-form">';
+    html += '<div class="form-group"><label>Medication Name ' + Utils.micHtml('rx-medication') + '</label>';
+    html += '<input type="text" id="rx-medication" name="medication" value="' + Utils.escapeHtml(rx ? rx.medication : '') + '" required placeholder="e.g., Aceclofenac"></div>';
+    html += '<div class="form-row">';
+    html += '<div class="form-group"><label>Dosage</label>';
+    html += '<input type="text" name="dosage" value="' + Utils.escapeHtml(rx ? rx.dosage : '') + '" required placeholder="e.g., 100mg"></div>';
+    html += '<div class="form-group"><label>Route</label>';
+    html += '<select name="route">';
+    var routes = ['Oral', 'Topical', 'Intramuscular', 'Intravenous', 'Subcutaneous', 'Inhalation', 'Sublingual', 'Rectal', 'Transdermal'];
+    for (var r = 0; r < routes.length; r++) {
+      html += '<option value="' + routes[r] + '"' + (rx && rx.route === routes[r] ? ' selected' : '') + '>' + routes[r] + '</option>';
+    }
+    html += '</select></div>';
+    html += '</div>';
+    html += '<div class="form-row">';
+    html += '<div class="form-group"><label>Frequency</label>';
+    html += '<input type="text" name="frequency" value="' + Utils.escapeHtml(rx ? rx.frequency : '') + '" required placeholder="e.g., Twice daily (after meals)"></div>';
+    html += '<div class="form-group"><label>Duration</label>';
+    html += '<input type="text" name="duration" value="' + Utils.escapeHtml(rx ? rx.duration : '') + '" required placeholder="e.g., 7 days"></div>';
+    html += '</div>';
+    html += '<div class="form-row">';
+    html += '<div class="form-group"><label>Date</label>';
+    html += '<input type="date" name="date" value="' + (rx ? rx.date : Utils.today()) + '" required></div>';
+    html += '<div class="form-group"><label>Prescribed By</label>';
+    html += '<input type="text" name="prescribedBy" value="' + Utils.escapeHtml(rx ? rx.prescribedBy : doctorName) + '"></div>';
+    html += '</div>';
+    html += '<div class="form-group"><label>Special Instructions ' + Utils.micHtml('rx-instructions') + '</label>';
+    html += '<textarea id="rx-instructions" name="instructions" rows="3" placeholder="e.g., Take after food. Avoid on empty stomach...">' + Utils.escapeHtml(rx ? rx.instructions || '' : '') + '</textarea></div>';
+    html += '<div class="form-group"><label>Status</label>';
+    html += '<select name="status">';
+    html += '<option value="active"' + (rx && rx.status === 'active' ? ' selected' : '') + '>Active</option>';
+    html += '<option value="discontinued"' + (rx && rx.status === 'discontinued' ? ' selected' : '') + '>Discontinued</option>';
+    html += '</select></div>';
+    html += '</form>';
+    html += '</div>';
+    html += '<div class="inline-form-actions">';
+    html += '<button class="btn btn-secondary" id="rx-form-cancel">Cancel</button>';
+    html += '<button class="btn btn-primary" id="rx-form-save">' + (rx ? 'Update' : 'Add') + ' Prescription</button>';
+    html += '</div></div>';
+    return html;
+  }
+
+  function renderRxPrintOptions(patient) {
+    var html = '<div class="inline-form-card mb-2" id="rx-print-panel">';
+    html += '<div class="inline-form-header">';
+    html += '<button class="back-btn" id="rx-print-close">';
+    html += '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>';
+    html += '</button>';
+    html += '<h3>Print Prescription</h3>';
+    html += '</div>';
+    html += '<div class="inline-form-body">';
+    html += '<h4 style="margin-bottom:0.5rem;">Signatures</h4>';
+    html += '<div class="tag-checkboxes">';
+    html += '<label class="tag-checkbox-item checked"><input type="checkbox" class="rx-sig" value="doctor" checked> Doctor Signature</label>';
+    html += '<label class="tag-checkbox-item"><input type="checkbox" class="rx-sig" value="patient"> Patient Signature</label>';
+    html += '</div>';
+    html += '</div>';
+    html += '<div class="inline-form-actions">';
+    html += '<button class="btn btn-secondary" id="rx-print-cancel">Cancel</button>';
+    html += '<button class="btn btn-primary" id="rx-print-go">';
+    html += '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>';
+    html += ' Print Prescription</button>';
+    html += '</div></div>';
     return html;
   }
 
@@ -396,10 +722,13 @@ window.PatientDetailView = (function() {
 
   // ==================== BILLING TAB ====================
   function renderBilling(patient) {
+    if (sub.billingView === 'form') {
+      return renderBillingForm(patient);
+    }
+
     var bills = Store.getBillingByPatient(patient.id);
     bills.sort(function(a, b) { return a.date > b.date ? -1 : 1; });
 
-    // Totals
     var total = 0, paid = 0, pending = 0;
     for (var i = 0; i < bills.length; i++) {
       var amt = parseFloat(bills[i].amount) || 0;
@@ -413,14 +742,12 @@ window.PatientDetailView = (function() {
     html += '<button class="btn btn-primary btn-sm" id="add-billing-btn">Add Invoice</button>';
     html += '</div>';
 
-    // Summary cards
     html += '<div class="billing-summary">';
     html += '<div class="billing-stat total"><h4>Total Billed</h4><div class="amount">' + Utils.formatCurrency(total) + '</div></div>';
     html += '<div class="billing-stat paid"><h4>Paid</h4><div class="amount">' + Utils.formatCurrency(paid) + '</div></div>';
     html += '<div class="billing-stat pending"><h4>Pending</h4><div class="amount">' + Utils.formatCurrency(pending) + '</div></div>';
     html += '</div>';
 
-    // Table
     html += '<div class="card"><div class="table-wrapper">';
     html += '<table class="data-table"><thead><tr>';
     html += '<th>Date</th><th>Description</th><th>Amount</th><th>Status</th><th>Actions</th>';
@@ -450,177 +777,107 @@ window.PatientDetailView = (function() {
     return html;
   }
 
-  // ==================== PRINT OPTIONS ====================
-  function showPrintOptions(patient) {
-    var bills = Store.getBillingByPatient(patient.id);
-    bills.sort(function(a, b) { return a.date > b.date ? -1 : 1; });
-
-    var body = '<div style="margin-bottom:1rem;">';
-    body += '<h4 style="margin-bottom:0.75rem;">Report Type</h4>';
-    body += '<div style="display:flex;gap:0.5rem;flex-wrap:wrap;">';
-    body += '<button class="btn btn-primary print-type-btn active" data-type="patient" id="pt-type-patient">Patient Report</button>';
-    body += '<button class="btn btn-secondary print-type-btn" data-type="billing" id="pt-type-billing">Billing Report</button>';
-    body += '<button class="btn btn-secondary print-type-btn" data-type="combined" id="pt-type-combined">Combined Report</button>';
-    body += '</div></div>';
-
-    // Patient report sections
-    body += '<div id="print-patient-opts">';
-    body += '<h4 style="margin-bottom:0.5rem;">Select Sections</h4>';
-    body += '<div class="tag-checkboxes">';
-    body += '<label class="tag-checkbox-item checked"><input type="checkbox" class="print-section" value="info" checked> Patient Info</label>';
-    body += '<label class="tag-checkbox-item checked"><input type="checkbox" class="print-section" value="diagnosis" checked> Diagnosis & Plan</label>';
-    body += '<label class="tag-checkbox-item checked"><input type="checkbox" class="print-section" value="body" checked> Body Diagram</label>';
-    body += '<label class="tag-checkbox-item checked"><input type="checkbox" class="print-section" value="sessions" checked> Sessions</label>';
-    body += '<label class="tag-checkbox-item checked"><input type="checkbox" class="print-section" value="exercises" checked> Exercises</label>';
-    body += '<label class="tag-checkbox-item checked"><input type="checkbox" class="print-section" value="prescriptions" checked> Prescriptions</label>';
-    body += '</div>';
-    body += '<h4 style="margin:0.75rem 0 0.5rem;">Signatures</h4>';
-    body += '<div class="tag-checkboxes">';
-    body += '<label class="tag-checkbox-item checked"><input type="checkbox" class="print-sig" value="doctor" checked> Doctor Signature</label>';
-    body += '<label class="tag-checkbox-item"><input type="checkbox" class="print-sig" value="patient"> Patient Signature</label>';
-    body += '</div></div>';
-
-    // Billing report options
-    body += '<div id="print-billing-opts" style="display:none;">';
-    body += '<h4 style="margin-bottom:0.5rem;">Billing Type</h4>';
-    body += '<div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem;">';
-    body += '<label class="tag-checkbox-item checked"><input type="radio" name="bill-type" value="statement" checked> Full Statement</label>';
-    body += '<label class="tag-checkbox-item"><input type="radio" name="bill-type" value="single"> Single Invoice</label>';
-    body += '</div>';
-    // Invoice picker (hidden by default)
-    body += '<div id="print-invoice-picker" style="display:none;margin-top:0.75rem;">';
-    body += '<label style="font-size:0.82rem;font-weight:600;margin-bottom:0.4rem;display:block;">Select Invoice</label>';
-    body += '<select id="print-invoice-select" style="width:100%;padding:0.55rem 0.75rem;border:1px solid #d1d5db;border-radius:8px;background:#fff;font-size:0.85rem;">';
-    for (var i = 0; i < bills.length; i++) {
-      body += '<option value="' + bills[i].id + '">' + Utils.formatDate(bills[i].date) + ' - ' + Utils.escapeHtml(bills[i].description) + ' - ' + Utils.formatCurrency(bills[i].amount) + '</option>';
-    }
-    body += '</select></div>';
-    body += '</div>';
-
-    var footer = '<button class="btn btn-secondary" id="print-cancel">Cancel</button>';
-    footer += '<button class="btn btn-primary" id="print-go">';
-    footer += '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>';
-    footer += ' Print</button>';
-
-    Utils.showModal('Print Report', body, footer);
-
-    var currentType = 'patient';
-
-    // Type toggle
-    var typeBtns = document.querySelectorAll('.print-type-btn');
-    for (var t = 0; t < typeBtns.length; t++) {
-      typeBtns[t].addEventListener('click', function() {
-        for (var x = 0; x < typeBtns.length; x++) { typeBtns[x].className = 'btn btn-secondary print-type-btn'; }
-        this.className = 'btn btn-primary print-type-btn active';
-        currentType = this.getAttribute('data-type');
-        document.getElementById('print-patient-opts').style.display = currentType === 'patient' || currentType === 'combined' ? '' : 'none';
-        document.getElementById('print-billing-opts').style.display = currentType === 'billing' || currentType === 'combined' ? '' : 'none';
-      });
-    }
-
-    // Billing type radio toggle
-    var radios = document.querySelectorAll('[name="bill-type"]');
-    for (var r = 0; r < radios.length; r++) {
-      radios[r].addEventListener('change', function() {
-        // Update visual state on all radio labels
-        for (var rr = 0; rr < radios.length; rr++) {
-          radios[rr].parentElement.classList.toggle('checked', radios[rr].checked);
-        }
-        // Show/hide invoice picker
-        var picker = document.getElementById('print-invoice-picker');
-        if (picker) {
-          picker.style.display = this.value === 'single' ? 'block' : 'none';
-        }
-      });
-    }
-
-    // Checkbox visual toggle
-    var checks = document.querySelectorAll('.print-section, .print-sig');
-    for (var c = 0; c < checks.length; c++) {
-      checks[c].addEventListener('change', function() {
-        this.parentElement.classList.toggle('checked', this.checked);
-      });
-    }
-
-    document.getElementById('print-cancel').onclick = Utils.closeModal;
-    document.getElementById('print-go').onclick = function() {
-      Utils.closeModal();
-      executePrint(patient, currentType);
-    };
-
-    // Store state for print execution
-    window._printOpts = {
-      getType: function() { return currentType; },
-      getSections: function() {
-        var secs = [];
-        var chks = document.querySelectorAll('.print-section');
-        for (var i = 0; i < chks.length; i++) {
-          if (chks[i].checked) secs.push(chks[i].value);
-        }
-        return secs;
-      },
-      getBillType: function() {
-        var sel = document.querySelector('[name="bill-type"]:checked');
-        return sel ? sel.value : 'statement';
-      },
-      getInvoiceId: function() {
-        var sel = document.getElementById('print-invoice-select');
-        return sel ? sel.value : '';
-      },
-      getSignatures: function() {
-        var sigs = [];
-        var sigChks = document.querySelectorAll('.print-sig');
-        for (var i = 0; i < sigChks.length; i++) {
-          if (sigChks[i].checked) sigs.push(sigChks[i].value);
-        }
-        return sigs;
-      }
-    };
-
-    // Override print-go to capture state before modal closes
-    document.getElementById('print-go').onclick = function() {
-      var type = currentType;
-      var sections = window._printOpts.getSections();
-      var billType = window._printOpts.getBillType();
-      var invoiceId = window._printOpts.getInvoiceId();
-      var signatures = window._printOpts.getSignatures();
-      Utils.closeModal();
-      executePrint(patient, type, sections, billType, invoiceId, signatures);
-    };
+  function renderBillingForm(patient) {
+    var html = '<div class="inline-form-card">';
+    html += '<div class="inline-form-header">';
+    html += '<button class="back-btn" id="billing-form-back">';
+    html += '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>';
+    html += '</button>';
+    html += '<h3>New Invoice</h3>';
+    html += '</div>';
+    html += '<div class="inline-form-body">';
+    html += '<form id="billing-form">';
+    html += '<div class="form-row">';
+    html += '<div class="form-group"><label>Date</label>';
+    html += '<input type="date" name="date" value="' + Utils.today() + '" required></div>';
+    html += '<div class="form-group"><label>Amount (' + Utils.getCurrencySymbol() + ')</label>';
+    html += '<input type="number" name="amount" step="0.01" min="0" value="" required placeholder="0.00"></div>';
+    html += '</div>';
+    html += '<div class="form-group"><label>Description</label>';
+    html += '<input type="text" name="description" required placeholder="e.g., Therapeutic Exercise + Manual Therapy"></div>';
+    html += '<div class="form-group"><label>Status</label>';
+    html += '<select name="status">';
+    html += '<option value="pending">Pending</option>';
+    html += '<option value="paid">Paid</option>';
+    html += '</select></div>';
+    html += '</form>';
+    html += '</div>';
+    html += '<div class="inline-form-actions">';
+    html += '<button class="btn btn-secondary" id="billing-form-cancel">Cancel</button>';
+    html += '<button class="btn btn-primary" id="billing-form-save">Create Invoice</button>';
+    html += '</div></div>';
+    return html;
   }
 
-  // ==================== PRESCRIPTION PAD PRINT ====================
-  function showRxPrintOptions(patient) {
-    var body = '<h4 style="margin-bottom:0.5rem;">Signatures</h4>';
-    body += '<div class="tag-checkboxes">';
-    body += '<label class="tag-checkbox-item checked"><input type="checkbox" class="rx-sig" value="doctor" checked> Doctor Signature</label>';
-    body += '<label class="tag-checkbox-item"><input type="checkbox" class="rx-sig" value="patient"> Patient Signature</label>';
-    body += '</div>';
+  // ==================== PRINT FUNCTIONS ====================
+  function buildSignatureBlock(signatures) {
+    if (!signatures || signatures.length === 0) return '';
+    var html = '<div class="print-signature-area">';
+    if (signatures.indexOf('patient') !== -1) {
+      html += '<div class="print-signature-box">';
+      html += '<div class="print-signature-line"></div>';
+      html += '<div class="print-signature-label">Patient\'s Signature</div>';
+      html += '</div>';
+    }
+    if (signatures.indexOf('doctor') !== -1) {
+      html += '<div class="print-signature-box">';
+      html += '<div class="print-signature-line"></div>';
+      html += '<div class="print-signature-label">Doctor\'s Signature &amp; Stamp</div>';
+      html += '</div>';
+    }
+    html += '</div>';
+    return html;
+  }
 
-    var footer = '<button class="btn btn-secondary" id="rx-print-cancel">Cancel</button>';
-    footer += '<button class="btn btn-primary" id="rx-print-go">';
-    footer += '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>';
-    footer += ' Print Prescription</button>';
+  function executePrint(patient, type, sections, billType, invoiceId, signatures) {
+    var html = '';
 
-    Utils.showModal('Print Prescription', body, footer);
+    html += '<div class="print-report-header">';
+    html += '<h1>PhysioClinic</h1>';
+    html += '<p>Clinic Management System</p>';
+    html += '</div>';
 
-    var sigChks = document.querySelectorAll('.rx-sig');
-    for (var c = 0; c < sigChks.length; c++) {
-      sigChks[c].addEventListener('change', function() {
-        this.parentElement.classList.toggle('checked', this.checked);
-      });
+    html += '<div class="print-patient-bar">';
+    html += '<strong>' + Utils.escapeHtml(patient.name) + '</strong>';
+    html += ' &nbsp;|&nbsp; Phone: ' + Utils.escapeHtml((patient.phoneCode || Utils.getPhoneCode()) + ' ' + (patient.phone || '-'));
+    html += ' &nbsp;|&nbsp; DOB: ' + Utils.formatDate(patient.dob) + ' (Age ' + Utils.calculateAge(patient.dob) + ')';
+    html += ' &nbsp;|&nbsp; Gender: ' + Utils.escapeHtml(patient.gender || '-');
+    html += '</div>';
+
+    if (type === 'patient' || type === 'combined') {
+      html += buildPatientReport(patient, sections);
     }
 
-    document.getElementById('rx-print-cancel').onclick = Utils.closeModal;
-    document.getElementById('rx-print-go').onclick = function() {
-      var sigs = [];
-      var chks = document.querySelectorAll('.rx-sig');
-      for (var i = 0; i < chks.length; i++) {
-        if (chks[i].checked) sigs.push(chks[i].value);
-      }
-      Utils.closeModal();
-      printPrescriptionPad(patient, sigs);
-    };
+    if (type === 'billing' || type === 'combined') {
+      html += buildBillingReport(patient, billType, invoiceId);
+    }
+
+    html += buildSignatureBlock(signatures);
+
+    html += '<div class="print-report-footer">';
+    html += '<p>Generated on ' + Utils.formatDate(Utils.today()) + ' &nbsp;|&nbsp; PhysioClinic</p>';
+    html += '</div>';
+
+    var printDiv = document.getElementById('print-report-area');
+    if (!printDiv) {
+      printDiv = document.createElement('div');
+      printDiv.id = 'print-report-area';
+      printDiv.className = 'print-report-area';
+      document.body.appendChild(printDiv);
+    }
+    printDiv.innerHTML = html;
+    printDiv.style.cssText = 'display:block !important;position:fixed;left:-9999px;top:0;width:210mm;';
+    document.body.classList.add('printing-report');
+    setTimeout(function() {
+      printDiv.style.cssText = '';
+      setTimeout(function() {
+        window.print();
+        setTimeout(function() {
+          printDiv.innerHTML = '';
+          document.body.classList.remove('printing-report');
+        }, 500);
+      }, 100);
+    }, 200);
   }
 
   function printPrescriptionPad(patient, signatures) {
@@ -663,14 +920,12 @@ window.PatientDetailView = (function() {
     }
     html += '</div>';
 
-    // Signatures
     html += buildSignatureBlock(signatures);
 
     html += '<div class="print-report-footer">';
     html += '<p>Generated on ' + Utils.formatDate(Utils.today()) + ' &nbsp;|&nbsp; PhysioClinic</p>';
     html += '</div>';
 
-    // Inject and print
     var printDiv = document.getElementById('print-report-area');
     if (!printDiv) {
       printDiv = document.createElement('div');
@@ -685,84 +940,6 @@ window.PatientDetailView = (function() {
       printDiv.style.cssText = '';
       setTimeout(function() {
         window.print();
-        setTimeout(function() {
-          printDiv.innerHTML = '';
-          document.body.classList.remove('printing-report');
-        }, 500);
-      }, 100);
-    }, 200);
-  }
-
-  function buildSignatureBlock(signatures) {
-    if (!signatures || signatures.length === 0) return '';
-    var html = '<div class="print-signature-area">';
-    if (signatures.indexOf('patient') !== -1) {
-      html += '<div class="print-signature-box">';
-      html += '<div class="print-signature-line"></div>';
-      html += '<div class="print-signature-label">Patient\'s Signature</div>';
-      html += '</div>';
-    }
-    if (signatures.indexOf('doctor') !== -1) {
-      html += '<div class="print-signature-box">';
-      html += '<div class="print-signature-line"></div>';
-      html += '<div class="print-signature-label">Doctor\'s Signature &amp; Stamp</div>';
-      html += '</div>';
-    }
-    html += '</div>';
-    return html;
-  }
-
-  function executePrint(patient, type, sections, billType, invoiceId, signatures) {
-    var html = '';
-
-    // Clinic header
-    html += '<div class="print-report-header">';
-    html += '<h1>PhysioClinic</h1>';
-    html += '<p>Clinic Management System</p>';
-    html += '</div>';
-
-    // Patient header (always shown)
-    html += '<div class="print-patient-bar">';
-    html += '<strong>' + Utils.escapeHtml(patient.name) + '</strong>';
-    html += ' &nbsp;|&nbsp; Phone: ' + Utils.escapeHtml((patient.phoneCode || Utils.getPhoneCode()) + ' ' + (patient.phone || '-'));
-    html += ' &nbsp;|&nbsp; DOB: ' + Utils.formatDate(patient.dob) + ' (Age ' + Utils.calculateAge(patient.dob) + ')';
-    html += ' &nbsp;|&nbsp; Gender: ' + Utils.escapeHtml(patient.gender || '-');
-    html += '</div>';
-
-    if (type === 'patient' || type === 'combined') {
-      html += buildPatientReport(patient, sections);
-    }
-
-    if (type === 'billing' || type === 'combined') {
-      html += buildBillingReport(patient, billType, invoiceId);
-    }
-
-    // Signatures
-    html += buildSignatureBlock(signatures);
-
-    // Footer
-    html += '<div class="print-report-footer">';
-    html += '<p>Generated on ' + Utils.formatDate(Utils.today()) + ' &nbsp;|&nbsp; PhysioClinic</p>';
-    html += '</div>';
-
-    // Inject into print container
-    var printDiv = document.getElementById('print-report-area');
-    if (!printDiv) {
-      printDiv = document.createElement('div');
-      printDiv.id = 'print-report-area';
-      printDiv.className = 'print-report-area';
-      document.body.appendChild(printDiv);
-    }
-    printDiv.innerHTML = html;
-    // Briefly make visible off-screen so SVGs render properly before print
-    printDiv.style.cssText = 'display:block !important;position:fixed;left:-9999px;top:0;width:210mm;';
-    document.body.classList.add('printing-report');
-    setTimeout(function() {
-      // Reset to normal print-area styling (hidden on screen, shown in @media print)
-      printDiv.style.cssText = '';
-      setTimeout(function() {
-        window.print();
-        // Clean up after print
         setTimeout(function() {
           printDiv.innerHTML = '';
           document.body.classList.remove('printing-report');
@@ -810,7 +987,7 @@ window.PatientDetailView = (function() {
       sessions.sort(function(a, b) { return a.date > b.date ? -1 : 1; });
       if (sessions.length > 0) {
         html += '<div class="print-section-block">';
-        html += '<h3>Session Notes (' + sessions.length + ')</h3>';
+        html += '<h3>Treatment Notes (' + sessions.length + ')</h3>';
         html += '<table class="print-data-table"><thead><tr><th>Date</th><th>Subjective</th><th>Objective</th><th>Assessment</th><th>Plan</th><th>Pain</th></tr></thead><tbody>';
         for (var s = 0; s < sessions.length; s++) {
           var sn = sessions[s];
@@ -831,7 +1008,7 @@ window.PatientDetailView = (function() {
       var exercises = Store.getExercisesByPatient(patient.id);
       if (exercises.length > 0) {
         html += '<div class="print-section-block">';
-        html += '<h3>Exercise Program (' + exercises.length + ')</h3>';
+        html += '<h3>Home Exercise Program (' + exercises.length + ')</h3>';
         html += '<table class="print-data-table"><thead><tr><th>Exercise</th><th>Sets x Reps</th><th>Frequency</th><th>Instructions</th></tr></thead><tbody>';
         for (var e = 0; e < exercises.length; e++) {
           var ex = exercises[e];
@@ -854,14 +1031,14 @@ window.PatientDetailView = (function() {
         html += '<h3>Active Prescriptions (' + activeRx.length + ')</h3>';
         html += '<table class="print-data-table"><thead><tr><th>Medication</th><th>Dosage</th><th>Route</th><th>Frequency</th><th>Duration</th><th>Instructions</th></tr></thead><tbody>';
         for (var p = 0; p < activeRx.length; p++) {
-          var rx = activeRx[p];
+          var rxp = activeRx[p];
           html += '<tr>';
-          html += '<td style="font-weight:600;">' + Utils.escapeHtml(rx.medication) + '</td>';
-          html += '<td>' + Utils.escapeHtml(rx.dosage || '-') + '</td>';
-          html += '<td>' + Utils.escapeHtml(rx.route || '-') + '</td>';
-          html += '<td>' + Utils.escapeHtml(rx.frequency || '-') + '</td>';
-          html += '<td>' + Utils.escapeHtml(rx.duration || '-') + '</td>';
-          html += '<td>' + Utils.escapeHtml(rx.instructions || '-') + '</td>';
+          html += '<td style="font-weight:600;">' + Utils.escapeHtml(rxp.medication) + '</td>';
+          html += '<td>' + Utils.escapeHtml(rxp.dosage || '-') + '</td>';
+          html += '<td>' + Utils.escapeHtml(rxp.route || '-') + '</td>';
+          html += '<td>' + Utils.escapeHtml(rxp.frequency || '-') + '</td>';
+          html += '<td>' + Utils.escapeHtml(rxp.duration || '-') + '</td>';
+          html += '<td>' + Utils.escapeHtml(rxp.instructions || '-') + '</td>';
           html += '</tr>';
         }
         html += '</tbody></table></div>';
@@ -877,7 +1054,6 @@ window.PatientDetailView = (function() {
     var html = '<h2 class="print-section-title">Billing Report</h2>';
 
     if (billType === 'single' && invoiceId) {
-      // Single invoice
       var bill = null;
       for (var i = 0; i < bills.length; i++) {
         if (bills[i].id === invoiceId) { bill = bills[i]; break; }
@@ -896,7 +1072,6 @@ window.PatientDetailView = (function() {
         html += '</table></div>';
       }
     } else {
-      // Full statement
       var total = 0, paidAmt = 0, pendingAmt = 0;
       for (var j = 0; j < bills.length; j++) {
         var amt = parseFloat(bills[j].amount) || 0;
@@ -940,92 +1115,113 @@ window.PatientDetailView = (function() {
     }
     _clickHandler = function(e) {
       // Tab switching
-      var tabBtn = e.target.closest('.tab-btn');
-      if (tabBtn) {
-        activeTab = tabBtn.getAttribute('data-tab');
+      var tabBtnEl = e.target.closest('.tab-btn');
+      if (tabBtnEl) {
+        activeTab = tabBtnEl.getAttribute('data-tab');
+        resetSub();
         renderDetail(container, patient);
         return;
       }
 
-      // Print
+      // Print button → toggle inline print options
       if (e.target.closest('#print-patient-btn') || e.target.closest('#print-exercises-btn')) {
-        showPrintOptions(patient);
+        sub.printExpanded = !sub.printExpanded;
+        activeTab = 'overview';
+        renderDetail(container, patient);
         return;
       }
 
       // === Sessions ===
       if (e.target.closest('#add-session-btn')) {
-        showSessionForm(null, patient, container);
+        sub.sessionsView = 'form';
+        sub.sessionsEditId = null;
+        renderDetail(container, patient);
         return;
       }
       var editSessionBtn = e.target.closest('.edit-session-btn');
       if (editSessionBtn) {
-        showSessionForm(editSessionBtn.getAttribute('data-id'), patient, container);
+        sub.sessionsView = 'form';
+        sub.sessionsEditId = editSessionBtn.getAttribute('data-id');
+        renderDetail(container, patient);
         return;
       }
       var deleteSessionBtn = e.target.closest('.delete-session-btn');
       if (deleteSessionBtn) {
-        Utils.confirm('Delete this session note?', function() {
-          Store.deleteSession(deleteSessionBtn.getAttribute('data-id'));
-          Utils.toast('Session note deleted', 'success');
+        var sessDelId = deleteSessionBtn.getAttribute('data-id');
+        Utils.inlineConfirm(container, 'Delete this treatment note?', function() {
+          Store.deleteSession(sessDelId);
+          Utils.toast('Treatment note deleted', 'success');
           renderDetail(container, Store.getPatient(patient.id));
-        });
+        }, { danger: true });
         return;
       }
 
       // === Exercises ===
       if (e.target.closest('#add-exercise-btn')) {
-        showExerciseForm(null, patient, container);
+        sub.exercisesView = 'form';
+        sub.exercisesEditId = null;
+        renderDetail(container, patient);
         return;
       }
       var editExBtn = e.target.closest('.edit-exercise-btn');
       if (editExBtn) {
-        showExerciseForm(editExBtn.getAttribute('data-id'), patient, container);
+        sub.exercisesView = 'form';
+        sub.exercisesEditId = editExBtn.getAttribute('data-id');
+        renderDetail(container, patient);
         return;
       }
       var deleteExBtn = e.target.closest('.delete-exercise-btn');
       if (deleteExBtn) {
-        Utils.confirm('Delete this exercise?', function() {
-          Store.deleteExercise(deleteExBtn.getAttribute('data-id'));
+        var exDelId = deleteExBtn.getAttribute('data-id');
+        Utils.inlineConfirm(container, 'Delete this exercise?', function() {
+          Store.deleteExercise(exDelId);
           Utils.toast('Exercise deleted', 'success');
           renderDetail(container, Store.getPatient(patient.id));
-        });
+        }, { danger: true });
         return;
       }
 
       // === Prescriptions ===
       if (e.target.closest('#add-rx-btn')) {
-        showPrescriptionForm(null, patient, container);
+        sub.rxView = 'form';
+        sub.rxEditId = null;
+        renderDetail(container, patient);
         return;
       }
       if (e.target.closest('#print-rx-btn')) {
-        showRxPrintOptions(patient);
+        sub.rxPrintExpanded = !sub.rxPrintExpanded;
+        renderDetail(container, patient);
         return;
       }
       var editRxBtn = e.target.closest('.edit-rx-btn');
       if (editRxBtn) {
-        showPrescriptionForm(editRxBtn.getAttribute('data-id'), patient, container);
+        sub.rxView = 'form';
+        sub.rxEditId = editRxBtn.getAttribute('data-id');
+        renderDetail(container, patient);
         return;
       }
       var deleteRxBtn = e.target.closest('.delete-rx-btn');
       if (deleteRxBtn) {
-        Utils.confirm('Delete this prescription?', function() {
-          Store.deletePrescription(deleteRxBtn.getAttribute('data-id'));
+        var rxDelId = deleteRxBtn.getAttribute('data-id');
+        Utils.inlineConfirm(container, 'Delete this prescription?', function() {
+          Store.deletePrescription(rxDelId);
           Utils.toast('Prescription deleted', 'success');
           renderDetail(container, Store.getPatient(patient.id));
-        });
+        }, { danger: true });
         return;
       }
 
       // === Book Next Visit ===
       if (e.target.closest('#book-next-visit-btn')) {
-        showBookNextVisit(patient, container);
+        sub.bookingView = 'form';
+        renderDetail(container, patient);
         return;
       }
 
       // === Billing ===
       if (e.target.closest('#add-billing-btn')) {
-        showBillingForm(patient, container);
+        sub.billingView = 'form';
+        renderDetail(container, patient);
         return;
       }
       var markPaidBtn = e.target.closest('.mark-paid-btn');
@@ -1038,306 +1234,247 @@ window.PatientDetailView = (function() {
       }
       var deleteBillingBtn = e.target.closest('.delete-billing-btn');
       if (deleteBillingBtn) {
-        Utils.confirm('Delete this billing record?', function() {
-          Store.deleteBilling(deleteBillingBtn.getAttribute('data-id'));
+        var billDelId = deleteBillingBtn.getAttribute('data-id');
+        Utils.inlineConfirm(container, 'Delete this billing record?', function() {
+          Store.deleteBilling(billDelId);
           Utils.toast('Billing record deleted', 'success');
           renderDetail(container, Store.getPatient(patient.id));
-        });
+        }, { danger: true });
         return;
       }
     };
     container.addEventListener('click', _clickHandler);
   }
 
-  // ==================== FORMS ====================
-
-  // Session form
-  function showSessionForm(sessionId, patient, container) {
-    var session = sessionId ? Store.getSession(sessionId) : null;
-    var title = session ? 'Edit Session Note' : 'New Session Note';
-
-    var body = '<form id="session-form">';
-    body += '<div class="form-row-3">';
-    body += '<div class="form-group"><label>Date</label>';
-    body += '<input type="date" name="date" value="' + (session ? session.date : Utils.today()) + '" required></div>';
-    body += '<div class="form-group"><label>Pain Score (0-10)</label>';
-    body += '<input type="number" name="painScore" min="0" max="10" value="' + (session ? session.painScore : '5') + '" required></div>';
-    body += '<div class="form-group"><label>Function Score (0-10)</label>';
-    body += '<input type="number" name="functionScore" min="0" max="10" value="' + (session ? session.functionScore : '5') + '" required></div>';
-    body += '</div>';
-    body += '<div class="form-group"><label>Subjective ' + Utils.micHtml('sf-subjective') + '</label>';
-    body += '<textarea id="sf-subjective" name="subjective" rows="3" data-ac="subjective" placeholder="Patient report, symptoms, functional status...">' + Utils.escapeHtml(session ? session.subjective || '' : '') + '</textarea></div>';
-    body += '<div class="form-group"><label>Objective ' + Utils.micHtml('sf-objective') + '</label>';
-    body += '<textarea id="sf-objective" name="objective" rows="3" data-ac="objective" placeholder="Measurements, ROM, strength, observations...">' + Utils.escapeHtml(session ? session.objective || '' : '') + '</textarea></div>';
-    body += '<div class="form-group"><label>Assessment ' + Utils.micHtml('sf-assessment') + '</label>';
-    body += '<textarea id="sf-assessment" name="assessment" rows="3" data-ac="assessment" placeholder="Clinical reasoning, progress, prognosis...">' + Utils.escapeHtml(session ? session.assessment || '' : '') + '</textarea></div>';
-    body += '<div class="form-group"><label>Plan ' + Utils.micHtml('sf-plan') + '</label>';
-    body += '<textarea id="sf-plan" name="plan" rows="3" data-ac="plan" placeholder="Treatment plan, goals, next steps...">' + Utils.escapeHtml(session ? session.plan || '' : '') + '</textarea></div>';
-    body += '</form>';
-
-    var footer = '<button class="btn btn-secondary" id="modal-cancel">Cancel</button>';
-    footer += '<button class="btn btn-primary" id="modal-save">Save Session</button>';
-
-    Utils.showModal(title, body, footer, { large: true });
-    var modalBody = document.getElementById('modal-body');
-    Utils.bindMicButtons(modalBody);
-    Utils.bindAllAutocomplete(modalBody);
-
-    document.getElementById('modal-cancel').onclick = Utils.closeModal;
-    document.getElementById('modal-save').onclick = function() {
-      var form = document.getElementById('session-form');
-      var data = Utils.getFormData(form);
-      data.painScore = parseInt(data.painScore, 10) || 0;
-      data.functionScore = parseInt(data.functionScore, 10) || 0;
-      data.patientId = patient.id;
-
-      if (session) {
-        Store.updateSession(session.id, data);
-        Utils.toast('Session updated', 'success');
-      } else {
-        Store.createSession(data);
-        Utils.toast('Session note added', 'success');
-      }
-      Utils.closeModal();
-      renderDetail(container, Store.getPatient(patient.id));
-    };
-  }
-
-  // Exercise form
-  function showExerciseForm(exerciseId, patient, container) {
-    var exercise = exerciseId ? Store.getExercises().filter(function(e) { return e.id === exerciseId; })[0] : null;
-    var title = exercise ? 'Edit Exercise' : 'New Exercise';
-
-    var body = '<form id="exercise-form">';
-    body += '<div class="form-group"><label>Exercise Name</label>';
-    body += '<input type="text" name="name" value="' + Utils.escapeHtml(exercise ? exercise.name : '') + '" required placeholder="e.g., Quad Sets"></div>';
-    body += '<div class="form-row-4">';
-    body += '<div class="form-group"><label>Sets</label>';
-    body += '<input type="text" name="sets" value="' + Utils.escapeHtml(exercise ? exercise.sets : '3') + '" placeholder="3"></div>';
-    body += '<div class="form-group"><label>Reps</label>';
-    body += '<input type="text" name="reps" value="' + Utils.escapeHtml(exercise ? exercise.reps : '10') + '" placeholder="10"></div>';
-    body += '<div class="form-group"><label>Hold</label>';
-    body += '<input type="text" name="hold" value="' + Utils.escapeHtml(exercise ? exercise.hold : '') + '" placeholder="5 sec"></div>';
-    body += '<div class="form-group"><label>Frequency</label>';
-    body += '<input type="text" name="frequency" value="' + Utils.escapeHtml(exercise ? exercise.frequency : '') + '" placeholder="2x daily"></div>';
-    body += '</div>';
-    body += '<div class="form-group"><label>Instructions ' + Utils.micHtml('ef-instructions') + '</label>';
-    body += '<textarea id="ef-instructions" name="instructions" rows="4" placeholder="Step-by-step instructions for the patient...">' + Utils.escapeHtml(exercise ? exercise.instructions || '' : '') + '</textarea></div>';
-    body += '<div class="form-group"><label>Status</label>';
-    body += '<select name="status">';
-    body += '<option value="active"' + (exercise && exercise.status === 'active' ? ' selected' : '') + '>Active</option>';
-    body += '<option value="discontinued"' + (exercise && exercise.status === 'discontinued' ? ' selected' : '') + '>Discontinued</option>';
-    body += '</select></div>';
-    body += '</form>';
-
-    var footer = '<button class="btn btn-secondary" id="modal-cancel">Cancel</button>';
-    footer += '<button class="btn btn-primary" id="modal-save">Save Exercise</button>';
-
-    Utils.showModal(title, body, footer);
-    Utils.bindMicButtons(document.getElementById('modal-body'));
-
-    document.getElementById('modal-cancel').onclick = Utils.closeModal;
-    document.getElementById('modal-save').onclick = function() {
-      var form = document.getElementById('exercise-form');
-      var nameInput = form.querySelector('[name="name"]');
-      if (!nameInput.value.trim()) {
-        Utils.toast('Exercise name is required', 'error');
-        return;
-      }
-      var data = Utils.getFormData(form);
-      data.patientId = patient.id;
-
-      if (exercise) {
-        Store.updateExercise(exercise.id, data);
-        Utils.toast('Exercise updated', 'success');
-      } else {
-        Store.createExercise(data);
-        Utils.toast('Exercise added', 'success');
-      }
-      Utils.closeModal();
-      renderDetail(container, Store.getPatient(patient.id));
-    };
-  }
-
-  // Billing form
-  function showBillingForm(patient, container) {
-    var body = '<form id="billing-form">';
-    body += '<div class="form-row">';
-    body += '<div class="form-group"><label>Date</label>';
-    body += '<input type="date" name="date" value="' + Utils.today() + '" required></div>';
-    body += '<div class="form-group"><label>Amount (' + Utils.getCurrencySymbol() + ')</label>';
-    body += '<input type="number" name="amount" step="0.01" min="0" value="" required placeholder="0.00"></div>';
-    body += '</div>';
-    body += '<div class="form-group"><label>Description</label>';
-    body += '<input type="text" name="description" required placeholder="e.g., Therapeutic Exercise + Manual Therapy"></div>';
-    body += '<div class="form-group"><label>Status</label>';
-    body += '<select name="status">';
-    body += '<option value="pending">Pending</option>';
-    body += '<option value="paid">Paid</option>';
-    body += '</select></div>';
-    body += '</form>';
-
-    var footer = '<button class="btn btn-secondary" id="modal-cancel">Cancel</button>';
-    footer += '<button class="btn btn-primary" id="modal-save">Create Invoice</button>';
-
-    Utils.showModal('New Invoice', body, footer);
-
-    document.getElementById('modal-cancel').onclick = Utils.closeModal;
-    document.getElementById('modal-save').onclick = function() {
-      var form = document.getElementById('billing-form');
-      var data = Utils.getFormData(form);
-      if (!data.description || !data.amount) {
-        Utils.toast('Description and amount are required', 'error');
-        return;
-      }
-      data.patientId = patient.id;
-      if (data.status === 'paid') data.paidDate = Utils.today();
-      Store.createBilling(data);
-      Utils.toast('Invoice created', 'success');
-      Utils.closeModal();
-      renderDetail(container, Store.getPatient(patient.id));
-    };
-  }
-
-  // Prescription form
-  function showPrescriptionForm(rxId, patient, container) {
-    var rx = rxId ? Store.getPrescription(rxId) : null;
-    var title = rx ? 'Edit Prescription' : 'New Prescription';
-    var user = App.getCurrentUser();
-    var doctorName = user ? user.name : 'Dr. Admin';
-
-    var body = '<form id="rx-form">';
-    body += '<div class="form-group"><label>Medication Name ' + Utils.micHtml('rx-medication') + '</label>';
-    body += '<input type="text" id="rx-medication" name="medication" value="' + Utils.escapeHtml(rx ? rx.medication : '') + '" required placeholder="e.g., Aceclofenac"></div>';
-    body += '<div class="form-row">';
-    body += '<div class="form-group"><label>Dosage</label>';
-    body += '<input type="text" name="dosage" value="' + Utils.escapeHtml(rx ? rx.dosage : '') + '" required placeholder="e.g., 100mg"></div>';
-    body += '<div class="form-group"><label>Route</label>';
-    body += '<select name="route">';
-    var routes = ['Oral', 'Topical', 'Intramuscular', 'Intravenous', 'Subcutaneous', 'Inhalation', 'Sublingual', 'Rectal', 'Transdermal'];
-    for (var r = 0; r < routes.length; r++) {
-      body += '<option value="' + routes[r] + '"' + (rx && rx.route === routes[r] ? ' selected' : '') + '>' + routes[r] + '</option>';
+  // ==================== INLINE FORM BINDINGS ====================
+  function bindInlineForms(container, patient) {
+    // Session form
+    var sessionBack = document.getElementById('session-form-back');
+    var sessionCancel = document.getElementById('session-form-cancel');
+    var sessionSave = document.getElementById('session-form-save');
+    if (sessionBack) sessionBack.onclick = function() { sub.sessionsView = 'list'; sub.sessionsEditId = null; renderDetail(container, patient); };
+    if (sessionCancel) sessionCancel.onclick = function() { sub.sessionsView = 'list'; sub.sessionsEditId = null; renderDetail(container, patient); };
+    if (sessionSave) {
+      sessionSave.onclick = function() {
+        var form = document.getElementById('session-form');
+        var data = Utils.getFormData(form);
+        data.painScore = parseInt(data.painScore, 10) || 0;
+        data.functionScore = parseInt(data.functionScore, 10) || 0;
+        data.patientId = patient.id;
+        var session = sub.sessionsEditId ? Store.getSession(sub.sessionsEditId) : null;
+        if (session) {
+          Store.updateSession(session.id, data);
+          Utils.toast('Treatment note updated', 'success');
+        } else {
+          Store.createSession(data);
+          Utils.toast('Treatment note added', 'success');
+        }
+        sub.sessionsView = 'list';
+        sub.sessionsEditId = null;
+        renderDetail(container, Store.getPatient(patient.id));
+      };
+      // Bind mic + autocomplete
+      Utils.bindMicButtons(container);
+      Utils.bindAllAutocomplete(container);
     }
-    body += '</select></div>';
-    body += '</div>';
-    body += '<div class="form-row">';
-    body += '<div class="form-group"><label>Frequency</label>';
-    body += '<input type="text" name="frequency" value="' + Utils.escapeHtml(rx ? rx.frequency : '') + '" required placeholder="e.g., Twice daily (after meals)"></div>';
-    body += '<div class="form-group"><label>Duration</label>';
-    body += '<input type="text" name="duration" value="' + Utils.escapeHtml(rx ? rx.duration : '') + '" required placeholder="e.g., 7 days"></div>';
-    body += '</div>';
-    body += '<div class="form-row">';
-    body += '<div class="form-group"><label>Date</label>';
-    body += '<input type="date" name="date" value="' + (rx ? rx.date : Utils.today()) + '" required></div>';
-    body += '<div class="form-group"><label>Prescribed By</label>';
-    body += '<input type="text" name="prescribedBy" value="' + Utils.escapeHtml(rx ? rx.prescribedBy : doctorName) + '"></div>';
-    body += '</div>';
-    body += '<div class="form-group"><label>Special Instructions ' + Utils.micHtml('rx-instructions') + '</label>';
-    body += '<textarea id="rx-instructions" name="instructions" rows="3" placeholder="e.g., Take after food. Avoid on empty stomach...">' + Utils.escapeHtml(rx ? rx.instructions || '' : '') + '</textarea></div>';
-    body += '<div class="form-group"><label>Status</label>';
-    body += '<select name="status">';
-    body += '<option value="active"' + (rx && rx.status === 'active' ? ' selected' : '') + '>Active</option>';
-    body += '<option value="discontinued"' + (rx && rx.status === 'discontinued' ? ' selected' : '') + '>Discontinued</option>';
-    body += '</select></div>';
-    body += '</form>';
 
-    var footer = '<button class="btn btn-secondary" id="modal-cancel">Cancel</button>';
-    footer += '<button class="btn btn-primary" id="modal-save">' + (rx ? 'Update' : 'Add') + ' Prescription</button>';
-
-    Utils.showModal(title, body, footer);
-    Utils.bindMicButtons(document.getElementById('modal-body'));
-
-    document.getElementById('modal-cancel').onclick = Utils.closeModal;
-    document.getElementById('modal-save').onclick = function() {
-      var form = document.getElementById('rx-form');
-      var medInput = form.querySelector('[name="medication"]');
-      if (!medInput.value.trim()) {
-        Utils.toast('Medication name is required', 'error');
-        return;
-      }
-      var data = Utils.getFormData(form);
-      data.patientId = patient.id;
-
-      if (rx) {
-        Store.updatePrescription(rx.id, data);
-        Utils.toast('Prescription updated', 'success');
-      } else {
-        Store.createPrescription(data);
-        Utils.toast('Prescription added', 'success');
-      }
-      Utils.closeModal();
-      renderDetail(container, Store.getPatient(patient.id));
-    };
-  }
-
-  // Book Next Visit modal
-  function showBookNextVisit(patient, container) {
-    // Get last appointment for defaults
-    var appts = Store.getAppointmentsByPatient(patient.id);
-    appts.sort(function(a, b) { return a.date > b.date ? -1 : 1; });
-    var lastAppt = appts.length > 0 ? appts[0] : null;
-
-    var defaultDate = Utils.toDateString(Utils.addDays(new Date(), 7));
-    var defaultTime = lastAppt ? lastAppt.time : '09:00';
-    var defaultType = lastAppt ? lastAppt.type : 'Follow-up';
-    var defaultDuration = lastAppt ? lastAppt.duration : '30';
-
-    var body = '<form id="next-visit-form">';
-    body += '<div class="form-row">';
-    body += '<div class="form-group"><label>Date</label>';
-    body += '<input type="date" name="date" value="' + defaultDate + '" required></div>';
-    body += '<div class="form-group"><label>Time</label>';
-    body += '<input type="time" name="time" value="' + defaultTime + '" required></div>';
-    body += '</div>';
-    body += '<div class="form-row">';
-    body += '<div class="form-group"><label>Type</label>';
-    body += '<select name="type">';
-    body += '<option value="Initial Evaluation"' + (defaultType === 'Initial Evaluation' ? ' selected' : '') + '>Initial Evaluation</option>';
-    body += '<option value="Treatment"' + (defaultType === 'Treatment' ? ' selected' : '') + '>Treatment</option>';
-    body += '<option value="Follow-up"' + (defaultType === 'Follow-up' ? ' selected' : '') + '>Follow-up</option>';
-    body += '</select></div>';
-    body += '<div class="form-group"><label>Duration (min)</label>';
-    body += '<select name="duration">';
-    var durations = ['15','30','45','60','90'];
-    for (var d = 0; d < durations.length; d++) {
-      body += '<option value="' + durations[d] + '"' + (durations[d] === defaultDuration ? ' selected' : '') + '>' + durations[d] + ' min</option>';
+    // Exercise form
+    var exBack = document.getElementById('exercise-form-back');
+    var exCancel = document.getElementById('exercise-form-cancel');
+    var exSave = document.getElementById('exercise-form-save');
+    if (exBack) exBack.onclick = function() { sub.exercisesView = 'list'; sub.exercisesEditId = null; renderDetail(container, patient); };
+    if (exCancel) exCancel.onclick = function() { sub.exercisesView = 'list'; sub.exercisesEditId = null; renderDetail(container, patient); };
+    if (exSave) {
+      exSave.onclick = function() {
+        var form = document.getElementById('exercise-form');
+        var nameInput = form.querySelector('[name="name"]');
+        if (!nameInput.value.trim()) {
+          Utils.toast('Exercise name is required', 'error');
+          return;
+        }
+        var data = Utils.getFormData(form);
+        data.patientId = patient.id;
+        var exercise = sub.exercisesEditId ? Store.getExercises().filter(function(e) { return e.id === sub.exercisesEditId; })[0] : null;
+        if (exercise) {
+          Store.updateExercise(exercise.id, data);
+          Utils.toast('Exercise updated', 'success');
+        } else {
+          Store.createExercise(data);
+          Utils.toast('Exercise added', 'success');
+        }
+        sub.exercisesView = 'list';
+        sub.exercisesEditId = null;
+        renderDetail(container, Store.getPatient(patient.id));
+      };
+      Utils.bindMicButtons(container);
     }
-    body += '</select></div>';
-    body += '</div>';
-    body += '<div class="form-group"><label>Notes</label>';
-    body += '<textarea name="notes" rows="2"></textarea></div>';
-    body += '<div id="conflict-warning" style="display:none;" class="login-error"></div>';
-    body += '</form>';
 
-    var footer = '<button class="btn btn-secondary" id="modal-cancel">Cancel</button>';
-    footer += '<button class="btn btn-primary" id="modal-save">Book Appointment</button>';
+    // Prescription form
+    var rxBack = document.getElementById('rx-form-back');
+    var rxCancel = document.getElementById('rx-form-cancel');
+    var rxSave = document.getElementById('rx-form-save');
+    if (rxBack) rxBack.onclick = function() { sub.rxView = 'list'; sub.rxEditId = null; renderDetail(container, patient); };
+    if (rxCancel) rxCancel.onclick = function() { sub.rxView = 'list'; sub.rxEditId = null; renderDetail(container, patient); };
+    if (rxSave) {
+      rxSave.onclick = function() {
+        var form = document.getElementById('rx-form');
+        var medInput = form.querySelector('[name="medication"]');
+        if (!medInput.value.trim()) {
+          Utils.toast('Medication name is required', 'error');
+          return;
+        }
+        var data = Utils.getFormData(form);
+        data.patientId = patient.id;
+        var rx = sub.rxEditId ? Store.getPrescription(sub.rxEditId) : null;
+        if (rx) {
+          Store.updatePrescription(rx.id, data);
+          Utils.toast('Prescription updated', 'success');
+        } else {
+          Store.createPrescription(data);
+          Utils.toast('Prescription added', 'success');
+        }
+        sub.rxView = 'list';
+        sub.rxEditId = null;
+        renderDetail(container, Store.getPatient(patient.id));
+      };
+      Utils.bindMicButtons(container);
+    }
 
-    Utils.showModal('Book Next Visit - ' + patient.name, body, footer);
+    // Billing form
+    var billBack = document.getElementById('billing-form-back');
+    var billCancel = document.getElementById('billing-form-cancel');
+    var billSave = document.getElementById('billing-form-save');
+    if (billBack) billBack.onclick = function() { sub.billingView = 'list'; renderDetail(container, patient); };
+    if (billCancel) billCancel.onclick = function() { sub.billingView = 'list'; renderDetail(container, patient); };
+    if (billSave) {
+      billSave.onclick = function() {
+        var form = document.getElementById('billing-form');
+        var data = Utils.getFormData(form);
+        if (!data.description || !data.amount) {
+          Utils.toast('Description and amount are required', 'error');
+          return;
+        }
+        data.patientId = patient.id;
+        if (data.status === 'paid') data.paidDate = Utils.today();
+        Store.createBilling(data);
+        Utils.toast('Invoice created', 'success');
+        sub.billingView = 'list';
+        renderDetail(container, Store.getPatient(patient.id));
+      };
+    }
 
-    document.getElementById('modal-cancel').onclick = Utils.closeModal;
-    document.getElementById('modal-save').onclick = function() {
-      var form = document.getElementById('next-visit-form');
-      var data = Utils.getFormData(form);
-      if (!data.date || !data.time) {
-        Utils.toast('Date and time are required', 'error');
-        return;
-      }
-      // Conflict check
-      var conflict = Store.hasConflict(data.date, data.time, data.duration);
-      if (conflict) {
-        var warningEl = document.getElementById('conflict-warning');
-        warningEl.textContent = 'Conflict: ' + conflict.patientName + ' already has an appointment at ' + Utils.formatTime(conflict.time) + ' (' + conflict.duration + ' min)';
-        warningEl.style.display = 'block';
-        return;
-      }
-      data.patientId = patient.id;
-      data.patientName = patient.name;
-      data.status = 'scheduled';
-      Store.createAppointment(data);
-      Utils.toast('Next visit booked', 'success');
-      Utils.closeModal();
-      renderDetail(container, Store.getPatient(patient.id));
-    };
+    // Book Next Visit form
+    var bookBack = document.getElementById('booking-form-back');
+    var bookCancel = document.getElementById('booking-form-cancel');
+    var bookSave = document.getElementById('booking-form-save');
+    if (bookBack) bookBack.onclick = function() { sub.bookingView = 'list'; renderDetail(container, patient); };
+    if (bookCancel) bookCancel.onclick = function() { sub.bookingView = 'list'; renderDetail(container, patient); };
+    if (bookSave) {
+      bookSave.onclick = function() {
+        var form = document.getElementById('next-visit-form');
+        var data = Utils.getFormData(form);
+        if (!data.date || !data.time) {
+          Utils.toast('Date and time are required', 'error');
+          return;
+        }
+        var conflict = Store.hasConflict(data.date, data.time, data.duration);
+        if (conflict) {
+          var warningEl = document.getElementById('conflict-warning-booking');
+          warningEl.textContent = 'Conflict: ' + conflict.patientName + ' already has an appointment at ' + Utils.formatTime(conflict.time) + ' (' + conflict.duration + ' min)';
+          warningEl.style.display = 'block';
+          return;
+        }
+        data.patientId = patient.id;
+        data.patientName = patient.name;
+        data.status = 'scheduled';
+        Store.createAppointment(data);
+        Utils.toast('Next visit booked', 'success');
+        sub.bookingView = 'list';
+        renderDetail(container, Store.getPatient(patient.id));
+      };
+    }
+
+    // Print options panel
+    var printClose = document.getElementById('print-options-close');
+    var printCancelBtn = document.getElementById('print-cancel-btn');
+    if (printClose) printClose.onclick = function() { sub.printExpanded = false; renderDetail(container, patient); };
+    if (printCancelBtn) printCancelBtn.onclick = function() { sub.printExpanded = false; renderDetail(container, patient); };
+
+    // Print type toggle
+    var typeBtns = container.querySelectorAll('.print-type-btn');
+    var currentPrintType = 'patient';
+    for (var t = 0; t < typeBtns.length; t++) {
+      typeBtns[t].addEventListener('click', function() {
+        for (var x = 0; x < typeBtns.length; x++) { typeBtns[x].className = 'btn btn-secondary print-type-btn'; }
+        this.className = 'btn btn-primary print-type-btn active';
+        currentPrintType = this.getAttribute('data-type');
+        var patOpts = document.getElementById('print-patient-opts');
+        var billOpts = document.getElementById('print-billing-opts');
+        if (patOpts) patOpts.style.display = currentPrintType === 'patient' || currentPrintType === 'combined' ? '' : 'none';
+        if (billOpts) billOpts.style.display = currentPrintType === 'billing' || currentPrintType === 'combined' ? '' : 'none';
+      });
+    }
+
+    // Billing type radio toggle
+    var radios = container.querySelectorAll('[name="bill-type"]');
+    for (var r = 0; r < radios.length; r++) {
+      radios[r].addEventListener('change', function() {
+        for (var rr = 0; rr < radios.length; rr++) {
+          radios[rr].parentElement.classList.toggle('checked', radios[rr].checked);
+        }
+        var picker = document.getElementById('print-invoice-picker');
+        if (picker) picker.style.display = this.value === 'single' ? 'block' : 'none';
+      });
+    }
+
+    // Checkbox visual toggle (print sections + sigs)
+    var checks = container.querySelectorAll('.print-section, .print-sig, .rx-sig');
+    for (var c = 0; c < checks.length; c++) {
+      checks[c].addEventListener('change', function() {
+        this.parentElement.classList.toggle('checked', this.checked);
+      });
+    }
+
+    // Print go button
+    var printGoBtn = document.getElementById('print-go-btn');
+    if (printGoBtn) {
+      printGoBtn.onclick = function() {
+        var sections = [];
+        var secChks = container.querySelectorAll('.print-section');
+        for (var i = 0; i < secChks.length; i++) { if (secChks[i].checked) sections.push(secChks[i].value); }
+        var billTypeRadio = container.querySelector('[name="bill-type"]:checked');
+        var billType = billTypeRadio ? billTypeRadio.value : 'statement';
+        var invoiceSel = document.getElementById('print-invoice-select');
+        var invoiceId = invoiceSel ? invoiceSel.value : '';
+        var signatures = [];
+        var sigChks = container.querySelectorAll('.print-sig');
+        for (var si = 0; si < sigChks.length; si++) { if (sigChks[si].checked) signatures.push(sigChks[si].value); }
+        // Determine print type from active button
+        var activeTypeBtn = container.querySelector('.print-type-btn.active');
+        var type = activeTypeBtn ? activeTypeBtn.getAttribute('data-type') : 'patient';
+        sub.printExpanded = false;
+        renderDetail(container, patient);
+        executePrint(patient, type, sections, billType, invoiceId, signatures);
+      };
+    }
+
+    // Rx print panel
+    var rxPrintClose = document.getElementById('rx-print-close');
+    var rxPrintCancel = document.getElementById('rx-print-cancel');
+    if (rxPrintClose) rxPrintClose.onclick = function() { sub.rxPrintExpanded = false; renderDetail(container, patient); };
+    if (rxPrintCancel) rxPrintCancel.onclick = function() { sub.rxPrintExpanded = false; renderDetail(container, patient); };
+
+    var rxPrintGo = document.getElementById('rx-print-go');
+    if (rxPrintGo) {
+      rxPrintGo.onclick = function() {
+        var sigs = [];
+        var rxSigChks = container.querySelectorAll('.rx-sig');
+        for (var i = 0; i < rxSigChks.length; i++) { if (rxSigChks[i].checked) sigs.push(rxSigChks[i].value); }
+        sub.rxPrintExpanded = false;
+        renderDetail(container, patient);
+        printPrescriptionPad(patient, sigs);
+      };
+    }
   }
 
   return { render: render };

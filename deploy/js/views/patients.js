@@ -11,7 +11,9 @@ window.PatientsView = (function() {
     genderFilter: '',
     tagFilter: '',
     page: 1,
-    perPage: 10
+    perPage: 10,
+    subView: 'list',  // 'list' | 'form'
+    editId: null
   };
 
   function render(container) {
@@ -20,7 +22,17 @@ window.PatientsView = (function() {
     state.genderFilter = '';
     state.tagFilter = '';
     state.page = 1;
-    renderList(container);
+    state.subView = 'list';
+    state.editId = null;
+    renderView(container);
+  }
+
+  function renderView(container) {
+    if (state.subView === 'form') {
+      renderForm(container);
+    } else {
+      renderList(container);
+    }
   }
 
   function renderList(container) {
@@ -143,10 +155,190 @@ window.PatientsView = (function() {
     container.innerHTML = html;
 
     // Event listeners
-    bindEvents(container);
+    bindListEvents(container);
   }
 
-  function bindEvents(container) {
+  function renderForm(container) {
+    var patient = state.editId ? Store.getPatient(state.editId) : null;
+    var title = patient ? 'Edit Patient' : 'New Patient';
+
+    var html = '<div class="inline-form-card">';
+    html += '<div class="inline-form-header">';
+    html += '<button class="back-btn" id="form-back-btn"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button>';
+    html += '<h3>' + title + '</h3>';
+    html += '</div>';
+    html += '<div class="inline-form-body">';
+    html += '<form id="patient-form">';
+    html += '<div class="form-row">';
+    html += formField('Full Name', 'name', 'text', patient ? patient.name : '', true);
+    html += '<div class="form-group"><label>Date of Birth</label>';
+    html += Utils.dobPickerHtml(patient ? patient.dob : '');
+    html += '<div class="dob-age" style="font-size:0.8em;color:var(--text-muted);margin-top:4px;">' + (patient && patient.dob ? 'Age: ' + Utils.calculateAge(patient.dob) : '') + '</div>';
+    html += '</div>';
+    html += '</div>';
+    html += '<div class="form-row">';
+    html += '<div class="form-group"><label>Gender</label>';
+    html += '<select name="gender" required>';
+    html += '<option value="">Select...</option>';
+    html += '<option value="male"' + (patient && patient.gender === 'male' ? ' selected' : '') + '>Male</option>';
+    html += '<option value="female"' + (patient && patient.gender === 'female' ? ' selected' : '') + '>Female</option>';
+    html += '<option value="other"' + (patient && patient.gender === 'other' ? ' selected' : '') + '>Other</option>';
+    html += '</select></div>';
+    html += '<div class="form-group"><label>Status</label>';
+    html += '<select name="status">';
+    html += '<option value="active"' + (patient && patient.status === 'active' ? ' selected' : '') + '>Active</option>';
+    html += '<option value="completed"' + (patient && patient.status === 'completed' ? ' selected' : '') + '>Completed</option>';
+    html += '</select></div>';
+    html += '</div>';
+    html += '<div class="form-row">';
+    html += phoneField('Phone', 'phone', 'phoneCode', patient ? patient.phone : '', patient ? patient.phoneCode : '');
+    html += formField('Email', 'email', 'email', patient ? patient.email : '');
+    html += '</div>';
+    html += formField('Address', 'address', 'text', patient ? patient.address : '');
+    html += formField('Insurance', 'insurance', 'text', patient ? patient.insurance : '');
+    html += '<div class="form-group"><label>Diagnosis ' + Utils.micHtml('pf-diagnosis') + '</label>';
+    html += '<textarea id="pf-diagnosis" name="diagnosis" rows="2" data-ac="diagnosis" placeholder="Start typing for suggestions...">' + Utils.escapeHtml(patient ? patient.diagnosis || '' : '') + '</textarea></div>';
+    html += '<div class="form-group"><label>Treatment Plan ' + Utils.micHtml('pf-treatplan') + '</label>';
+    html += '<textarea id="pf-treatplan" name="treatmentPlan" rows="3" data-ac="treatmentPlan" placeholder="Start typing for suggestions...">' + Utils.escapeHtml(patient ? patient.treatmentPlan || '' : '') + '</textarea></div>';
+    html += '<div class="form-row">';
+    html += formField('Emergency Contact', 'emergencyContact', 'text', patient ? patient.emergencyContact : '');
+    html += phoneField('Emergency Phone', 'emergencyPhone', 'emergencyPhoneCode', patient ? patient.emergencyPhone : '', patient ? patient.emergencyPhoneCode : '');
+    html += '</div>';
+    html += '<div class="form-group"><label>Notes ' + Utils.micHtml('pf-notes') + '</label>';
+    html += '<textarea id="pf-notes" name="notes" rows="2">' + Utils.escapeHtml(patient ? patient.notes || '' : '') + '</textarea></div>';
+    // Body diagram
+    html += '<div class="form-group"><label>Affected Body Areas</label>';
+    html += '<div class="body-diagram-wrap"><div id="pf-body-diagram"></div></div></div>';
+    // Tag pill buttons
+    var formTags = Store.getTags();
+    var patientTags = (patient && patient.tags) ? patient.tags : [];
+    html += '<div class="form-group"><label>Tags</label>';
+    html += '<div class="tag-pill-group">';
+    for (var ti = 0; ti < formTags.length; ti++) {
+      var isChecked = patientTags.indexOf(formTags[ti].id) !== -1;
+      var tagColor = formTags[ti].color || '#6b7280';
+      html += '<button type="button" class="tag-pill' + (isChecked ? ' active' : '') + '" data-tag-id="' + formTags[ti].id + '" data-color="' + tagColor + '"' + (isChecked ? ' style="background:' + tagColor + ';color:#fff;border-color:' + tagColor + ';"' : '') + '>';
+      html += '<span class="tag-pill-dot" style="background:' + tagColor + ';"></span>';
+      html += Utils.escapeHtml(formTags[ti].name);
+      html += '</button>';
+    }
+    html += '</div></div>';
+    html += '</form>';
+    html += '</div>';
+    html += '<div class="inline-form-actions">';
+    html += '<button class="btn btn-secondary" id="form-cancel-btn">Cancel</button>';
+    html += '<button class="btn btn-primary" id="form-save-btn">Save Patient</button>';
+    html += '</div>';
+    html += '</div>';
+
+    container.innerHTML = html;
+
+    // Bind mic buttons, autocomplete, and DOB picker
+    Utils.bindMicButtons(container);
+    Utils.bindAllAutocomplete(container);
+    Utils.bindDobPicker(container);
+
+    // Tag pill toggle
+    var tagPills = container.querySelectorAll('.tag-pill');
+    for (var tp = 0; tp < tagPills.length; tp++) {
+      tagPills[tp].addEventListener('click', function() {
+        var color = this.getAttribute('data-color');
+        this.classList.toggle('active');
+        if (this.classList.contains('active')) {
+          this.style.background = color;
+          this.style.color = '#fff';
+          this.style.borderColor = color;
+        } else {
+          this.style.background = '';
+          this.style.color = '';
+          this.style.borderColor = '';
+        }
+      });
+    }
+
+    // Render body diagram
+    var _bodyRegions = (patient && patient.bodyRegions) ? patient.bodyRegions.slice() : [];
+    BodyDiagram.render('pf-body-diagram', _bodyRegions);
+
+    // Phone digit enforcement
+    var phoneWraps = container.querySelectorAll('.phone-input-wrap');
+    for (var pi = 0; pi < phoneWraps.length; pi++) {
+      (function(wrap) {
+        var codeInput = wrap.querySelector('.phone-code-input');
+        var numInput = wrap.querySelector('.phone-number-input');
+        if (!codeInput || !numInput) return;
+
+        function getMax() {
+          return Utils.getDigitsByPhoneCode(codeInput.value);
+        }
+
+        codeInput.addEventListener('input', function() {
+          var max = getMax();
+          numInput.maxLength = max;
+          numInput.placeholder = 'Phone number (' + max + ' digits)';
+          var digits = numInput.value.replace(/[^\d]/g, '');
+          if (digits.length > max) {
+            numInput.value = digits.substring(0, max);
+          }
+        });
+
+        numInput.addEventListener('input', function() {
+          var max = getMax();
+          var digits = this.value.replace(/[^\d]/g, '');
+          if (digits.length > max) digits = digits.substring(0, max);
+          this.value = digits;
+        });
+        numInput.addEventListener('keypress', function(e) {
+          if (e.key && e.key.length === 1 && !/\d/.test(e.key)) {
+            e.preventDefault();
+          }
+          var max = getMax();
+          var digits = this.value.replace(/[^\d]/g, '');
+          if (digits.length >= max && !e.ctrlKey && !e.metaKey) {
+            e.preventDefault();
+          }
+        });
+      })(phoneWraps[pi]);
+    }
+
+    // Back/Cancel
+    document.getElementById('form-back-btn').onclick = function() {
+      state.subView = 'list'; state.editId = null; renderView(container);
+    };
+    document.getElementById('form-cancel-btn').onclick = function() {
+      state.subView = 'list'; state.editId = null; renderView(container);
+    };
+
+    // Save
+    document.getElementById('form-save-btn').onclick = function() {
+      var form = document.getElementById('patient-form');
+      var nameInput = form.querySelector('[name="name"]');
+      if (!nameInput.value.trim()) {
+        Utils.toast('Name is required', 'error');
+        return;
+      }
+      var data = Utils.getFormData(form);
+      // Collect tags from pill buttons
+      var activePills = form.querySelectorAll('.tag-pill.active');
+      data.tags = [];
+      for (var tc = 0; tc < activePills.length; tc++) {
+        data.tags.push(activePills[tc].getAttribute('data-tag-id'));
+      }
+      // Collect body diagram selections
+      data.bodyRegions = BodyDiagram.getSelected('pf-body-diagram');
+      if (patient) {
+        Store.updatePatient(patient.id, data);
+        Utils.toast('Patient updated', 'success');
+      } else {
+        Store.createPatient(data);
+        Utils.toast('Patient created', 'success');
+      }
+      state.subView = 'list'; state.editId = null;
+      renderView(container);
+    };
+  }
+
+  function bindListEvents(container) {
     // Search
     var searchInput = document.getElementById('patient-search');
     var searchTimeout;
@@ -201,7 +393,8 @@ window.PatientsView = (function() {
 
       // Add patient
       if (e.target.closest('#add-patient-btn')) {
-        showPatientForm(null, container);
+        state.subView = 'form'; state.editId = null;
+        renderView(container);
         return;
       }
 
@@ -209,8 +402,8 @@ window.PatientsView = (function() {
       var editBtn = e.target.closest('.edit-patient-btn');
       if (editBtn) {
         e.stopPropagation();
-        var pid = editBtn.getAttribute('data-id');
-        showPatientForm(pid, container);
+        state.subView = 'form'; state.editId = editBtn.getAttribute('data-id');
+        renderView(container);
         return;
       }
 
@@ -220,11 +413,11 @@ window.PatientsView = (function() {
         e.stopPropagation();
         var delId = deleteBtn.getAttribute('data-id');
         var patient = Store.getPatient(delId);
-        Utils.confirm('Are you sure you want to delete ' + patient.name + '? This will also remove all their appointments, sessions, exercises, and billing records.', function() {
+        Utils.inlineConfirm(container, 'Delete ' + patient.name + '? All their records will be removed.', function() {
           Store.deletePatient(delId);
           Utils.toast('Patient deleted', 'success');
           renderList(container);
-        });
+        }, { danger: true });
         return;
       }
 
@@ -235,171 +428,6 @@ window.PatientsView = (function() {
       }
     };
     container.addEventListener('click', _clickHandler);
-  }
-
-  function showPatientForm(patientId, container) {
-    var patient = patientId ? Store.getPatient(patientId) : null;
-    var title = patient ? 'Edit Patient' : 'New Patient';
-
-    var body = '<form id="patient-form">';
-    body += '<div class="form-row">';
-    body += formField('Full Name', 'name', 'text', patient ? patient.name : '', true);
-    body += '<div class="form-group"><label>Date of Birth</label>';
-    body += Utils.dobPickerHtml(patient ? patient.dob : '');
-    body += '<div class="dob-age" style="font-size:0.8em;color:var(--text-muted);margin-top:4px;">' + (patient && patient.dob ? 'Age: ' + Utils.calculateAge(patient.dob) : '') + '</div>';
-    body += '</div>';
-    body += '</div>';
-    body += '<div class="form-row">';
-    body += '<div class="form-group"><label>Gender</label>';
-    body += '<select name="gender" required>';
-    body += '<option value="">Select...</option>';
-    body += '<option value="male"' + (patient && patient.gender === 'male' ? ' selected' : '') + '>Male</option>';
-    body += '<option value="female"' + (patient && patient.gender === 'female' ? ' selected' : '') + '>Female</option>';
-    body += '<option value="other"' + (patient && patient.gender === 'other' ? ' selected' : '') + '>Other</option>';
-    body += '</select></div>';
-    body += '<div class="form-group"><label>Status</label>';
-    body += '<select name="status">';
-    body += '<option value="active"' + (patient && patient.status === 'active' ? ' selected' : '') + '>Active</option>';
-    body += '<option value="completed"' + (patient && patient.status === 'completed' ? ' selected' : '') + '>Completed</option>';
-    body += '</select></div>';
-    body += '</div>';
-    body += '<div class="form-row">';
-    body += phoneField('Phone', 'phone', 'phoneCode', patient ? patient.phone : '', patient ? patient.phoneCode : '');
-    body += formField('Email', 'email', 'email', patient ? patient.email : '');
-    body += '</div>';
-    body += formField('Address', 'address', 'text', patient ? patient.address : '');
-    body += formField('Insurance', 'insurance', 'text', patient ? patient.insurance : '');
-    body += '<div class="form-group"><label>Diagnosis ' + Utils.micHtml('pf-diagnosis') + '</label>';
-    body += '<textarea id="pf-diagnosis" name="diagnosis" rows="2" data-ac="diagnosis" placeholder="Start typing for suggestions...">' + Utils.escapeHtml(patient ? patient.diagnosis || '' : '') + '</textarea></div>';
-    body += '<div class="form-group"><label>Treatment Plan ' + Utils.micHtml('pf-treatplan') + '</label>';
-    body += '<textarea id="pf-treatplan" name="treatmentPlan" rows="3" data-ac="treatmentPlan" placeholder="Start typing for suggestions...">' + Utils.escapeHtml(patient ? patient.treatmentPlan || '' : '') + '</textarea></div>';
-    body += '<div class="form-row">';
-    body += formField('Emergency Contact', 'emergencyContact', 'text', patient ? patient.emergencyContact : '');
-    body += phoneField('Emergency Phone', 'emergencyPhone', 'emergencyPhoneCode', patient ? patient.emergencyPhone : '', patient ? patient.emergencyPhoneCode : '');
-    body += '</div>';
-    body += '<div class="form-group"><label>Notes ' + Utils.micHtml('pf-notes') + '</label>';
-    body += '<textarea id="pf-notes" name="notes" rows="2">' + Utils.escapeHtml(patient ? patient.notes || '' : '') + '</textarea></div>';
-    // Body diagram
-    body += '<div class="form-group"><label>Affected Body Areas</label>';
-    body += '<div class="body-diagram-wrap"><div id="pf-body-diagram"></div></div></div>';
-    // Tag pill buttons
-    var formTags = Store.getTags();
-    var patientTags = (patient && patient.tags) ? patient.tags : [];
-    body += '<div class="form-group"><label>Tags</label>';
-    body += '<div class="tag-pill-group">';
-    for (var ti = 0; ti < formTags.length; ti++) {
-      var isChecked = patientTags.indexOf(formTags[ti].id) !== -1;
-      var tagColor = formTags[ti].color || '#6b7280';
-      body += '<button type="button" class="tag-pill' + (isChecked ? ' active' : '') + '" data-tag-id="' + formTags[ti].id + '" data-color="' + tagColor + '"' + (isChecked ? ' style="background:' + tagColor + ';color:#fff;border-color:' + tagColor + ';"' : '') + '>';
-      body += '<span class="tag-pill-dot" style="background:' + tagColor + ';"></span>';
-      body += Utils.escapeHtml(formTags[ti].name);
-      body += '</button>';
-    }
-    body += '</div></div>';
-    body += '</form>';
-
-    var footer = '<button class="btn btn-secondary" id="modal-cancel">Cancel</button>';
-    footer += '<button class="btn btn-primary" id="modal-save">Save Patient</button>';
-
-    Utils.showModal(title, body, footer, { large: true });
-
-    // Bind mic buttons, autocomplete, and DOB picker
-    var modalBody = document.getElementById('modal-body');
-    Utils.bindMicButtons(modalBody);
-    Utils.bindAllAutocomplete(modalBody);
-    Utils.bindDobPicker(modalBody);
-
-    // Tag pill toggle
-    var tagPills = document.querySelectorAll('.tag-pill');
-    for (var tp = 0; tp < tagPills.length; tp++) {
-      tagPills[tp].addEventListener('click', function() {
-        var color = this.getAttribute('data-color');
-        this.classList.toggle('active');
-        if (this.classList.contains('active')) {
-          this.style.background = color;
-          this.style.color = '#fff';
-          this.style.borderColor = color;
-        } else {
-          this.style.background = '';
-          this.style.color = '';
-          this.style.borderColor = '';
-        }
-      });
-    }
-
-    // Render body diagram
-    var _bodyRegions = (patient && patient.bodyRegions) ? patient.bodyRegions.slice() : [];
-    BodyDiagram.render('pf-body-diagram', _bodyRegions);
-
-    // Enforce digits-only on phone inputs, limit adjusts per country code
-    var phoneWraps = document.querySelectorAll('.phone-input-wrap');
-    for (var pi = 0; pi < phoneWraps.length; pi++) {
-      (function(wrap) {
-        var codeInput = wrap.querySelector('.phone-code-input');
-        var numInput = wrap.querySelector('.phone-number-input');
-        if (!codeInput || !numInput) return;
-
-        function getMax() {
-          return Utils.getDigitsByPhoneCode(codeInput.value);
-        }
-
-        // When country code changes, update maxlength and trim if needed
-        codeInput.addEventListener('input', function() {
-          var max = getMax();
-          numInput.maxLength = max;
-          numInput.placeholder = 'Phone number (' + max + ' digits)';
-          var digits = numInput.value.replace(/[^\d]/g, '');
-          if (digits.length > max) {
-            numInput.value = digits.substring(0, max);
-          }
-        });
-
-        numInput.addEventListener('input', function() {
-          var max = getMax();
-          var digits = this.value.replace(/[^\d]/g, '');
-          if (digits.length > max) digits = digits.substring(0, max);
-          this.value = digits;
-        });
-        numInput.addEventListener('keypress', function(e) {
-          if (e.key && e.key.length === 1 && !/\d/.test(e.key)) {
-            e.preventDefault();
-          }
-          var max = getMax();
-          var digits = this.value.replace(/[^\d]/g, '');
-          if (digits.length >= max && !e.ctrlKey && !e.metaKey) {
-            e.preventDefault();
-          }
-        });
-      })(phoneWraps[pi]);
-    }
-
-    document.getElementById('modal-cancel').onclick = Utils.closeModal;
-    document.getElementById('modal-save').onclick = function() {
-      var form = document.getElementById('patient-form');
-      var nameInput = form.querySelector('[name="name"]');
-      if (!nameInput.value.trim()) {
-        Utils.toast('Name is required', 'error');
-        return;
-      }
-      var data = Utils.getFormData(form);
-      // Collect tags from pill buttons
-      var tagPills = form.querySelectorAll('.tag-pill.active');
-      data.tags = [];
-      for (var tc = 0; tc < tagPills.length; tc++) {
-        data.tags.push(tagPills[tc].getAttribute('data-tag-id'));
-      }
-      // Collect body diagram selections
-      data.bodyRegions = BodyDiagram.getSelected('pf-body-diagram');
-      if (patient) {
-        Store.updatePatient(patient.id, data);
-        Utils.toast('Patient updated', 'success');
-      } else {
-        Store.createPatient(data);
-        Utils.toast('Patient created', 'success');
-      }
-      Utils.closeModal();
-      renderList(container);
-    };
   }
 
   function phoneField(label, phoneName, codeName, phoneVal, codeVal) {

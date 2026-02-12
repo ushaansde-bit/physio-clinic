@@ -1818,3 +1818,136 @@ table.data-table { width: 100%; }
 .settings-toggle-row:last-child {
   border-bottom: none;
 }
+
+/* ============================================
+   Inline Form System (replaces modals)
+   ============================================ */
+.inline-form-card {
+  background: var(--card-bg);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
+  margin-bottom: 1.5rem;
+}
+.inline-form-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+.inline-form-header h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--gray-800);
+  flex: 1;
+}
+.inline-form-header .back-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: var(--gray-100);
+  border-radius: var(--radius);
+  cursor: pointer;
+  color: var(--gray-600);
+  transition: all var(--transition);
+  flex-shrink: 0;
+}
+.inline-form-header .back-btn:hover {
+  background: var(--gray-200);
+  color: var(--gray-800);
+}
+.inline-form-body {
+  padding: 1.25rem;
+}
+.inline-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid var(--border);
+  background: var(--gray-50);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+.inline-confirm-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 1rem;
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  border-radius: var(--radius);
+  margin-bottom: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--gray-800);
+}
+.inline-confirm-bar.danger {
+  background: #fee2e2;
+  border-color: #ef4444;
+}
+.inline-confirm-bar .confirm-msg {
+  flex: 1;
+  font-weight: 500;
+}
+.inline-confirm-bar .btn {
+  flex-shrink: 0;
+}
+.form-section-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--border);
+  margin: 1.25rem 0 0.75rem;
+}
+.form-section-title:first-child {
+  margin-top: 0;
+}
+/* Inline detail card (appointment detail, etc.) */
+.inline-detail-card {
+  background: var(--card-bg);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
+  margin-bottom: 1.5rem;
+}
+.inline-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--primary-50);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+.inline-detail-header .patient-name-lg {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--gray-900);
+}
+.inline-detail-body {
+  padding: 1.25rem;
+}
+/* WhatsApp links inline section */
+.wa-links-section {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-top: 1rem;
+  max-height: 350px;
+  overflow-y: auto;
+}
+.wa-link-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--gray-100);
+}
+.wa-link-item:last-child {
+  border-bottom: none;
+}

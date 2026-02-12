@@ -1,5 +1,5 @@
 /* ============================================
-   Appointments View - List + Calendar
+   Appointments View - List + Calendar (Inline Forms)
    ============================================ */
 window.AppointmentsView = (function() {
 
@@ -7,6 +7,7 @@ window.AppointmentsView = (function() {
 
   var state = {
     view: 'list',       // list | month | week
+    subView: 'list',    // list | form | detail
     dateFrom: '',
     dateTo: '',
     statusFilter: '',
@@ -15,7 +16,13 @@ window.AppointmentsView = (function() {
     perPage: 10,
     calMonth: new Date().getMonth(),
     calYear: new Date().getFullYear(),
-    weekStart: Utils.getWeekStart(new Date())
+    weekStart: Utils.getWeekStart(new Date()),
+    editId: null,
+    detailId: null,
+    prefillDate: '',
+    prefillTime: '',
+    rescheduleFrom: null,
+    nextVisitAppt: null   // set after completing, for inline next-visit prompt
   };
 
   function render(container) {
@@ -24,11 +31,34 @@ window.AppointmentsView = (function() {
     state.statusFilter = '';
     state.typeFilter = '';
     state.page = 1;
+    state.subView = 'list';
+    state.editId = null;
+    state.detailId = null;
+    state.prefillDate = '';
+    state.prefillTime = '';
+    state.rescheduleFrom = null;
+    state.nextVisitAppt = null;
     renderView(container);
   }
 
   function renderView(container) {
+    if (state.subView === 'form') {
+      renderForm(container);
+    } else if (state.subView === 'detail') {
+      renderDetail(container);
+    } else {
+      renderMain(container);
+    }
+  }
+
+  // ==================== MAIN VIEW (list/month/week) ====================
+  function renderMain(container) {
     var html = '';
+
+    // Next visit prompt (shown after completing an appointment)
+    if (state.nextVisitAppt) {
+      html += renderNextVisitPrompt();
+    }
 
     // View toggle + New button
     html += '<div class="toolbar">';
@@ -52,7 +82,18 @@ window.AppointmentsView = (function() {
     }
 
     container.innerHTML = html;
-    bindEvents(container);
+    bindMainEvents(container);
+  }
+
+  // ==================== NEXT VISIT PROMPT (inline) ====================
+  function renderNextVisitPrompt() {
+    var appt = state.nextVisitAppt;
+    var html = '<div class="inline-confirm-bar" id="next-visit-prompt">';
+    html += '<span class="confirm-msg">Appointment for <strong>' + Utils.escapeHtml(appt.patientName) + '</strong> completed. Schedule next visit?</span>';
+    html += '<button class="btn btn-sm btn-secondary" data-nv-no>No, Thanks</button>';
+    html += '<button class="btn btn-sm btn-primary" data-nv-yes>Schedule Next Visit</button>';
+    html += '</div>';
+    return html;
   }
 
   // ==================== LIST VIEW ====================
@@ -168,7 +209,6 @@ window.AppointmentsView = (function() {
     var todayStr = Utils.today();
     var appointments = Store.getAppointments();
 
-    // Build appt lookup by date
     var apptsByDate = {};
     for (var i = 0; i < appointments.length; i++) {
       var a = appointments[i];
@@ -188,17 +228,14 @@ window.AppointmentsView = (function() {
 
     html += '<div class="calendar-grid">';
 
-    // Day headers
     for (var d = 0; d < 7; d++) {
       html += '<div class="calendar-day-header">' + Utils.DAYS_SHORT[d] + '</div>';
     }
 
-    // Calculate days
     var firstDay = new Date(year, month, 1).getDay();
     var daysInMonth = new Date(year, month + 1, 0).getDate();
     var prevMonthDays = new Date(year, month, 0).getDate();
 
-    // Previous month days
     for (var p = firstDay - 1; p >= 0; p--) {
       var prevDay = prevMonthDays - p;
       var prevDate = Utils.toDateString(new Date(year, month - 1, prevDay));
@@ -208,7 +245,6 @@ window.AppointmentsView = (function() {
       html += '</div>';
     }
 
-    // Current month days
     for (var c = 1; c <= daysInMonth; c++) {
       var curDate = Utils.toDateString(new Date(year, month, c));
       var isToday = curDate === todayStr;
@@ -218,7 +254,6 @@ window.AppointmentsView = (function() {
       html += '</div>';
     }
 
-    // Next month days
     var totalCells = firstDay + daysInMonth;
     var remaining = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
     for (var n = 1; n <= remaining; n++) {
@@ -236,7 +271,6 @@ window.AppointmentsView = (function() {
   function renderCalEvents(appts) {
     if (!appts || appts.length === 0) return '';
     var html = '';
-    // Sort by time
     appts.sort(function(a, b) { return a.time < b.time ? -1 : 1; });
     var max = Math.min(appts.length, 3);
     for (var i = 0; i < max; i++) {
@@ -257,7 +291,6 @@ window.AppointmentsView = (function() {
     var todayStr = Utils.today();
     var appointments = Store.getAppointments();
 
-    // Build lookup
     var apptsByDate = {};
     for (var i = 0; i < appointments.length; i++) {
       var a = appointments[i];
@@ -276,14 +309,12 @@ window.AppointmentsView = (function() {
     html += '<button class="btn btn-ghost btn-sm" id="week-today">Today</button>';
     html += '</div>';
 
-    // Time slots: 8 AM to 6 PM
     var startHour = 8;
     var endHour = 18;
 
     html += '<div class="week-grid">';
 
-    // Header row
-    html += '<div class="week-header-cell"></div>'; // time column header
+    html += '<div class="week-header-cell"></div>';
     for (var d = 0; d < 7; d++) {
       var dayDate = Utils.addDays(ws, d);
       var dayStr = Utils.toDateString(dayDate);
@@ -293,7 +324,6 @@ window.AppointmentsView = (function() {
       html += '</div>';
     }
 
-    // Time rows
     for (var h = startHour; h < endHour; h++) {
       var timeLabel = ((h % 12) || 12) + ':00 ' + (h >= 12 ? 'PM' : 'AM');
       html += '<div class="week-time-label">' + timeLabel + '</div>';
@@ -303,7 +333,6 @@ window.AppointmentsView = (function() {
         var isTodayCol = cellDate === todayStr;
         html += '<div class="week-cell' + (isTodayCol ? ' today-col' : '') + '" data-date="' + cellDate + '" data-hour="' + h + '">';
 
-        // Find appointments in this hour
         var dayAppts = apptsByDate[cellDate] || [];
         for (var k = 0; k < dayAppts.length; k++) {
           var ap = dayAppts[k];
@@ -322,11 +351,240 @@ window.AppointmentsView = (function() {
     return html;
   }
 
-  // ==================== EVENT BINDING ====================
-  function bindEvents(container) {
+  // ==================== INLINE FORM ====================
+  function renderForm(container) {
+    var appt = state.editId ? Store.getAppointment(state.editId) : null;
+    var rescheduleFrom = state.rescheduleFrom;
+    var title = appt ? 'Edit Appointment' : (rescheduleFrom ? 'Reschedule Appointment' : 'New Appointment');
+    var patients = Store.getPatients().filter(function(p) { return p.status === 'active'; });
+    patients.sort(function(a, b) { return a.name.localeCompare(b.name); });
+
+    var defaultDate = state.prefillDate || (appt ? appt.date : (rescheduleFrom ? '' : Utils.today()));
+    var defaultTime = state.prefillTime || (appt ? appt.time : (rescheduleFrom ? rescheduleFrom.time : '09:00'));
+    var defaultPatient = appt ? appt.patientId : (rescheduleFrom ? rescheduleFrom.patientId : '');
+    var defaultType = appt ? appt.type : (rescheduleFrom ? rescheduleFrom.type : 'Treatment');
+    var defaultDuration = appt ? appt.duration : (rescheduleFrom ? rescheduleFrom.duration : '30');
+    var defaultNotes = appt ? appt.notes : (rescheduleFrom ? rescheduleFrom.notes : '');
+
+    var html = '<div class="inline-form-card">';
+    html += '<div class="inline-form-header">';
+    html += '<button class="back-btn" id="appt-form-back">';
+    html += '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>';
+    html += '</button>';
+    html += '<h3>' + title + '</h3>';
+    html += '</div>';
+
+    html += '<div class="inline-form-body">';
+    html += '<form id="appt-form">';
+    html += '<div class="form-group"><label>Patient</label>';
+    html += '<select name="patientId" required>';
+    html += '<option value="">Select patient...</option>';
+    for (var i = 0; i < patients.length; i++) {
+      html += '<option value="' + patients[i].id + '"' + (patients[i].id === defaultPatient ? ' selected' : '') + '>' + Utils.escapeHtml(patients[i].name) + '</option>';
+    }
+    html += '</select></div>';
+    html += '<div class="form-row">';
+    html += '<div class="form-group"><label>Date</label>';
+    html += '<input type="date" name="date" value="' + defaultDate + '" required></div>';
+    html += '<div class="form-group"><label>Time</label>';
+    html += '<input type="time" name="time" value="' + defaultTime + '" required></div>';
+    html += '</div>';
+    html += '<div class="form-row">';
+    html += '<div class="form-group"><label>Type</label>';
+    html += '<select name="type">';
+    html += '<option value="Initial Evaluation"' + (defaultType === 'Initial Evaluation' ? ' selected' : '') + '>Initial Evaluation</option>';
+    html += '<option value="Treatment"' + (defaultType === 'Treatment' ? ' selected' : '') + '>Treatment</option>';
+    html += '<option value="Follow-up"' + (defaultType === 'Follow-up' ? ' selected' : '') + '>Follow-up</option>';
+    html += '</select></div>';
+    html += '<div class="form-group"><label>Duration (min)</label>';
+    html += '<select name="duration">';
+    var durations = ['15','30','45','60','90'];
+    for (var d = 0; d < durations.length; d++) {
+      html += '<option value="' + durations[d] + '"' + (durations[d] === String(defaultDuration) ? ' selected' : '') + '>' + durations[d] + ' min</option>';
+    }
+    html += '</select></div>';
+    html += '</div>';
+    html += '<div class="form-group"><label>Notes ' + Utils.micHtml('af-notes') + '</label>';
+    html += '<textarea name="notes" id="af-notes" rows="3">' + Utils.escapeHtml(defaultNotes || '') + '</textarea></div>';
+    html += '<div id="conflict-warning" style="display:none;" class="login-error"></div>';
+    html += '</form>';
+    html += '</div>';
+
+    html += '<div class="inline-form-actions">';
+    html += '<button class="btn btn-secondary" id="appt-form-cancel">Cancel</button>';
+    html += '<button class="btn btn-primary" id="appt-form-save">' + (appt ? 'Update' : 'Book Appointment') + '</button>';
+    html += '</div>';
+    html += '</div>';
+
+    container.innerHTML = html;
+    Utils.bindMicButtons(container);
+
+    // Back / Cancel
+    document.getElementById('appt-form-back').onclick = function() {
+      goBackToList(container);
+    };
+    document.getElementById('appt-form-cancel').onclick = function() {
+      goBackToList(container);
+    };
+
+    // Save
+    document.getElementById('appt-form-save').onclick = function() {
+      var form = document.getElementById('appt-form');
+      var data = Utils.getFormData(form);
+
+      if (!data.patientId || !data.date || !data.time) {
+        Utils.toast('Please fill in all required fields', 'error');
+        return;
+      }
+
+      // Conflict check
+      var conflict = Store.hasConflict(data.date, data.time, data.duration, appt ? appt.id : null);
+      if (conflict) {
+        var warningEl = document.getElementById('conflict-warning');
+        warningEl.textContent = 'Conflict: ' + conflict.patientName + ' already has an appointment at ' + Utils.formatTime(conflict.time) + ' (' + conflict.duration + ' min)';
+        warningEl.style.display = 'block';
+        return;
+      }
+
+      var patient = Store.getPatient(data.patientId);
+      data.patientName = patient ? patient.name : 'Unknown';
+      data.status = appt ? appt.status : 'scheduled';
+
+      if (appt) {
+        Store.updateAppointment(appt.id, data);
+        Utils.toast('Appointment updated', 'success');
+      } else {
+        Store.createAppointment(data);
+        Utils.toast('Appointment booked', 'success');
+      }
+      goBackToList(container);
+    };
+  }
+
+  // ==================== INLINE DETAIL ====================
+  function renderDetail(container) {
+    var appt = Store.getAppointment(state.detailId);
+    if (!appt) {
+      goBackToList(container);
+      return;
+    }
+
+    var statusBadge = '<span class="badge ' + getStatusBadgeClass(appt.status) + '">' + appt.status + '</span>';
+
+    var html = '<div class="inline-detail-card">';
+    html += '<div class="inline-detail-header">';
+    html += '<button class="back-btn" id="detail-back">';
+    html += '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>';
+    html += '</button>';
+    html += '<div>';
+    html += '<div class="patient-name-lg"><a href="#/patients/' + appt.patientId + '">' + Utils.escapeHtml(appt.patientName) + '</a></div>';
+    html += '<div style="font-size:0.85rem;color:var(--gray-500);">Appointment Details</div>';
+    html += '</div>';
+    html += '<div style="margin-left:auto;">' + statusBadge + '</div>';
+    html += '</div>';
+
+    html += '<div class="inline-detail-body">';
+    html += '<div class="info-grid" style="grid-template-columns:1fr 1fr;">';
+    html += '<div class="info-item"><label>Date</label><span>' + Utils.formatDate(appt.date) + '</span></div>';
+    html += '<div class="info-item"><label>Time</label><span>' + Utils.formatTime(appt.time) + '</span></div>';
+    html += '<div class="info-item"><label>Type</label><span>' + Utils.escapeHtml(appt.type) + '</span></div>';
+    html += '<div class="info-item"><label>Duration</label><span>' + appt.duration + ' min</span></div>';
+    html += '</div>';
+    if (appt.notes) {
+      html += '<div class="mt-2"><label style="font-size:0.72rem;font-weight:600;color:var(--gray-500);text-transform:uppercase;">Notes</label>';
+      html += '<p style="font-size:0.85rem;color:var(--gray-600);margin-top:0.2rem;">' + Utils.escapeHtml(appt.notes) + '</p></div>';
+    }
+    html += '</div>';
+
+    // Actions
+    html += '<div class="inline-form-actions">';
+    if (appt.status === 'scheduled') {
+      html += '<button class="btn btn-success" id="detail-complete">Complete</button>';
+      html += '<button class="btn btn-warning" id="detail-cancel-appt">Cancel Appt</button>';
+      html += '<button class="btn btn-ghost" id="detail-noshow">No-Show</button>';
+    }
+    html += '<button class="btn btn-secondary" id="detail-back-btn">Back</button>';
+    html += '</div>';
+    html += '</div>';
+
+    container.innerHTML = html;
+
+    // Back
+    document.getElementById('detail-back').onclick = function() { goBackToList(container); };
+    document.getElementById('detail-back-btn').onclick = function() { goBackToList(container); };
+
+    // Actions
+    var compBtn = document.getElementById('detail-complete');
+    if (compBtn) compBtn.onclick = function() {
+      Store.updateAppointment(appt.id, { status: 'completed' });
+      Store.logActivity('Appointment completed: ' + appt.patientName);
+      Utils.toast('Appointment completed', 'success');
+      state.nextVisitAppt = appt;
+      goBackToList(container);
+    };
+
+    var canBtn = document.getElementById('detail-cancel-appt');
+    if (canBtn) canBtn.onclick = function() {
+      Utils.inlineConfirm(container, 'Cancel this appointment?', function() {
+        Store.updateAppointment(appt.id, { status: 'cancelled' });
+        Store.logActivity('Appointment cancelled: ' + appt.patientName);
+        Utils.toast('Appointment cancelled', 'warning');
+        goBackToList(container);
+      });
+    };
+
+    var nsBtn = document.getElementById('detail-noshow');
+    if (nsBtn) nsBtn.onclick = function() {
+      Store.updateAppointment(appt.id, { status: 'no-show' });
+      Store.logActivity('Patient no-show: ' + appt.patientName);
+      Utils.toast('Marked as no-show', 'warning');
+      goBackToList(container);
+    };
+  }
+
+  // ==================== HELPERS ====================
+  function goBackToList(container) {
+    state.subView = 'list';
+    state.editId = null;
+    state.detailId = null;
+    state.prefillDate = '';
+    state.prefillTime = '';
+    state.rescheduleFrom = null;
+    renderView(container);
+  }
+
+  // ==================== MAIN EVENT BINDING ====================
+  function bindMainEvents(container) {
     if (_clickHandler) container.removeEventListener('click', _clickHandler);
 
     _clickHandler = function(e) {
+      // Next visit prompt
+      if (e.target.closest('[data-nv-no]')) {
+        state.nextVisitAppt = null;
+        var bar = document.getElementById('next-visit-prompt');
+        if (bar) bar.remove();
+        return;
+      }
+      if (e.target.closest('[data-nv-yes]')) {
+        var nvAppt = state.nextVisitAppt;
+        state.nextVisitAppt = null;
+        var nextDate = Utils.toDateString(Utils.addDays(new Date(), 7));
+        state.subView = 'form';
+        state.editId = null;
+        state.prefillDate = nextDate;
+        state.prefillTime = nvAppt.time;
+        state.rescheduleFrom = {
+          patientId: nvAppt.patientId,
+          patientName: nvAppt.patientName,
+          type: nvAppt.type,
+          duration: nvAppt.duration,
+          time: nvAppt.time,
+          notes: ''
+        };
+        renderView(container);
+        return;
+      }
+
       // View toggle
       var viewBtn = e.target.closest('.view-btn');
       if (viewBtn) {
@@ -337,7 +595,12 @@ window.AppointmentsView = (function() {
 
       // New appointment
       if (e.target.closest('#add-appt-btn')) {
-        showAppointmentForm(null, container);
+        state.subView = 'form';
+        state.editId = null;
+        state.prefillDate = '';
+        state.prefillTime = '';
+        state.rescheduleFrom = null;
+        renderView(container);
         return;
       }
 
@@ -379,11 +642,13 @@ window.AppointmentsView = (function() {
         return;
       }
 
-      // Click on calendar event
+      // Click on calendar event → inline detail
       var calEvent = e.target.closest('[data-appt-id]');
       if (calEvent) {
         var apptId = calEvent.getAttribute('data-appt-id');
-        showAppointmentDetail(apptId, container);
+        state.subView = 'detail';
+        state.detailId = apptId;
+        renderView(container);
         return;
       }
 
@@ -391,7 +656,12 @@ window.AppointmentsView = (function() {
       var calDay = e.target.closest('.calendar-day');
       if (calDay && !e.target.closest('.cal-event')) {
         var date = calDay.getAttribute('data-date');
-        showAppointmentForm(null, container, date);
+        state.subView = 'form';
+        state.editId = null;
+        state.prefillDate = date;
+        state.prefillTime = '';
+        state.rescheduleFrom = null;
+        renderView(container);
         return;
       }
 
@@ -401,25 +671,31 @@ window.AppointmentsView = (function() {
         var cellDate = weekCell.getAttribute('data-date');
         var cellHour = weekCell.getAttribute('data-hour');
         var timeStr = (cellHour.length < 2 ? '0' : '') + cellHour + ':00';
-        showAppointmentForm(null, container, cellDate, timeStr);
+        state.subView = 'form';
+        state.editId = null;
+        state.prefillDate = cellDate;
+        state.prefillTime = timeStr;
+        state.rescheduleFrom = null;
+        renderView(container);
         return;
       }
 
-      // Quick actions
+      // Quick actions on list
       var completeBtn = e.target.closest('.complete-appt-btn');
       if (completeBtn) {
         var completedAppt = Store.getAppointment(completeBtn.getAttribute('data-id'));
         Store.updateAppointment(completeBtn.getAttribute('data-id'), { status: 'completed' });
         Store.logActivity('Appointment completed');
         Utils.toast('Appointment completed', 'success');
+        if (completedAppt) state.nextVisitAppt = completedAppt;
         renderView(container);
-        if (completedAppt) promptNextVisit(completedAppt, container);
         return;
       }
       var cancelBtn = e.target.closest('.cancel-appt-btn');
       if (cancelBtn) {
-        Utils.confirm('Cancel this appointment?', function() {
-          Store.updateAppointment(cancelBtn.getAttribute('data-id'), { status: 'cancelled' });
+        var cancelId = cancelBtn.getAttribute('data-id');
+        Utils.inlineConfirm(container, 'Cancel this appointment?', function() {
+          Store.updateAppointment(cancelId, { status: 'cancelled' });
           Store.logActivity('Appointment cancelled');
           Utils.toast('Appointment cancelled', 'warning');
           renderView(container);
@@ -436,20 +712,26 @@ window.AppointmentsView = (function() {
       }
       var rescheduleBtn = e.target.closest('.reschedule-appt-btn');
       if (rescheduleBtn) {
-        var appt = Store.getAppointment(rescheduleBtn.getAttribute('data-id'));
-        if (appt) {
-          Store.updateAppointment(appt.id, { status: 'cancelled' });
-          showAppointmentForm(null, container, '', '', appt);
+        var rAppt = Store.getAppointment(rescheduleBtn.getAttribute('data-id'));
+        if (rAppt) {
+          Store.updateAppointment(rAppt.id, { status: 'cancelled' });
+          state.subView = 'form';
+          state.editId = null;
+          state.prefillDate = '';
+          state.prefillTime = '';
+          state.rescheduleFrom = rAppt;
+          renderView(container);
         }
         return;
       }
       var deleteBtn = e.target.closest('.delete-appt-btn');
       if (deleteBtn) {
-        Utils.confirm('Delete this appointment?', function() {
-          Store.deleteAppointment(deleteBtn.getAttribute('data-id'));
+        var delId = deleteBtn.getAttribute('data-id');
+        Utils.inlineConfirm(container, 'Delete this appointment?', function() {
+          Store.deleteAppointment(delId);
           Utils.toast('Appointment deleted', 'success');
           renderView(container);
-        });
+        }, { danger: true });
         return;
       }
 
@@ -497,182 +779,6 @@ window.AppointmentsView = (function() {
         renderView(container);
       });
     }
-  }
-
-  // ==================== APPOINTMENT FORM ====================
-  function showAppointmentForm(apptId, container, prefillDate, prefillTime, rescheduleFrom) {
-    var appt = apptId ? Store.getAppointment(apptId) : null;
-    var title = appt ? 'Edit Appointment' : (rescheduleFrom ? 'Reschedule Appointment' : 'New Appointment');
-    var patients = Store.getPatients().filter(function(p) { return p.status === 'active'; });
-    patients.sort(function(a, b) { return a.name.localeCompare(b.name); });
-
-    var defaultDate = prefillDate || (appt ? appt.date : (rescheduleFrom ? '' : Utils.today()));
-    var defaultTime = prefillTime || (appt ? appt.time : (rescheduleFrom ? rescheduleFrom.time : '09:00'));
-    var defaultPatient = appt ? appt.patientId : (rescheduleFrom ? rescheduleFrom.patientId : '');
-    var defaultType = appt ? appt.type : (rescheduleFrom ? rescheduleFrom.type : 'Treatment');
-    var defaultDuration = appt ? appt.duration : (rescheduleFrom ? rescheduleFrom.duration : '30');
-    var defaultNotes = appt ? appt.notes : (rescheduleFrom ? rescheduleFrom.notes : '');
-
-    var body = '<form id="appt-form">';
-    body += '<div class="form-group"><label>Patient</label>';
-    body += '<select name="patientId" required>';
-    body += '<option value="">Select patient...</option>';
-    for (var i = 0; i < patients.length; i++) {
-      body += '<option value="' + patients[i].id + '"' + (patients[i].id === defaultPatient ? ' selected' : '') + '>' + Utils.escapeHtml(patients[i].name) + '</option>';
-    }
-    body += '</select></div>';
-    body += '<div class="form-row">';
-    body += '<div class="form-group"><label>Date</label>';
-    body += '<input type="date" name="date" value="' + defaultDate + '" required></div>';
-    body += '<div class="form-group"><label>Time</label>';
-    body += '<input type="time" name="time" value="' + defaultTime + '" required></div>';
-    body += '</div>';
-    body += '<div class="form-row">';
-    body += '<div class="form-group"><label>Type</label>';
-    body += '<select name="type">';
-    body += '<option value="Initial Evaluation"' + (defaultType === 'Initial Evaluation' ? ' selected' : '') + '>Initial Evaluation</option>';
-    body += '<option value="Treatment"' + (defaultType === 'Treatment' ? ' selected' : '') + '>Treatment</option>';
-    body += '<option value="Follow-up"' + (defaultType === 'Follow-up' ? ' selected' : '') + '>Follow-up</option>';
-    body += '</select></div>';
-    body += '<div class="form-group"><label>Duration (min)</label>';
-    body += '<select name="duration">';
-    var durations = ['15','30','45','60','90'];
-    for (var d = 0; d < durations.length; d++) {
-      body += '<option value="' + durations[d] + '"' + (durations[d] === defaultDuration ? ' selected' : '') + '>' + durations[d] + ' min</option>';
-    }
-    body += '</select></div>';
-    body += '</div>';
-    body += '<div class="form-group"><label>Notes ' + Utils.micHtml('af-notes') + '</label>';
-    body += '<textarea name="notes" id="af-notes" rows="3">' + Utils.escapeHtml(defaultNotes || '') + '</textarea></div>';
-    body += '<div id="conflict-warning" style="display:none;" class="login-error"></div>';
-    body += '</form>';
-
-    var footer = '<button class="btn btn-secondary" id="modal-cancel">Cancel</button>';
-    footer += '<button class="btn btn-primary" id="modal-save">' + (appt ? 'Update' : 'Book Appointment') + '</button>';
-
-    Utils.showModal(title, body, footer);
-    Utils.bindMicButtons(document.getElementById('modal-body'));
-
-    document.getElementById('modal-cancel').onclick = Utils.closeModal;
-    document.getElementById('modal-save').onclick = function() {
-      var form = document.getElementById('appt-form');
-      var data = Utils.getFormData(form);
-
-      if (!data.patientId || !data.date || !data.time) {
-        Utils.toast('Please fill in all required fields', 'error');
-        return;
-      }
-
-      // Conflict check
-      var conflict = Store.hasConflict(data.date, data.time, data.duration, appt ? appt.id : null);
-      if (conflict) {
-        var warningEl = document.getElementById('conflict-warning');
-        warningEl.textContent = 'Conflict: ' + conflict.patientName + ' already has an appointment at ' + Utils.formatTime(conflict.time) + ' (' + conflict.duration + ' min)';
-        warningEl.style.display = 'block';
-        return;
-      }
-
-      // Get patient name
-      var patient = Store.getPatient(data.patientId);
-      data.patientName = patient ? patient.name : 'Unknown';
-      data.status = appt ? appt.status : 'scheduled';
-
-      if (appt) {
-        Store.updateAppointment(appt.id, data);
-        Utils.toast('Appointment updated', 'success');
-      } else {
-        Store.createAppointment(data);
-        Utils.toast('Appointment booked', 'success');
-      }
-      Utils.closeModal();
-      renderView(container);
-    };
-  }
-
-  // ==================== APPOINTMENT DETAIL (from calendar click) ====================
-  function showAppointmentDetail(apptId, container) {
-    var appt = Store.getAppointment(apptId);
-    if (!appt) return;
-
-    var statusBadge = '<span class="badge ' + getStatusBadgeClass(appt.status) + '">' + appt.status + '</span>';
-
-    var body = '<div class="info-grid" style="grid-template-columns:1fr 1fr;">';
-    body += '<div class="info-item"><label>Patient</label><span><a href="#/patients/' + appt.patientId + '">' + Utils.escapeHtml(appt.patientName) + '</a></span></div>';
-    body += '<div class="info-item"><label>Status</label><span>' + statusBadge + '</span></div>';
-    body += '<div class="info-item"><label>Date</label><span>' + Utils.formatDate(appt.date) + '</span></div>';
-    body += '<div class="info-item"><label>Time</label><span>' + Utils.formatTime(appt.time) + '</span></div>';
-    body += '<div class="info-item"><label>Type</label><span>' + Utils.escapeHtml(appt.type) + '</span></div>';
-    body += '<div class="info-item"><label>Duration</label><span>' + appt.duration + ' min</span></div>';
-    body += '</div>';
-    if (appt.notes) {
-      body += '<div class="mt-2"><label style="font-size:0.72rem;font-weight:600;color:var(--gray-500);text-transform:uppercase;">Notes</label>';
-      body += '<p style="font-size:0.85rem;color:var(--gray-600);margin-top:0.2rem;">' + Utils.escapeHtml(appt.notes) + '</p></div>';
-    }
-
-    var footer = '';
-    if (appt.status === 'scheduled') {
-      footer += '<button class="btn btn-success" id="detail-complete">Complete</button>';
-      footer += '<button class="btn btn-warning" id="detail-cancel">Cancel</button>';
-      footer += '<button class="btn btn-ghost" id="detail-noshow">No-Show</button>';
-    }
-    footer += '<button class="btn btn-secondary" id="detail-close">Close</button>';
-
-    Utils.showModal('Appointment Details', body, footer);
-
-    var closeBtn = document.getElementById('detail-close');
-    if (closeBtn) closeBtn.onclick = Utils.closeModal;
-
-    var compBtn = document.getElementById('detail-complete');
-    if (compBtn) compBtn.onclick = function() {
-      Store.updateAppointment(apptId, { status: 'completed' });
-      Store.logActivity('Appointment completed: ' + appt.patientName);
-      Utils.toast('Appointment completed', 'success');
-      Utils.closeModal();
-      renderView(container);
-      promptNextVisit(appt, container);
-    };
-
-    var canBtn = document.getElementById('detail-cancel');
-    if (canBtn) canBtn.onclick = function() {
-      Store.updateAppointment(apptId, { status: 'cancelled' });
-      Store.logActivity('Appointment cancelled: ' + appt.patientName);
-      Utils.toast('Appointment cancelled', 'warning');
-      Utils.closeModal();
-      renderView(container);
-    };
-
-    var nsBtn = document.getElementById('detail-noshow');
-    if (nsBtn) nsBtn.onclick = function() {
-      Store.updateAppointment(apptId, { status: 'no-show' });
-      Store.logActivity('Patient no-show: ' + appt.patientName);
-      Utils.toast('Marked as no-show', 'warning');
-      Utils.closeModal();
-      renderView(container);
-    };
-  }
-
-  // Revisit prompt after completing an appointment
-  function promptNextVisit(appt, container) {
-    var body = '<p class="confirm-text">Appointment for <strong>' + Utils.escapeHtml(appt.patientName) + '</strong> has been completed. Would you like to schedule their next visit?</p>';
-    var footer = '<button class="btn btn-secondary" id="revisit-no">No, Thanks</button>';
-    footer += '<button class="btn btn-primary" id="revisit-yes">Schedule Next Visit</button>';
-
-    Utils.showModal('Schedule Next Visit?', body, footer);
-
-    document.getElementById('revisit-no').onclick = Utils.closeModal;
-    document.getElementById('revisit-yes').onclick = function() {
-      Utils.closeModal();
-      // Open appointment form pre-filled with same patient, +7 days, same type/duration
-      var nextDate = Utils.toDateString(Utils.addDays(new Date(), 7));
-      showAppointmentForm(null, container, nextDate, appt.time, {
-        patientId: appt.patientId,
-        patientName: appt.patientName,
-        type: appt.type,
-        duration: appt.duration,
-        time: appt.time,
-        notes: ''
-      });
-    };
   }
 
   function getStatusBadgeClass(status) {

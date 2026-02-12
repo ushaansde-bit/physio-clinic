@@ -10,7 +10,10 @@ window.MessagingView = (function() {
     selectedTags: [],
     selectedPatients: [],
     messageText: '',
-    selectedTemplate: ''
+    selectedTemplate: '',
+    waLinks: null,
+    templateSubView: 'list',
+    templateEditId: null
   };
 
   function render(container) {
@@ -18,6 +21,9 @@ window.MessagingView = (function() {
     state.selectedPatients = [];
     state.messageText = '';
     state.selectedTemplate = '';
+    state.waLinks = null;
+    state.templateSubView = 'list';
+    state.templateEditId = null;
     renderView(container);
   }
 
@@ -34,7 +40,11 @@ window.MessagingView = (function() {
     if (state.tab === 'compose') {
       html += renderCompose();
     } else if (state.tab === 'templates') {
-      html += renderTemplates();
+      if (state.templateSubView === 'form') {
+        html += renderTemplateForm();
+      } else {
+        html += renderTemplates();
+      }
     } else if (state.tab === 'history') {
       html += renderHistory();
     }
@@ -50,7 +60,6 @@ window.MessagingView = (function() {
     var patients = Store.getPatients();
     var templates = Store.getMessageTemplates();
 
-    // Filter patients by selected tags
     var filteredPatients = [];
     for (var i = 0; i < patients.length; i++) {
       var p = patients[i];
@@ -149,6 +158,29 @@ window.MessagingView = (function() {
     html += '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.61.61l4.458-1.495A11.952 11.952 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.33 0-4.484-.763-6.227-2.053l-.436-.334-2.652.889.889-2.652-.334-.436A9.935 9.935 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>';
     html += ' Send via WhatsApp (' + state.selectedPatients.length + ')</button>';
 
+    // Inline WhatsApp links section (for multi-patient send)
+    if (state.waLinks && state.waLinks.length > 0) {
+      html += '<div class="wa-links-section" style="margin-top:1rem;">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">';
+      html += '<h4 style="margin:0;font-size:0.95rem;">Click each link to open WhatsApp:</h4>';
+      html += '<div style="display:flex;gap:0.5rem;">';
+      html += '<button class="btn btn-sm btn-whatsapp" id="open-all-wa">Open All (' + state.waLinks.length + ')</button>';
+      html += '<button class="btn btn-sm btn-ghost" id="close-wa-links">Close</button>';
+      html += '</div>';
+      html += '</div>';
+      html += '<div style="max-height:300px;overflow-y:auto;">';
+      for (var w = 0; w < state.waLinks.length; w++) {
+        var wl = state.waLinks[w];
+        html += '<div class="wa-link-item">';
+        html += '<div><div style="font-weight:500;">' + Utils.escapeHtml(wl.name) + '</div>';
+        html += '<div style="font-size:0.75rem;color:var(--gray-500);">' + Utils.escapeHtml(wl.phone || 'No phone') + '</div></div>';
+        html += '<a href="' + wl.url + '" target="_blank" class="btn btn-sm btn-whatsapp wa-link" data-wa-idx="' + w + '">Open</a>';
+        html += '</div>';
+      }
+      html += '</div>';
+      html += '</div>';
+    }
+
     html += '</div></div>';
     html += '</div>';
 
@@ -190,6 +222,38 @@ window.MessagingView = (function() {
     return html;
   }
 
+  function renderTemplateForm() {
+    var template = state.templateEditId ? Store.getMessageTemplate(state.templateEditId) : null;
+    var isEdit = !!template;
+
+    var html = '<div class="inline-form-card">';
+    html += '<div class="inline-form-header">';
+    html += '<button class="back-btn" id="tpl-form-back">';
+    html += '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>';
+    html += '</button>';
+    html += '<h3>' + (isEdit ? 'Edit Template' : 'New Template') + '</h3>';
+    html += '</div>';
+    html += '<div class="inline-form-body">';
+
+    html += '<form id="template-form">';
+    html += '<div class="form-group"><label>Template Name</label>';
+    html += '<input type="text" name="name" value="' + Utils.escapeHtml(template ? template.name : '') + '" required placeholder="e.g., Appointment Reminder"></div>';
+    html += '<div class="form-group"><label>Message Text ' + Utils.micHtml('tpl-text') + '</label>';
+    html += '<textarea id="tpl-text" name="text" rows="5" required placeholder="Type message... Use {name}, {date}, {time}">' + Utils.escapeHtml(template ? template.text : '') + '</textarea>';
+    html += '<div class="form-hint">Variables: {name} = patient name, {date} = today\'s date, {time} = current time</div>';
+    html += '</div>';
+    html += '</form>';
+
+    html += '</div>';
+    html += '<div class="inline-form-actions">';
+    html += '<button class="btn btn-secondary" id="tpl-form-cancel">Cancel</button>';
+    html += '<button class="btn btn-primary" id="tpl-form-save">' + (isEdit ? 'Update' : 'Create') + ' Template</button>';
+    html += '</div>';
+    html += '</div>';
+
+    return html;
+  }
+
   // ==================== HISTORY TAB ====================
   function renderHistory() {
     var log = Store.getMessageLog();
@@ -220,13 +284,14 @@ window.MessagingView = (function() {
 
   // ==================== EVENT BINDING ====================
   function bindEvents(container) {
-    // Remove old click handler to prevent duplicates
     if (_clickHandler) container.removeEventListener('click', _clickHandler);
 
     _clickHandler = function(e) {
       var tabBtn = e.target.closest('.tab-btn');
       if (tabBtn) {
         state.tab = tabBtn.getAttribute('data-tab');
+        state.templateSubView = 'list';
+        state.templateEditId = null;
         renderView(container);
         return;
       }
@@ -241,7 +306,6 @@ window.MessagingView = (function() {
         } else {
           state.selectedTags.push(tagId);
         }
-        // Reset patient selection when tag filter changes
         state.selectedPatients = [];
         renderView(container);
         return;
@@ -269,23 +333,80 @@ window.MessagingView = (function() {
         return;
       }
 
+      // WhatsApp links: open all
+      if (e.target.closest('#open-all-wa')) {
+        if (state.waLinks) {
+          for (var w = 0; w < state.waLinks.length; w++) {
+            window.open(state.waLinks[w].url, '_blank');
+            Store.createMessageLog({
+              patientId: state.waLinks[w].id,
+              patientName: state.waLinks[w].name,
+              message: state.waLinks[w].message
+            });
+          }
+          Store.logActivity('WhatsApp messages sent to ' + state.waLinks.length + ' patients');
+          Utils.toast('Opening WhatsApp for ' + state.waLinks.length + ' patients', 'success');
+          state.waLinks = null;
+          renderView(container);
+        }
+        return;
+      }
+
+      // WhatsApp links: close
+      if (e.target.closest('#close-wa-links')) {
+        state.waLinks = null;
+        renderView(container);
+        return;
+      }
+
+      // WhatsApp individual link click - log it
+      var waLink = e.target.closest('.wa-link');
+      if (waLink && state.waLinks) {
+        var waIdx = parseInt(waLink.getAttribute('data-wa-idx'), 10);
+        var wl = state.waLinks[waIdx];
+        if (wl) {
+          Store.createMessageLog({
+            patientId: wl.id,
+            patientName: wl.name,
+            message: wl.message
+          });
+        }
+        return;
+      }
+
       // Templates tab
       if (e.target.closest('#add-template-btn')) {
-        showTemplateForm(null, container);
+        state.templateSubView = 'form';
+        state.templateEditId = null;
+        renderView(container);
         return;
       }
       var editTplBtn = e.target.closest('.edit-template-btn');
       if (editTplBtn) {
-        showTemplateForm(editTplBtn.getAttribute('data-id'), container);
+        state.templateSubView = 'form';
+        state.templateEditId = editTplBtn.getAttribute('data-id');
+        renderView(container);
         return;
       }
       var deleteTplBtn = e.target.closest('.delete-template-btn');
       if (deleteTplBtn) {
-        Utils.confirm('Delete this template?', function() {
+        Utils.inlineConfirm(container, 'Delete this template?', function() {
           Store.deleteMessageTemplate(deleteTplBtn.getAttribute('data-id'));
           Utils.toast('Template deleted', 'success');
           renderView(container);
-        });
+        }, { danger: true });
+        return;
+      }
+
+      // Template form buttons
+      if (e.target.closest('#tpl-form-back') || e.target.closest('#tpl-form-cancel')) {
+        state.templateSubView = 'list';
+        state.templateEditId = null;
+        renderView(container);
+        return;
+      }
+      if (e.target.closest('#tpl-form-save')) {
+        saveTemplate(container);
         return;
       }
     };
@@ -324,7 +445,6 @@ window.MessagingView = (function() {
     if (msgText) {
       msgText.addEventListener('input', function() {
         state.messageText = this.value;
-        // Update preview
         var preview = document.getElementById('message-preview');
         if (preview && state.selectedPatients.length > 0) {
           var previewPatient = Store.getPatient(state.selectedPatients[0]);
@@ -346,7 +466,6 @@ window.MessagingView = (function() {
 
   function cleanPhone(phone) {
     if (!phone) return '';
-    // Strip non-digits
     return phone.replace(/[^\d]/g, '');
   }
 
@@ -375,7 +494,6 @@ window.MessagingView = (function() {
       var url = 'https://wa.me/' + pCode + phone + '?text=' + encodeURIComponent(msg);
       window.open(url, '_blank');
 
-      // Log
       Store.createMessageLog({
         patientId: pt.id,
         patientName: pt.name,
@@ -385,107 +503,44 @@ window.MessagingView = (function() {
       Store.logActivity('WhatsApp message sent to ' + pt.name);
       Utils.toast('Opening WhatsApp for ' + pt.name, 'success');
     } else {
-      // Multiple patients - show modal with links
-      var body = '<p class="confirm-text">Click each link to open WhatsApp for each patient:</p>';
-      body += '<div style="max-height:350px;overflow-y:auto;">';
+      // Multiple patients - show links inline
+      var links = [];
       for (var j = 0; j < patients.length; j++) {
         var p2 = patients[j];
         var msg2 = resolveVariables(state.messageText, p2);
         var phone2 = cleanPhone(p2.phone);
         var pCode2 = (p2.phoneCode || Utils.getPhoneCode()).replace('+', '');
         var url2 = 'https://wa.me/' + pCode2 + phone2 + '?text=' + encodeURIComponent(msg2);
-        body += '<div style="display:flex;align-items:center;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid var(--gray-100);">';
-        body += '<div><div style="font-weight:500;">' + Utils.escapeHtml(p2.name) + '</div>';
-        body += '<div style="font-size:0.75rem;color:var(--gray-500);">' + Utils.escapeHtml(p2.phone || 'No phone') + '</div></div>';
-        body += '<a href="' + url2 + '" target="_blank" class="btn btn-sm btn-whatsapp wa-link" data-patient-id="' + p2.id + '" data-patient-name="' + Utils.escapeHtml(p2.name) + '" data-message="' + Utils.escapeHtml(msg2) + '">Open</a>';
-        body += '</div>';
-      }
-      body += '</div>';
-
-      var footer = '<button class="btn btn-whatsapp" id="open-all-wa">Open All (' + patients.length + ')</button>';
-      footer += '<button class="btn btn-secondary" id="modal-cancel">Close</button>';
-
-      Utils.showModal('Send WhatsApp Messages', body, footer);
-
-      // Log individual sends when clicked
-      var waLinks = document.querySelectorAll('.wa-link');
-      for (var k = 0; k < waLinks.length; k++) {
-        waLinks[k].addEventListener('click', function() {
-          var pId = this.getAttribute('data-patient-id');
-          var pName = this.getAttribute('data-patient-name');
-          var pMsg = this.getAttribute('data-message');
-          Store.createMessageLog({
-            patientId: pId,
-            patientName: pName,
-            message: pMsg
-          });
+        links.push({
+          id: p2.id,
+          name: p2.name,
+          phone: p2.phone || '',
+          url: url2,
+          message: msg2
         });
       }
-
-      document.getElementById('modal-cancel').onclick = function() {
-        Utils.closeModal();
-        renderView(container);
-      };
-      document.getElementById('open-all-wa').onclick = function() {
-        var links = document.querySelectorAll('.wa-link');
-        for (var l = 0; l < links.length; l++) {
-          window.open(links[l].href, '_blank');
-          // Log each
-          var pId = links[l].getAttribute('data-patient-id');
-          var pName = links[l].getAttribute('data-patient-name');
-          var pMsg = links[l].getAttribute('data-message');
-          Store.createMessageLog({
-            patientId: pId,
-            patientName: pName,
-            message: pMsg
-          });
-        }
-        Store.logActivity('WhatsApp messages sent to ' + links.length + ' patients');
-        Utils.toast('Opening WhatsApp for ' + links.length + ' patients', 'success');
-        Utils.closeModal();
-        renderView(container);
-      };
+      state.waLinks = links;
+      renderView(container);
     }
   }
 
-  function showTemplateForm(templateId, container) {
-    var template = templateId ? Store.getMessageTemplate(templateId) : null;
-    var title = template ? 'Edit Template' : 'New Template';
-
-    var body = '<form id="template-form">';
-    body += '<div class="form-group"><label>Template Name</label>';
-    body += '<input type="text" name="name" value="' + Utils.escapeHtml(template ? template.name : '') + '" required placeholder="e.g., Appointment Reminder"></div>';
-    body += '<div class="form-group"><label>Message Text ' + Utils.micHtml('tpl-text') + '</label>';
-    body += '<textarea id="tpl-text" name="text" rows="5" required placeholder="Type message... Use {name}, {date}, {time}">' + Utils.escapeHtml(template ? template.text : '') + '</textarea>';
-    body += '<div class="form-hint">Variables: {name} = patient name, {date} = today\'s date, {time} = current time</div>';
-    body += '</div>';
-    body += '</form>';
-
-    var footer = '<button class="btn btn-secondary" id="modal-cancel">Cancel</button>';
-    footer += '<button class="btn btn-primary" id="modal-save">' + (template ? 'Update' : 'Create') + ' Template</button>';
-
-    Utils.showModal(title, body, footer);
-
-    Utils.bindMicButtons(document.getElementById('modal-body'));
-
-    document.getElementById('modal-cancel').onclick = Utils.closeModal;
-    document.getElementById('modal-save').onclick = function() {
-      var form = document.getElementById('template-form');
-      var data = Utils.getFormData(form);
-      if (!data.name || !data.text) {
-        Utils.toast('Name and message are required', 'error');
-        return;
-      }
-      if (template) {
-        Store.updateMessageTemplate(template.id, data);
-        Utils.toast('Template updated', 'success');
-      } else {
-        Store.createMessageTemplate(data);
-        Utils.toast('Template created', 'success');
-      }
-      Utils.closeModal();
-      renderView(container);
-    };
+  function saveTemplate(container) {
+    var form = document.getElementById('template-form');
+    var data = Utils.getFormData(form);
+    if (!data.name || !data.text) {
+      Utils.toast('Name and message are required', 'error');
+      return;
+    }
+    if (state.templateEditId) {
+      Store.updateMessageTemplate(state.templateEditId, data);
+      Utils.toast('Template updated', 'success');
+    } else {
+      Store.createMessageTemplate(data);
+      Utils.toast('Template created', 'success');
+    }
+    state.templateSubView = 'list';
+    state.templateEditId = null;
+    renderView(container);
   }
 
   return { render: render };
