@@ -15,7 +15,8 @@ window.PatientDetailView = (function() {
     exercisesEditId: null,
     rxView: 'list',          // list | form
     rxEditId: null,
-    billingView: 'list',     // list | form
+    billingView: 'list',     // list | form | detail
+    billingViewId: null,
     bookingView: 'list',     // list | form
     printExpanded: false,
     rxPrintExpanded: false,
@@ -30,6 +31,7 @@ window.PatientDetailView = (function() {
     sub.rxView = 'list';
     sub.rxEditId = null;
     sub.billingView = 'list';
+    sub.billingViewId = null;
     sub.bookingView = 'list';
     sub.printExpanded = false;
     sub.rxPrintExpanded = false;
@@ -101,7 +103,6 @@ window.PatientDetailView = (function() {
     }
     html += '</div>';
     html += '<div class="patient-header-actions">';
-    html += '<span class="badge ' + (patient.status === 'active' ? 'badge-success' : 'badge-gray') + '" style="margin-right:0.5rem;font-size:0.8rem;padding:0.25rem 0.75rem;">' + (patient.status || 'active') + '</span>';
     html += '<button class="btn btn-secondary" id="print-patient-btn">';
     html += '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>';
     html += 'Print</button>';
@@ -110,8 +111,7 @@ window.PatientDetailView = (function() {
     // Tabs
     html += '<div class="tabs">';
     html += tabBtn('overview', 'Overview');
-    html += tabBtn('history', 'History');
-    html += tabBtn('sessions', 'Treatment Notes');
+    html += tabBtn('sessions', 'Diagnosis & Treatment');
     if (Store.isFeatureEnabled('exercises')) html += tabBtn('exercises', 'HEP');
     if (Store.isFeatureEnabled('prescriptions')) html += tabBtn('prescriptions', 'Prescriptions');
     if (Store.isFeatureEnabled('billing')) html += tabBtn('billing', 'Billing');
@@ -120,10 +120,6 @@ window.PatientDetailView = (function() {
     // Tab content
     html += '<div id="tab-overview" class="tab-content' + (activeTab === 'overview' ? ' active' : '') + '">';
     html += renderOverview(patient);
-    html += '</div>';
-
-    html += '<div id="tab-history" class="tab-content' + (activeTab === 'history' ? ' active' : '') + '">';
-    html += renderHistory(patient);
     html += '</div>';
 
     html += '<div id="tab-sessions" class="tab-content' + (activeTab === 'sessions' ? ' active' : '') + '">';
@@ -161,67 +157,13 @@ window.PatientDetailView = (function() {
   function renderOverview(patient) {
     var html = '';
 
-    // Edit Patient section (inline, replaces that card only)
+    // Edit Patient section (inline, replaces card)
     if (sub.editingPatient) {
       html += renderEditPatientSection(patient, sub.editingPatient);
       return html;
     }
 
-    // Book Next Visit inline form (when active)
-    if (sub.bookingView === 'form') {
-      html += renderBookNextVisitForm(patient);
-    }
-
-    // Next/Last Visit info cards + Book Visit button
-    var allAppts = Store.getAppointmentsByPatient(patient.id);
-    var todayStr = Utils.today();
-    var nextAppt = null;
-    var lastVisit = null;
-    for (var vi = 0; vi < allAppts.length; vi++) {
-      var vap = allAppts[vi];
-      if (vap.status === 'scheduled' && vap.date >= todayStr) {
-        if (!nextAppt || vap.date < nextAppt.date || (vap.date === nextAppt.date && vap.time < nextAppt.time)) {
-          nextAppt = vap;
-        }
-      }
-      if (vap.status === 'completed') {
-        if (!lastVisit || vap.date > lastVisit.date || (vap.date === lastVisit.date && vap.time > lastVisit.time)) {
-          lastVisit = vap;
-        }
-      }
-    }
-
-    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:1rem;">';
-    html += '<div class="visit-info-card">';
-    html += '<div class="visit-info-icon next"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>';
-    html += '<div class="visit-info-detail">';
-    html += '<div class="visit-label">Next Appointment</div>';
-    if (nextAppt) {
-      html += '<div class="visit-value">' + Utils.formatDate(nextAppt.date) + ' at ' + Utils.formatTime(nextAppt.time) + '</div>';
-      if (sub.bookingView !== 'form') {
-        html += '<a href="javascript:void(0)" id="book-next-visit-btn" style="font-size:0.75rem;color:var(--primary);margin-top:0.25rem;display:inline-block;">Book Another</a>';
-      }
-    } else {
-      if (sub.bookingView !== 'form') {
-        html += '<button class="btn btn-primary btn-sm" id="book-next-visit-btn" style="margin-top:0.35rem;font-size:0.75rem;padding:0.25rem 0.6rem;">Book Now</button>';
-      } else {
-        html += '<div class="visit-value" style="color:var(--gray-400);">None scheduled</div>';
-      }
-    }
-    html += '</div></div>';
-    html += '<div class="visit-info-card">';
-    html += '<div class="visit-info-icon last"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div>';
-    html += '<div class="visit-info-detail">';
-    html += '<div class="visit-label">Last Visit</div>';
-    if (lastVisit) {
-      html += '<div class="visit-value">' + Utils.formatDate(lastVisit.date) + '</div>';
-    } else {
-      html += '<div class="visit-value" style="color:var(--gray-400);">No visits yet</div>';
-    }
-    html += '</div></div>';
-    html += '</div>';
-
-    // Patient info card (includes contact + emergency contact)
+    // Patient info card only
     html += '<div class="card mb-2"><div class="card-header"><h3>Patient Information</h3><button class="btn btn-sm btn-ghost edit-section-btn" data-section="personal" style="font-size:0.78rem;padding:0.2rem 0.5rem;">Edit</button></div><div class="card-body">';
     html += '<div class="info-grid">';
     html += infoItem('Full Name', patient.name);
@@ -231,60 +173,9 @@ window.PatientDetailView = (function() {
     html += infoItem('Email', patient.email);
     html += infoItem('Address', patient.address);
     html += infoItem('Insurance', patient.insurance);
-    html += infoItem('Status', patient.status ? patient.status.charAt(0).toUpperCase() + patient.status.slice(1) : 'Active');
     var emergencyVal = (patient.emergencyContact || '-') + (patient.emergencyPhone ? ' (' + (patient.emergencyPhoneCode || Utils.getPhoneCode()) + ' ' + patient.emergencyPhone + ')' : '');
     html += infoItem('Emergency Contact', emergencyVal);
     html += '</div></div></div>';
-
-    // Diagnosis & treatment
-    html += '<div class="card mb-2"><div class="card-header"><h3>Diagnosis & Treatment Plan</h3><button class="btn btn-sm btn-ghost edit-section-btn" data-section="clinical" style="font-size:0.78rem;padding:0.2rem 0.5rem;">Edit</button></div><div class="card-body">';
-    html += '<div class="info-grid" style="grid-template-columns:1fr;">';
-    html += infoItem('Diagnosis', patient.diagnosis);
-    html += infoItem('Treatment Plan', patient.treatmentPlan);
-    html += infoItem('Notes', patient.notes);
-    html += '</div></div></div>';
-
-    // Affected Body Areas
-    if (Store.isFeatureEnabled('bodyDiagram')) {
-      html += '<div class="card mb-2"><div class="card-header"><h3>Affected Body Areas</h3><button class="btn btn-sm btn-ghost edit-section-btn" data-section="body" style="font-size:0.78rem;padding:0.2rem 0.5rem;">Edit</button></div><div class="card-body body-diagram-card">';
-      if (patient.bodyRegions && patient.bodyRegions.length > 0) {
-        html += '<div class="body-diagram-screen">';
-        html += BodyDiagram.renderHtml(patient.bodyRegions, { readOnly: true });
-        html += '<div class="body-region-badges">' + BodyDiagram.renderBadges(patient.bodyRegions) + '</div>';
-        html += '</div>';
-        html += '<div class="body-diagram-print-only">';
-        html += BodyDiagram.renderPrintHtml(patient.bodyRegions);
-        html += '</div>';
-      } else {
-        html += '<p style="color:var(--gray-400);font-size:0.85rem;">No areas marked</p>';
-      }
-      html += '</div></div>';
-    }
-
-    // Progress snapshot
-    var sessions = Store.getSessionsByPatient(patient.id);
-    if (sessions.length > 0) {
-      sessions.sort(function(a, b) { return a.date < b.date ? -1 : 1; });
-      html += '<div class="card mb-2"><div class="card-header"><h3>Progress Snapshot</h3></div><div class="card-body">';
-      html += '<div class="progress-chart">';
-      for (var i = 0; i < sessions.length; i++) {
-        var s = sessions[i];
-        var painPct = ((s.painScore || 0) / 10 * 100);
-        var funcPct = ((s.functionScore || 0) / 10 * 100);
-        html += '<div style="margin-bottom:0.75rem;">';
-        html += '<div style="font-size:0.78rem;font-weight:600;color:var(--gray-600);margin-bottom:0.35rem;">' + Utils.formatDateShort(s.date) + '</div>';
-        html += '<div class="progress-bar-row">';
-        html += '<span class="progress-bar-label">Pain</span>';
-        html += '<div class="progress-bar-track"><div class="progress-bar-fill pain" style="width:' + painPct + '%;">' + s.painScore + '/10</div></div>';
-        html += '</div>';
-        html += '<div class="progress-bar-row" style="margin-top:0.25rem;">';
-        html += '<span class="progress-bar-label">Function</span>';
-        html += '<div class="progress-bar-track"><div class="progress-bar-fill function" style="width:' + funcPct + '%;">' + s.functionScore + '/10</div></div>';
-        html += '</div>';
-        html += '</div>';
-      }
-      html += '</div></div></div>';
-    }
 
     // Print options (inline collapsible)
     if (sub.printExpanded) {
@@ -298,147 +189,72 @@ window.PatientDetailView = (function() {
     return '<div class="info-item"><label>' + label + '</label><span>' + Utils.escapeHtml(value || '-') + '</span></div>';
   }
 
-  // ==================== BOOK NEXT VISIT (inline) ====================
-  function renderBookNextVisitForm(patient) {
-    var appts = Store.getAppointmentsByPatient(patient.id);
-    appts.sort(function(a, b) { return a.date > b.date ? -1 : 1; });
-    var lastAppt = appts.length > 0 ? appts[0] : null;
-
-    var defaultDate = Utils.toDateString(Utils.addDays(new Date(), 7));
-    var defaultTime = lastAppt ? lastAppt.time : '09:00';
-    var defaultType = lastAppt ? lastAppt.type : 'Follow-up';
-    var defaultDuration = lastAppt ? lastAppt.duration : '30';
-
-    var html = '<div class="inline-form-card mb-2">';
-    html += '<div class="inline-form-header">';
-    html += '<button class="back-btn" id="booking-form-back">';
-    html += '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>';
-    html += '</button>';
-    html += '<h3>Book Next Visit - ' + Utils.escapeHtml(patient.name) + '</h3>';
-    html += '</div>';
-    html += '<div class="inline-form-body">';
-    html += '<form id="next-visit-form">';
-    html += '<div class="form-row">';
-    html += '<div class="form-group"><label>Date</label>';
-    html += '<input type="date" name="date" value="' + defaultDate + '" required></div>';
-    html += '<div class="form-group"><label>Time</label>';
-    html += '<input type="time" name="time" value="' + defaultTime + '" required></div>';
-    html += '</div>';
-    html += '<div class="form-row">';
-    html += '<div class="form-group"><label>Type</label>';
-    html += '<select name="type" required>';
-    html += '<option value="Initial Evaluation"' + (defaultType === 'Initial Evaluation' ? ' selected' : '') + '>Initial Evaluation</option>';
-    html += '<option value="Treatment"' + (defaultType === 'Treatment' ? ' selected' : '') + '>Treatment</option>';
-    html += '<option value="Follow-up"' + (defaultType === 'Follow-up' ? ' selected' : '') + '>Follow-up</option>';
-    html += '</select></div>';
-    html += '<div class="form-group"><label>Duration (min)</label>';
-    html += '<select name="duration" required>';
-    var durations = ['15','30','45','60','90'];
-    for (var d = 0; d < durations.length; d++) {
-      html += '<option value="' + durations[d] + '"' + (durations[d] === String(defaultDuration) ? ' selected' : '') + '>' + durations[d] + ' min</option>';
-    }
-    html += '</select></div>';
-    html += '</div>';
-    html += '<div class="form-group"><label>Notes</label>';
-    html += '<textarea name="notes" rows="2"></textarea></div>';
-    html += '<div id="conflict-warning-booking" style="display:none;" class="login-error"></div>';
-    html += '</form>';
-    html += '</div>';
-    html += '<div class="inline-form-actions">';
-    html += '<button class="btn btn-secondary" id="booking-form-cancel">Cancel</button>';
-    html += '<button class="btn btn-primary" id="booking-form-save">Book Appointment</button>';
-    html += '</div></div>';
-    return html;
-  }
-
   // ==================== EDIT PATIENT SECTION (inline per-card) ====================
-  function renderEditPatientSection(patient, section) {
-    var titles = { personal: 'Edit Patient Information', clinical: 'Edit Diagnosis & Treatment', body: 'Edit Affected Body Areas' };
+  function renderEditPatientSection(patient) {
     var html = '<div class="inline-form-card mb-2">';
     html += '<div class="inline-form-header">';
     html += '<button class="back-btn" id="edit-patient-back">';
     html += '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>';
     html += '</button>';
-    html += '<h3>' + (titles[section] || 'Edit') + '</h3>';
+    html += '<h3>Edit Patient Information</h3>';
     html += '</div>';
     html += '<div class="inline-form-body">';
     html += '<form id="edit-patient-form">';
 
-    if (section === 'personal') {
-      html += '<div class="form-group"><label>Full Name</label>';
-      html += '<input type="text" name="name" value="' + Utils.escapeHtml(patient.name || '') + '" required></div>';
-      html += '<div class="form-row">';
-      html += '<div class="form-group"><label>Date of Birth</label>';
-      html += Utils.dobPickerHtml(patient.dob || '');
-      html += '</div>';
-      html += '<div class="form-group"><label>Gender</label>';
-      html += '<select name="gender">';
-      html += '<option value="">Select...</option>';
-      html += '<option value="male"' + (patient.gender === 'male' ? ' selected' : '') + '>Male</option>';
-      html += '<option value="female"' + (patient.gender === 'female' ? ' selected' : '') + '>Female</option>';
-      html += '<option value="other"' + (patient.gender === 'other' ? ' selected' : '') + '>Other</option>';
-      html += '</select></div>';
-      html += '</div>';
-      html += '<div class="form-row">';
-      html += '<div class="form-group"><label>Phone</label>';
-      html += '<div class="phone-input-wrap">';
-      html += '<input type="text" name="phoneCode" class="phone-code-input" value="' + Utils.escapeHtml(patient.phoneCode || Utils.getPhoneCode()) + '" maxlength="5">';
-      html += '<input type="tel" name="phone" class="phone-number-input" value="' + Utils.escapeHtml(patient.phone || '') + '" maxlength="' + Utils.getPhoneDigits() + '" required>';
-      html += '</div></div>';
-      html += '<div class="form-group"><label>Email</label>';
-      html += '<input type="email" name="email" value="' + Utils.escapeHtml(patient.email || '') + '"></div>';
-      html += '</div>';
-      html += '<div class="form-row">';
-      html += '<div class="form-group"><label>Address</label>';
-      html += '<input type="text" name="address" value="' + Utils.escapeHtml(patient.address || '') + '"></div>';
-      html += '<div class="form-group"><label>Insurance</label>';
-      html += '<input type="text" name="insurance" value="' + Utils.escapeHtml(patient.insurance || '') + '"></div>';
-      html += '</div>';
-      html += '<div class="form-group"><label>Status</label>';
-      html += '<select name="status" style="max-width:200px;">';
-      html += '<option value="active"' + (patient.status === 'active' ? ' selected' : '') + '>Active</option>';
-      html += '<option value="completed"' + (patient.status === 'completed' ? ' selected' : '') + '>Completed</option>';
-      html += '</select></div>';
-      // Emergency contact (part of personal info)
-      html += '<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--gray-400);margin:1.25rem 0 0.5rem;padding-bottom:0.35rem;border-bottom:1px solid var(--border);">Emergency Contact</div>';
-      html += '<div class="form-row">';
-      html += '<div class="form-group"><label>Contact Name</label>';
-      html += '<input type="text" name="emergencyContact" value="' + Utils.escapeHtml(patient.emergencyContact || '') + '"></div>';
-      html += '<div class="form-group"><label>Contact Phone</label>';
-      html += '<div class="phone-input-wrap">';
-      html += '<input type="text" name="emergencyPhoneCode" class="phone-code-input" value="' + Utils.escapeHtml(patient.emergencyPhoneCode || Utils.getPhoneCode()) + '" maxlength="5">';
-      html += '<input type="tel" name="emergencyPhone" class="phone-number-input" value="' + Utils.escapeHtml(patient.emergencyPhone || '') + '" maxlength="' + Utils.getPhoneDigits() + '">';
-      html += '</div></div>';
-      html += '</div>';
-      // Tags (part of personal info)
-      if (Store.isFeatureEnabled('tags')) {
-        var formTags = Store.getTags();
-        var patientTags = patient.tags || [];
-        html += '<div class="form-group"><label>Tags</label><div class="tag-pill-group">';
-        for (var ti = 0; ti < formTags.length; ti++) {
-          var isChecked = patientTags.indexOf(formTags[ti].id) !== -1;
-          var tagColor = formTags[ti].color || '#6b7280';
-          html += '<button type="button" class="tag-pill' + (isChecked ? ' active' : '') + '" data-tag-id="' + formTags[ti].id + '" data-color="' + tagColor + '"' + (isChecked ? ' style="background:' + tagColor + ';color:#fff;border-color:' + tagColor + ';"' : '') + '>';
-          html += '<span class="tag-pill-dot" style="background:' + tagColor + ';"></span>';
-          html += Utils.escapeHtml(formTags[ti].name);
-          html += '</button>';
-        }
-        html += '</div></div>';
+    html += '<div class="form-group"><label>Full Name</label>';
+    html += '<input type="text" name="name" value="' + Utils.escapeHtml(patient.name || '') + '" required></div>';
+    html += '<div class="form-row">';
+    html += '<div class="form-group"><label>Date of Birth</label>';
+    html += Utils.dobPickerHtml(patient.dob || '');
+    html += '</div>';
+    html += '<div class="form-group"><label>Gender</label>';
+    html += '<select name="gender">';
+    html += '<option value="">Select...</option>';
+    html += '<option value="male"' + (patient.gender === 'male' ? ' selected' : '') + '>Male</option>';
+    html += '<option value="female"' + (patient.gender === 'female' ? ' selected' : '') + '>Female</option>';
+    html += '<option value="other"' + (patient.gender === 'other' ? ' selected' : '') + '>Other</option>';
+    html += '</select></div>';
+    html += '</div>';
+    html += '<div class="form-row">';
+    html += '<div class="form-group"><label>Phone</label>';
+    html += '<div class="phone-input-wrap">';
+    html += '<input type="text" name="phoneCode" class="phone-code-input" value="' + Utils.escapeHtml(patient.phoneCode || Utils.getPhoneCode()) + '" maxlength="5">';
+    html += '<input type="tel" name="phone" class="phone-number-input" value="' + Utils.escapeHtml(patient.phone || '') + '" maxlength="' + Utils.getPhoneDigits() + '" required>';
+    html += '</div></div>';
+    html += '<div class="form-group"><label>Email</label>';
+    html += '<input type="email" name="email" value="' + Utils.escapeHtml(patient.email || '') + '"></div>';
+    html += '</div>';
+    html += '<div class="form-row">';
+    html += '<div class="form-group"><label>Address</label>';
+    html += '<input type="text" name="address" value="' + Utils.escapeHtml(patient.address || '') + '"></div>';
+    html += '<div class="form-group"><label>Insurance</label>';
+    html += '<input type="text" name="insurance" value="' + Utils.escapeHtml(patient.insurance || '') + '"></div>';
+    html += '</div>';
+    // Emergency contact
+    html += '<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--gray-400);margin:1.25rem 0 0.5rem;padding-bottom:0.35rem;border-bottom:1px solid var(--border);">Emergency Contact</div>';
+    html += '<div class="form-row">';
+    html += '<div class="form-group"><label>Contact Name</label>';
+    html += '<input type="text" name="emergencyContact" value="' + Utils.escapeHtml(patient.emergencyContact || '') + '"></div>';
+    html += '<div class="form-group"><label>Contact Phone</label>';
+    html += '<div class="phone-input-wrap">';
+    html += '<input type="text" name="emergencyPhoneCode" class="phone-code-input" value="' + Utils.escapeHtml(patient.emergencyPhoneCode || Utils.getPhoneCode()) + '" maxlength="5">';
+    html += '<input type="tel" name="emergencyPhone" class="phone-number-input" value="' + Utils.escapeHtml(patient.emergencyPhone || '') + '" maxlength="' + Utils.getPhoneDigits() + '">';
+    html += '</div></div>';
+    html += '</div>';
+    // Tags
+    if (Store.isFeatureEnabled('tags')) {
+      var formTags = Store.getTags();
+      var patientTags = patient.tags || [];
+      html += '<div class="form-group"><label>Tags</label><div class="tag-pill-group">';
+      for (var ti = 0; ti < formTags.length; ti++) {
+        var isChecked = patientTags.indexOf(formTags[ti].id) !== -1;
+        var tagColor = formTags[ti].color || '#6b7280';
+        html += '<button type="button" class="tag-pill' + (isChecked ? ' active' : '') + '" data-tag-id="' + formTags[ti].id + '" data-color="' + tagColor + '"' + (isChecked ? ' style="background:' + tagColor + ';color:#fff;border-color:' + tagColor + ';"' : '') + '>';
+        html += '<span class="tag-pill-dot" style="background:' + tagColor + ';"></span>';
+        html += Utils.escapeHtml(formTags[ti].name);
+        html += '</button>';
       }
-    }
-
-    if (section === 'clinical') {
-      html += '<div class="form-group"><label>Diagnosis ' + Utils.micHtml('ep-diagnosis') + '</label>';
-      html += '<textarea id="ep-diagnosis" name="diagnosis" rows="2" data-ac="diagnosis">' + Utils.escapeHtml(patient.diagnosis || '') + '</textarea></div>';
-      html += '<div class="form-group"><label>Treatment Plan ' + Utils.micHtml('ep-treatplan') + '</label>';
-      html += '<textarea id="ep-treatplan" name="treatmentPlan" rows="3" data-ac="treatmentPlan">' + Utils.escapeHtml(patient.treatmentPlan || '') + '</textarea></div>';
-      html += '<div class="form-group"><label>Notes ' + Utils.micHtml('ep-notes') + '</label>';
-      html += '<textarea id="ep-notes" name="notes" rows="2">' + Utils.escapeHtml(patient.notes || '') + '</textarea></div>';
-    }
-
-    if (section === 'body') {
-      html += '<div class="form-group"><label>Affected Body Areas</label>';
-      html += '<div class="body-diagram-wrap"><div id="ep-body-diagram"></div></div></div>';
+      html += '</div></div>';
     }
 
     html += '</form>';
@@ -476,9 +292,7 @@ window.PatientDetailView = (function() {
     html += '<h4 style="margin-bottom:0.5rem;">Select Sections</h4>';
     html += '<div class="tag-checkboxes">';
     html += '<label class="tag-checkbox-item checked"><input type="checkbox" class="print-section" value="info" checked> Patient Info</label>';
-    html += '<label class="tag-checkbox-item checked"><input type="checkbox" class="print-section" value="diagnosis" checked> Diagnosis & Plan</label>';
-    html += '<label class="tag-checkbox-item checked"><input type="checkbox" class="print-section" value="body" checked> Body Diagram</label>';
-    html += '<label class="tag-checkbox-item checked"><input type="checkbox" class="print-section" value="sessions" checked> Sessions</label>';
+    html += '<label class="tag-checkbox-item checked"><input type="checkbox" class="print-section" value="sessions" checked> Diagnosis & Treatment</label>';
     html += '<label class="tag-checkbox-item checked"><input type="checkbox" class="print-section" value="exercises" checked> Exercises</label>';
     html += '<label class="tag-checkbox-item checked"><input type="checkbox" class="print-section" value="prescriptions" checked> Prescriptions</label>';
     html += '</div>';
@@ -513,143 +327,24 @@ window.PatientDetailView = (function() {
     return html;
   }
 
-  // ==================== HISTORY TAB ====================
-  function renderHistory(patient) {
-    var events = [];
-
-    // Appointments
-    var appts = Store.getAppointmentsByPatient(patient.id);
-    for (var a = 0; a < appts.length; a++) {
-      var ap = appts[a];
-      var apSummary = ap.type + ' - ' + Utils.formatTime(ap.time) + ' (' + ap.duration + ' min)';
-      if (ap.notes) apSummary += ' - ' + ap.notes.substring(0, 80);
-      events.push({
-        date: ap.date,
-        time: ap.time || '00:00',
-        type: 'appointment',
-        badge: 'badge-appointment',
-        label: 'Appt',
-        summary: '<strong>' + ap.status.charAt(0).toUpperCase() + ap.status.slice(1) + '</strong>: ' + Utils.escapeHtml(apSummary)
-      });
-    }
-
-    // Sessions/Treatment Notes
-    var sessions = Store.getSessionsByPatient(patient.id);
-    for (var s = 0; s < sessions.length; s++) {
-      var sn = sessions[s];
-      var snText = '';
-      if (sn.subjective) snText += 'S: ' + sn.subjective.substring(0, 60) + '... ';
-      if (sn.assessment) snText += 'A: ' + sn.assessment.substring(0, 60);
-      events.push({
-        date: sn.date,
-        time: '10:00',
-        type: 'session',
-        badge: 'badge-session',
-        label: 'Note',
-        summary: '<strong>Pain ' + (sn.painScore || 0) + '/10, Func ' + (sn.functionScore || 0) + '/10</strong> - ' + Utils.escapeHtml(snText || 'Treatment note recorded')
-      });
-    }
-
-    // Prescriptions
-    if (Store.isFeatureEnabled('prescriptions')) {
-      var rxs = Store.getPrescriptionsByPatient(patient.id);
-      for (var r = 0; r < rxs.length; r++) {
-        var rx = rxs[r];
-        events.push({
-          date: rx.date,
-          time: '12:00',
-          type: 'rx',
-          badge: 'badge-rx',
-          label: 'Rx',
-          summary: '<strong>' + Utils.escapeHtml(rx.medication) + '</strong> ' + Utils.escapeHtml(rx.dosage || '') + ' - ' + Utils.escapeHtml(rx.status)
-        });
-      }
-    }
-
-    // Billing
-    if (Store.isFeatureEnabled('billing')) {
-      var bills = Store.getBillingByPatient(patient.id);
-      for (var b = 0; b < bills.length; b++) {
-        var bill = bills[b];
-        events.push({
-          date: bill.date,
-          time: '14:00',
-          type: 'billing',
-          badge: 'badge-billing',
-          label: 'Bill',
-          summary: '<strong>' + Utils.formatCurrency(bill.amount) + '</strong> - ' + Utils.escapeHtml(bill.description) + ' (' + bill.status + ')'
-        });
-      }
-    }
-
-    // Exercises
-    if (Store.isFeatureEnabled('exercises')) {
-      var exs = Store.getExercisesByPatient(patient.id);
-      for (var e = 0; e < exs.length; e++) {
-        var ex = exs[e];
-        var exDate = ex.createdAt ? ex.createdAt.substring(0, 10) : Utils.today();
-        events.push({
-          date: exDate,
-          time: '11:00',
-          type: 'exercise',
-          badge: 'badge-exercise',
-          label: 'HEP',
-          summary: '<strong>' + Utils.escapeHtml(ex.name) + '</strong> - ' + ex.sets + ' x ' + ex.reps + ' (' + Utils.escapeHtml(ex.status) + ')'
-        });
-      }
-    }
-
-    // Sort by date desc, then time desc
-    events.sort(function(a, b) {
-      if (a.date !== b.date) return a.date > b.date ? -1 : 1;
-      return a.time > b.time ? -1 : 1;
-    });
-
-    var html = '<div class="flex-between mb-2">';
-    html += '<h3 style="font-size:1rem;">Patient History (' + events.length + ' events)</h3>';
-    html += '</div>';
-
-    if (events.length === 0) {
-      html += '<div class="empty-state"><p>No history yet</p></div>';
-      return html;
-    }
-
-    // Group by date
-    var currentDate = '';
-    for (var i = 0; i < events.length; i++) {
-      var ev = events[i];
-      if (ev.date !== currentDate) {
-        if (currentDate) html += '</div>'; // close previous group
-        currentDate = ev.date;
-        html += '<div class="timeline-group">';
-        html += '<div class="timeline-date">' + Utils.formatDate(ev.date) + '</div>';
-      }
-      html += '<div class="timeline-item">';
-      html += '<span class="timeline-badge ' + ev.badge + '">' + ev.label + '</span>';
-      html += '<div class="timeline-summary">' + ev.summary + '</div>';
-      html += '</div>';
-    }
-    if (currentDate) html += '</div>'; // close last group
-
-    return html;
-  }
-
-  // ==================== SESSIONS TAB ====================
+  // ==================== DIAGNOSIS & TREATMENT TAB ====================
   function renderSessions(patient) {
     if (sub.sessionsView === 'form') {
       return renderSessionForm(patient);
     }
 
+    var html = '';
+
     var sessions = Store.getSessionsByPatient(patient.id);
     sessions.sort(function(a, b) { return a.date > b.date ? -1 : 1; });
 
-    var html = '<div class="flex-between mb-2">';
-    html += '<h3 style="font-size:1rem;">Treatment Notes (' + sessions.length + ')</h3>';
-    html += '<button class="btn btn-primary btn-sm" id="add-session-btn">Add Treatment Note</button>';
+    html += '<div class="flex-between mb-2">';
+    html += '<h3 style="font-size:1rem;">Diagnosis & Treatment (' + sessions.length + ')</h3>';
+    html += '<button class="btn btn-primary btn-sm" id="add-session-btn">Add Diagnosis & Treatment</button>';
     html += '</div>';
 
     if (sessions.length === 0) {
-      html += '<div class="empty-state"><p>No treatment notes yet</p><p class="empty-sub">Click "Add Treatment Note" to record the first session.</p></div>';
+      html += '<div class="empty-state"><p>No records yet</p><p class="empty-sub">Click "Add Diagnosis & Treatment" to create the first record.</p></div>';
     } else {
       for (var i = 0; i < sessions.length; i++) {
         var s = sessions[i];
@@ -663,6 +358,10 @@ window.PatientDetailView = (function() {
         html += '<button class="btn btn-sm btn-ghost delete-session-btn" data-id="' + s.id + '" style="color:var(--danger);">Delete</button>';
         html += '</div></div>';
         html += '<div class="soap-card-body">';
+        if (s.bodyRegions && s.bodyRegions.length > 0) {
+          html += '<div class="soap-section"><div class="soap-label" style="background:var(--gray-100);color:var(--gray-600);">Pain Regions</div>';
+          html += '<div class="soap-text">' + BodyDiagram.renderBadges(s.bodyRegions) + '</div></div>';
+        }
         html += soapSection('Subjective', 's', s.subjective);
         html += soapSection('Objective', 'o', s.objective);
         html += soapSection('Assessment', 'a', s.assessment);
@@ -675,7 +374,7 @@ window.PatientDetailView = (function() {
 
   function renderSessionForm(patient) {
     var session = sub.sessionsEditId ? Store.getSession(sub.sessionsEditId) : null;
-    var title = session ? 'Edit Treatment Note' : 'New Treatment Note';
+    var title = session ? 'Edit Diagnosis & Treatment' : 'New Diagnosis & Treatment';
 
     var html = '<div class="inline-form-card">';
     html += '<div class="inline-form-header">';
@@ -705,11 +404,18 @@ window.PatientDetailView = (function() {
     html += '<textarea id="sf-assessment" name="assessment" rows="3" data-ac="assessment" placeholder="Clinical reasoning, progress, prognosis...">' + Utils.escapeHtml(session ? session.assessment || '' : '') + '</textarea></div>';
     html += '<div class="form-group"><label>Plan ' + Utils.micHtml('sf-plan') + '</label>';
     html += '<textarea id="sf-plan" name="plan" rows="3" data-ac="plan" placeholder="Treatment plan, goals, next steps...">' + Utils.escapeHtml(session ? session.plan || '' : '') + '</textarea></div>';
+    // Body diagram for pain regions
+    if (Store.isFeatureEnabled('bodyDiagram')) {
+      html += '<div class="form-group">';
+      html += '<label>Pain Regions <span style="font-weight:400;color:var(--gray-400);font-size:0.8rem;">(tap to mark affected areas)</span></label>';
+      html += '<div id="session-body-diagram"></div>';
+      html += '</div>';
+    }
     html += '</form>';
     html += '</div>';
     html += '<div class="inline-form-actions">';
     html += '<button class="btn btn-secondary" id="session-form-cancel">Cancel</button>';
-    html += '<button class="btn btn-primary" id="session-form-save">Save Treatment Note</button>';
+    html += '<button class="btn btn-primary" id="session-form-save">Save</button>';
     html += '</div></div>';
     return html;
   }
@@ -845,14 +551,7 @@ window.PatientDetailView = (function() {
     }
 
     var prescriptions = Store.getPrescriptionsByPatient(patient.id);
-    var active = [];
-    var discontinued = [];
-    for (var i = 0; i < prescriptions.length; i++) {
-      if (prescriptions[i].status === 'active') active.push(prescriptions[i]);
-      else discontinued.push(prescriptions[i]);
-    }
-    active.sort(function(a, b) { return a.date > b.date ? -1 : 1; });
-    discontinued.sort(function(a, b) { return a.date > b.date ? -1 : 1; });
+    prescriptions.sort(function(a, b) { return a.date > b.date ? -1 : 1; });
 
     var html = '<div class="flex-between mb-2">';
     html += '<h3 style="font-size:1rem;">Prescriptions (' + prescriptions.length + ')</h3>';
@@ -871,17 +570,8 @@ window.PatientDetailView = (function() {
     if (prescriptions.length === 0) {
       html += '<div class="empty-state"><p>No prescriptions yet</p><p class="empty-sub">Click "Add Prescription" to add medication details.</p></div>';
     } else {
-      if (active.length > 0) {
-        html += '<h4 style="font-size:0.85rem;color:var(--success);margin-bottom:0.5rem;">Active Medications (' + active.length + ')</h4>';
-        for (var j = 0; j < active.length; j++) {
-          html += rxCard(active[j]);
-        }
-      }
-      if (discontinued.length > 0) {
-        html += '<h4 style="font-size:0.85rem;color:var(--gray-500);margin:1rem 0 0.5rem;">Discontinued (' + discontinued.length + ')</h4>';
-        for (var k = 0; k < discontinued.length; k++) {
-          html += rxCard(discontinued[k]);
-        }
+      for (var j = 0; j < prescriptions.length; j++) {
+        html += rxCard(prescriptions[j]);
       }
     }
 
@@ -930,11 +620,6 @@ window.PatientDetailView = (function() {
     html += '</div>';
     html += '<div class="form-group"><label>Special Instructions ' + Utils.micHtml('rx-instructions') + '</label>';
     html += '<textarea id="rx-instructions" name="instructions" rows="3" placeholder="e.g., Take after food. Avoid on empty stomach...">' + Utils.escapeHtml(rx ? rx.instructions || '' : '') + '</textarea></div>';
-    html += '<div class="form-group"><label>Status</label>';
-    html += '<select name="status">';
-    html += '<option value="active"' + (rx && rx.status === 'active' ? ' selected' : '') + '>Active</option>';
-    html += '<option value="discontinued"' + (rx && rx.status === 'discontinued' ? ' selected' : '') + '>Discontinued</option>';
-    html += '</select></div>';
     html += '</form>';
     html += '</div>';
     html += '<div class="inline-form-actions">';
@@ -969,8 +654,7 @@ window.PatientDetailView = (function() {
   }
 
   function rxCard(rx) {
-    var isActive = rx.status === 'active';
-    var html = '<div class="rx-card' + (isActive ? '' : ' discontinued') + '">';
+    var html = '<div class="rx-card">';
     html += '<div class="rx-card-header">';
     html += '<div class="rx-card-title">';
     html += '<span class="rx-icon">Rx</span>';
@@ -979,7 +663,6 @@ window.PatientDetailView = (function() {
     html += '<div class="rx-dosage">' + Utils.escapeHtml(rx.dosage) + ' &middot; ' + Utils.escapeHtml(rx.route) + '</div>';
     html += '</div></div>';
     html += '<div class="rx-card-actions">';
-    html += '<span class="badge ' + (isActive ? 'badge-success' : 'badge-gray') + '">' + rx.status + '</span>';
     html += '<button class="btn btn-sm btn-ghost edit-rx-btn" data-id="' + rx.id + '">Edit</button>';
     html += '<button class="btn btn-sm btn-ghost delete-rx-btn" data-id="' + rx.id + '" style="color:var(--danger);">Delete</button>';
     html += '</div></div>';
@@ -1001,6 +684,9 @@ window.PatientDetailView = (function() {
   function renderBilling(patient) {
     if (sub.billingView === 'form') {
       return renderBillingForm(patient);
+    }
+    if (sub.billingView === 'detail' && sub.billingViewId) {
+      return renderBillingDetail(patient);
     }
 
     var bills = Store.getBillingByPatient(patient.id);
@@ -1042,6 +728,7 @@ window.PatientDetailView = (function() {
         html += '<td style="font-weight:600;white-space:nowrap;">' + Utils.formatCurrency(b.amount) + '</td>';
         html += '<td><span class="badge ' + statusCls + '">' + b.status + '</span></td>';
         html += '<td><div class="btn-group">';
+        html += '<button class="btn btn-sm btn-ghost view-billing-btn" data-id="' + b.id + '">View</button>';
         if (b.status === 'pending') {
           html += '<button class="btn btn-sm btn-success mark-paid-btn" data-id="' + b.id + '">Mark Paid</button>';
         }
@@ -1082,6 +769,61 @@ window.PatientDetailView = (function() {
     html += '<div class="inline-form-actions">';
     html += '<button class="btn btn-secondary" id="billing-form-cancel">Cancel</button>';
     html += '<button class="btn btn-primary" id="billing-form-save">Create Invoice</button>';
+    html += '</div></div>';
+    return html;
+  }
+
+  function renderBillingDetail(patient) {
+    var bill = null;
+    var bills = Store.getBillingByPatient(patient.id);
+    for (var i = 0; i < bills.length; i++) {
+      if (bills[i].id === sub.billingViewId) { bill = bills[i]; break; }
+    }
+    if (!bill) { sub.billingView = 'list'; sub.billingViewId = null; return renderBilling(patient); }
+
+    var statusCls = bill.status === 'paid' ? 'badge-success' : 'badge-warning';
+
+    var html = '<div class="inline-form-card">';
+    html += '<div class="inline-form-header">';
+    html += '<button class="back-btn" id="billing-detail-back">';
+    html += '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>';
+    html += '</button>';
+    html += '<h3>Invoice</h3>';
+    html += '</div>';
+    html += '<div class="inline-form-body">';
+
+    // Invoice header
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">';
+    html += '<span class="badge ' + statusCls + '" style="font-size:0.85rem;padding:0.3rem 0.75rem;">' + (bill.status === 'paid' ? 'Paid' : 'Pending') + '</span>';
+    html += '<span style="font-size:0.82rem;color:var(--gray-400);">' + Utils.formatDate(bill.date) + '</span>';
+    html += '</div>';
+
+    // Amount
+    html += '<div style="text-align:center;padding:1.5rem 0;border:1px solid var(--border);border-radius:10px;margin-bottom:1rem;background:var(--gray-50);">';
+    html += '<div style="font-size:0.78rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--gray-400);margin-bottom:0.25rem;">Amount</div>';
+    html += '<div style="font-size:1.8rem;font-weight:700;color:var(--gray-800);">' + Utils.formatCurrency(bill.amount) + '</div>';
+    html += '</div>';
+
+    // Details
+    html += '<div class="info-grid">';
+    html += infoItem('Description', bill.description);
+    html += infoItem('Date', Utils.formatDate(bill.date));
+    html += infoItem('Patient', patient.name);
+    html += infoItem('Status', bill.status === 'paid' ? 'Paid' : 'Pending');
+    if (bill.paidDate) {
+      html += infoItem('Paid Date', Utils.formatDate(bill.paidDate));
+    }
+    html += '</div>';
+
+    html += '</div>';
+    html += '<div class="inline-form-actions">';
+    html += '<button class="btn btn-secondary" id="billing-detail-back2">Back</button>';
+    if (bill.status === 'pending') {
+      html += '<button class="btn btn-success" id="billing-detail-mark-paid" data-id="' + bill.id + '">Mark Paid</button>';
+    }
+    html += '<button class="btn btn-primary" id="billing-detail-print" data-id="' + bill.id + '">';
+    html += '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>';
+    html += ' Print</button>';
     html += '</div></div>';
     return html;
   }
@@ -1159,8 +901,7 @@ window.PatientDetailView = (function() {
 
   function printPrescriptionPad(patient, signatures) {
     var prescriptions = Store.getPrescriptionsByPatient(patient.id);
-    var active = prescriptions.filter(function(rx) { return rx.status === 'active'; });
-    active.sort(function(a, b) { return a.date > b.date ? -1 : 1; });
+    prescriptions.sort(function(a, b) { return a.date > b.date ? -1 : 1; });
 
     var html = '<div class="print-report-header">';
     html += '<h1>PhysioClinic</h1>';
@@ -1174,18 +915,14 @@ window.PatientDetailView = (function() {
     html += ' &nbsp;|&nbsp; Date: ' + Utils.formatDate(Utils.today());
     html += '</div>';
 
-    if (patient.diagnosis) {
-      html += '<div style="margin:0.5rem 0;font-size:0.9rem;"><strong>Diagnosis:</strong> ' + Utils.escapeHtml(patient.diagnosis) + '</div>';
-    }
-
     html += '<div style="border-top:1px solid #999;padding-top:0.75rem;margin-top:0.5rem;">';
     html += '<h2 style="font-size:1.2rem;margin-bottom:0.75rem;">Rx</h2>';
 
-    if (active.length === 0) {
-      html += '<p style="color:#666;">No active prescriptions.</p>';
+    if (prescriptions.length === 0) {
+      html += '<p style="color:#666;">No prescriptions.</p>';
     } else {
-      for (var i = 0; i < active.length; i++) {
-        var rx = active[i];
+      for (var i = 0; i < prescriptions.length; i++) {
+        var rx = prescriptions[i];
         html += '<div style="margin-bottom:0.75rem;page-break-inside:avoid;">';
         html += '<div style="font-weight:700;">' + (i + 1) + '. ' + Utils.escapeHtml(rx.medication) + '</div>';
         html += '<div style="padding-left:1.2rem;font-size:0.9rem;">';
@@ -1233,30 +970,17 @@ window.PatientDetailView = (function() {
       html += '<h3>Patient Information</h3>';
       html += '<table class="print-info-table">';
       html += '<tr><td class="lbl">Full Name</td><td>' + Utils.escapeHtml(patient.name) + '</td>';
-      html += '<tr><td class="lbl">Phone</td><td>' + Utils.escapeHtml((patient.phoneCode || Utils.getPhoneCode()) + ' ' + (patient.phone || '-')) + '</td>';
-      html += '<td class="lbl">Email</td><td>' + Utils.escapeHtml(patient.email || '-') + '</td></tr>';
+      html += '<td class="lbl">DOB</td><td>' + Utils.formatDate(patient.dob) + (patient.dob ? ' (Age ' + Utils.calculateAge(patient.dob) + ')' : '') + '</td></tr>';
+      html += '<tr><td class="lbl">Gender</td><td>' + Utils.escapeHtml(patient.gender || '-') + '</td>';
+      html += '<td class="lbl">Phone</td><td>' + Utils.escapeHtml((patient.phoneCode || Utils.getPhoneCode()) + ' ' + (patient.phone || '-')) + '</td></tr>';
+      html += '<tr><td class="lbl">Email</td><td colspan="3">' + Utils.escapeHtml(patient.email || '-') + '</td></tr>';
       html += '<tr><td class="lbl">Address</td><td colspan="3">' + Utils.escapeHtml(patient.address || '-') + '</td></tr>';
-      html += '<tr><td class="lbl">Insurance</td><td>' + Utils.escapeHtml(patient.insurance || '-') + '</td>';
-      html += '<td class="lbl">Status</td><td>' + Utils.escapeHtml(patient.status || 'active') + '</td></tr>';
-      html += '<tr><td class="lbl">Emergency</td><td>' + Utils.escapeHtml(patient.emergencyContact || '-') + '</td>';
-      html += '<td class="lbl">Emergency Ph.</td><td>' + Utils.escapeHtml(patient.emergencyPhone || '-') + '</td></tr>';
+      html += '<tr><td class="lbl">Insurance</td><td colspan="3">' + Utils.escapeHtml(patient.insurance || '-') + '</td></tr>';
+      if (patient.emergencyContact || patient.emergencyPhone) {
+        html += '<tr><td class="lbl">Emergency</td><td>' + Utils.escapeHtml(patient.emergencyContact || '-') + '</td>';
+        html += '<td class="lbl">Emergency Ph.</td><td>' + Utils.escapeHtml(patient.emergencyPhone || '-') + '</td></tr>';
+      }
       html += '</table></div>';
-    }
-
-    if (sections.indexOf('diagnosis') !== -1) {
-      html += '<div class="print-section-block">';
-      html += '<h3>Diagnosis & Treatment Plan</h3>';
-      html += '<p><strong>Diagnosis:</strong> ' + Utils.escapeHtml(patient.diagnosis || '-') + '</p>';
-      html += '<p><strong>Treatment Plan:</strong> ' + Utils.escapeHtml(patient.treatmentPlan || '-') + '</p>';
-      if (patient.notes) html += '<p><strong>Notes:</strong> ' + Utils.escapeHtml(patient.notes) + '</p>';
-      html += '</div>';
-    }
-
-    if (sections.indexOf('body') !== -1 && patient.bodyRegions && patient.bodyRegions.length > 0) {
-      html += '<div class="print-section-block">';
-      html += '<h3>Affected Body Areas</h3>';
-      html += BodyDiagram.renderPrintHtml(patient.bodyRegions);
-      html += '</div>';
     }
 
     if (sections.indexOf('sessions') !== -1) {
@@ -1264,20 +988,27 @@ window.PatientDetailView = (function() {
       sessions.sort(function(a, b) { return a.date > b.date ? -1 : 1; });
       if (sessions.length > 0) {
         html += '<div class="print-section-block">';
-        html += '<h3>Treatment Notes (' + sessions.length + ')</h3>';
-        html += '<table class="print-data-table"><thead><tr><th>Date</th><th>Subjective</th><th>Objective</th><th>Assessment</th><th>Plan</th><th>Pain</th></tr></thead><tbody>';
+        html += '<h3>Diagnosis & Treatment (' + sessions.length + ')</h3>';
         for (var s = 0; s < sessions.length; s++) {
           var sn = sessions[s];
-          html += '<tr>';
-          html += '<td style="white-space:nowrap;">' + Utils.formatDate(sn.date) + '</td>';
-          html += '<td>' + Utils.escapeHtml(sn.subjective || '-') + '</td>';
-          html += '<td>' + Utils.escapeHtml(sn.objective || '-') + '</td>';
-          html += '<td>' + Utils.escapeHtml(sn.assessment || '-') + '</td>';
-          html += '<td>' + Utils.escapeHtml(sn.plan || '-') + '</td>';
-          html += '<td>' + (sn.painScore != null ? sn.painScore + '/10' : '-') + '</td>';
-          html += '</tr>';
+          html += '<div style="margin-bottom:1rem;padding:0.75rem;border:1px solid #ddd;page-break-inside:avoid;">';
+          html += '<div style="display:flex;justify-content:space-between;margin-bottom:0.5rem;border-bottom:1px solid #eee;padding-bottom:0.4rem;">';
+          html += '<strong style="font-size:0.95rem;">' + Utils.formatDate(sn.date) + '</strong>';
+          html += '<span style="font-size:0.85rem;">Pain: ' + (sn.painScore != null ? sn.painScore : '-') + '/10 &nbsp; Function: ' + (sn.functionScore != null ? sn.functionScore : '-') + '/10</span>';
+          html += '</div>';
+          if (sn.bodyRegions && sn.bodyRegions.length > 0) {
+            html += '<div style="margin-bottom:0.5rem;">';
+            html += '<strong style="font-size:0.85rem;">Pain Regions:</strong>';
+            html += BodyDiagram.renderPrintHtml(sn.bodyRegions);
+            html += '</div>';
+          }
+          if (sn.subjective) html += '<p style="margin:0.25rem 0;font-size:0.85rem;"><strong>S:</strong> ' + Utils.escapeHtml(sn.subjective) + '</p>';
+          if (sn.objective) html += '<p style="margin:0.25rem 0;font-size:0.85rem;"><strong>O:</strong> ' + Utils.escapeHtml(sn.objective) + '</p>';
+          if (sn.assessment) html += '<p style="margin:0.25rem 0;font-size:0.85rem;"><strong>A:</strong> ' + Utils.escapeHtml(sn.assessment) + '</p>';
+          if (sn.plan) html += '<p style="margin:0.25rem 0;font-size:0.85rem;"><strong>P:</strong> ' + Utils.escapeHtml(sn.plan) + '</p>';
+          html += '</div>';
         }
-        html += '</tbody></table></div>';
+        html += '</div>';
       }
     }
 
@@ -1302,13 +1033,13 @@ window.PatientDetailView = (function() {
 
     if (sections.indexOf('prescriptions') !== -1) {
       var rxs = Store.getPrescriptionsByPatient(patient.id);
-      var activeRx = rxs.filter(function(r) { return r.status === 'active'; });
-      if (activeRx.length > 0) {
+      rxs.sort(function(a, b) { return a.date > b.date ? -1 : 1; });
+      if (rxs.length > 0) {
         html += '<div class="print-section-block">';
-        html += '<h3>Active Prescriptions (' + activeRx.length + ')</h3>';
+        html += '<h3>Prescriptions (' + rxs.length + ')</h3>';
         html += '<table class="print-data-table"><thead><tr><th>Medication</th><th>Dosage</th><th>Route</th><th>Frequency</th><th>Duration</th><th>Instructions</th></tr></thead><tbody>';
-        for (var p = 0; p < activeRx.length; p++) {
-          var rxp = activeRx[p];
+        for (var p = 0; p < rxs.length; p++) {
+          var rxp = rxs[p];
           html += '<tr>';
           html += '<td style="font-weight:600;">' + Utils.escapeHtml(rxp.medication) + '</td>';
           html += '<td>' + Utils.escapeHtml(rxp.dosage || '-') + '</td>';
@@ -1488,7 +1219,7 @@ window.PatientDetailView = (function() {
         return;
       }
 
-      // === Edit Patient Section (personal / clinical / body) ===
+      // === Edit Patient Info ===
       var editSectionBtn = e.target.closest('.edit-section-btn');
       if (editSectionBtn) {
         sub.editingPatient = editSectionBtn.getAttribute('data-section');
@@ -1496,16 +1227,16 @@ window.PatientDetailView = (function() {
         return;
       }
 
-      // === Book Next Visit ===
-      if (e.target.closest('#book-next-visit-btn')) {
-        sub.bookingView = 'form';
-        renderDetail(container, patient);
-        return;
-      }
-
       // === Billing ===
       if (e.target.closest('#add-billing-btn')) {
         sub.billingView = 'form';
+        renderDetail(container, patient);
+        return;
+      }
+      var viewBillingBtn = e.target.closest('.view-billing-btn');
+      if (viewBillingBtn) {
+        sub.billingView = 'detail';
+        sub.billingViewId = viewBillingBtn.getAttribute('data-id');
         renderDetail(container, patient);
         return;
       }
@@ -1546,13 +1277,15 @@ window.PatientDetailView = (function() {
         data.painScore = parseInt(data.painScore, 10) || 0;
         data.functionScore = parseInt(data.functionScore, 10) || 0;
         data.patientId = patient.id;
+        // Capture body regions from diagram
+        data.bodyRegions = BodyDiagram.getSelected('session-body-diagram');
         var session = sub.sessionsEditId ? Store.getSession(sub.sessionsEditId) : null;
         if (session) {
           Store.updateSession(session.id, data);
-          Utils.toast('Treatment note updated', 'success');
+          Utils.toast('Record updated', 'success');
         } else {
           Store.createSession(data);
-          Utils.toast('Treatment note added', 'success');
+          Utils.toast('Record added', 'success');
         }
         sub.sessionsView = 'list';
         sub.sessionsEditId = null;
@@ -1561,6 +1294,12 @@ window.PatientDetailView = (function() {
       // Bind mic + autocomplete
       Utils.bindMicButtons(container);
       Utils.bindAllAutocomplete(container);
+      // Initialize interactive body diagram
+      if (Store.isFeatureEnabled('bodyDiagram')) {
+        var editSession = sub.sessionsEditId ? Store.getSession(sub.sessionsEditId) : null;
+        var _sessionRegions = (editSession && editSession.bodyRegions ? editSession.bodyRegions : []).slice();
+        BodyDiagram.render('session-body-diagram', _sessionRegions);
+      }
     }
 
     // Exercise form
@@ -1648,57 +1387,27 @@ window.PatientDetailView = (function() {
       };
     }
 
-    // Book Next Visit form
-    var bookBack = document.getElementById('booking-form-back');
-    var bookCancel = document.getElementById('booking-form-cancel');
-    var bookSave = document.getElementById('booking-form-save');
-    if (bookBack) bookBack.onclick = function() { sub.bookingView = 'list'; renderDetail(container, patient); };
-    if (bookCancel) bookCancel.onclick = function() { sub.bookingView = 'list'; renderDetail(container, patient); };
-    if (bookSave) {
-      var _bookDupConfirmed = false;
-      bookSave.onclick = function() {
-        var form = document.getElementById('next-visit-form');
-        var data = Utils.getFormData(form);
-        if (!data.date || !data.time) {
-          Utils.toast('Date and time are required', 'error');
-          return;
-        }
-        var conflict = Store.hasConflict(data.date, data.time, data.duration);
-        if (conflict) {
-          var warningEl = document.getElementById('conflict-warning-booking');
-          warningEl.textContent = 'Conflict: ' + conflict.patientName + ' already has an appointment at ' + Utils.formatTime(conflict.time) + ' (' + conflict.duration + ' min)';
-          warningEl.style.display = 'block';
-          return;
-        }
-        // Duplicate check
-        if (!_bookDupConfirmed) {
-          var existing = Store.hasDuplicateFutureAppointment(patient.id, null);
-          if (existing) {
-            var warningEl2 = document.getElementById('conflict-warning-booking');
-            warningEl2.innerHTML = 'Patient already has appointment on <strong>' + Utils.formatDate(existing.date) + '</strong> at <strong>' + Utils.formatTime(existing.time) + '</strong>. ' +
-              '<br><button class="btn btn-sm btn-warning" id="book-dup-cancel" style="margin-top:0.4rem;">Cancel old & book new</button> ' +
-              '<button class="btn btn-sm btn-ghost" id="book-dup-keep" style="margin-top:0.4rem;">Keep both</button>';
-            warningEl2.style.display = 'block';
-            document.getElementById('book-dup-cancel').onclick = function() {
-              Store.updateAppointment(existing.id, { status: 'cancelled' });
-              _bookDupConfirmed = true;
-              bookSave.click();
-            };
-            document.getElementById('book-dup-keep').onclick = function() {
-              _bookDupConfirmed = true;
-              bookSave.click();
-            };
-            return;
-          }
-        }
-        data.patientId = patient.id;
-        data.patientName = patient.name;
-        data.status = 'scheduled';
-        Store.createAppointment(data);
-        Utils.toast('Next visit booked', 'success');
-        _bookDupConfirmed = false;
-        sub.bookingView = 'list';
-        renderDetail(container, Store.getPatient(patient.id));
+    // Billing detail view
+    var billDetailBack = document.getElementById('billing-detail-back');
+    var billDetailBack2 = document.getElementById('billing-detail-back2');
+    var billDetailMarkPaid = document.getElementById('billing-detail-mark-paid');
+    var billDetailPrint = document.getElementById('billing-detail-print');
+    function goBackBilling() { sub.billingView = 'list'; sub.billingViewId = null; renderDetail(container, patient); }
+    if (billDetailBack) billDetailBack.onclick = goBackBilling;
+    if (billDetailBack2) billDetailBack2.onclick = goBackBilling;
+    if (billDetailMarkPaid) {
+      billDetailMarkPaid.onclick = function() {
+        Store.updateBilling(this.getAttribute('data-id'), { status: 'paid', paidDate: Utils.today() });
+        Utils.toast('Marked as paid', 'success');
+        Store.logActivity('Payment received from ' + patient.name);
+        patient = Store.getPatient(patient.id);
+        renderDetail(container, patient);
+      };
+    }
+    if (billDetailPrint) {
+      billDetailPrint.onclick = function() {
+        var invoiceId = this.getAttribute('data-id');
+        executePrint(patient, 'billing', [], 'single', invoiceId, ['doctor']);
       };
     }
 
@@ -1711,45 +1420,30 @@ window.PatientDetailView = (function() {
     if (editPatientSave) {
       editPatientSave.onclick = function() {
         var form = document.getElementById('edit-patient-form');
-        var section = sub.editingPatient;
-        var data = {};
-
-        if (section === 'personal') {
-          var nameInput = form.querySelector('[name="name"]');
-          if (!nameInput || !nameInput.value.trim()) {
-            Utils.toast('Name is required', 'error');
-            return;
-          }
-          var formData = Utils.getFormData(form);
-          data.name = formData.name;
-          data.dob = formData.dob;
-          data.gender = formData.gender;
-          data.phoneCode = formData.phoneCode;
-          data.phone = formData.phone;
-          data.email = formData.email;
-          data.address = formData.address;
-          data.insurance = formData.insurance;
-          data.status = formData.status;
-          data.emergencyContact = formData.emergencyContact;
-          data.emergencyPhoneCode = formData.emergencyPhoneCode;
-          data.emergencyPhone = formData.emergencyPhone;
-          // Collect tags
-          var activePills = form.querySelectorAll('.tag-pill.active');
-          data.tags = [];
-          for (var tc = 0; tc < activePills.length; tc++) {
-            data.tags.push(activePills[tc].getAttribute('data-tag-id'));
-          }
+        var nameInput = form.querySelector('[name="name"]');
+        if (!nameInput || !nameInput.value.trim()) {
+          Utils.toast('Name is required', 'error');
+          return;
         }
-
-        if (section === 'clinical') {
-          var clinicalData = Utils.getFormData(form);
-          data.diagnosis = clinicalData.diagnosis;
-          data.treatmentPlan = clinicalData.treatmentPlan;
-          data.notes = clinicalData.notes;
-        }
-
-        if (section === 'body') {
-          data.bodyRegions = BodyDiagram.getSelected('ep-body-diagram');
+        var formData = Utils.getFormData(form);
+        var data = {
+          name: formData.name,
+          dob: formData.dob,
+          gender: formData.gender,
+          phoneCode: formData.phoneCode,
+          phone: formData.phone,
+          email: formData.email,
+          address: formData.address,
+          insurance: formData.insurance,
+          emergencyContact: formData.emergencyContact,
+          emergencyPhoneCode: formData.emergencyPhoneCode,
+          emergencyPhone: formData.emergencyPhone
+        };
+        // Collect tags
+        var activePills = form.querySelectorAll('.tag-pill.active');
+        data.tags = [];
+        for (var tc = 0; tc < activePills.length; tc++) {
+          data.tags.push(activePills[tc].getAttribute('data-tag-id'));
         }
 
         Store.updatePatient(patient.id, data);
@@ -1757,16 +1451,8 @@ window.PatientDetailView = (function() {
         sub.editingPatient = false;
         renderDetail(container, Store.getPatient(patient.id));
       };
-      // Bind mic + autocomplete + DOB picker (for personal/clinical sections)
-      Utils.bindMicButtons(container);
-      Utils.bindAllAutocomplete(container);
       Utils.bindDobPicker(container);
-      // Body diagram (for body section)
-      if (sub.editingPatient === 'body') {
-        var _bodyRegions = (patient.bodyRegions || []).slice();
-        BodyDiagram.render('ep-body-diagram', _bodyRegions);
-      }
-      // Tag pill toggles (for personal section)
+      // Tag pill toggles
       var tagPills = container.querySelectorAll('#edit-patient-form .tag-pill');
       for (var tp = 0; tp < tagPills.length; tp++) {
         tagPills[tp].addEventListener('click', function() {

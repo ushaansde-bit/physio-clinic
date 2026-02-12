@@ -7,7 +7,6 @@ window.PatientsView = (function() {
 
   var state = {
     search: '',
-    statusFilter: '',
     genderFilter: '',
     tagFilter: '',
     page: 1,
@@ -18,7 +17,6 @@ window.PatientsView = (function() {
 
   function render(container) {
     state.search = '';
-    state.statusFilter = '';
     state.genderFilter = '';
     state.tagFilter = '';
     state.page = 1;
@@ -46,10 +44,8 @@ window.PatientsView = (function() {
         var q = state.search.toLowerCase();
         if (p.name.toLowerCase().indexOf(q) === -1 &&
             (p.phone || '').indexOf(q) === -1 &&
-            (p.email || '').toLowerCase().indexOf(q) === -1 &&
-            (p.diagnosis || '').toLowerCase().indexOf(q) === -1) continue;
+            (p.email || '').toLowerCase().indexOf(q) === -1) continue;
       }
-      if (state.statusFilter && p.status !== state.statusFilter) continue;
       if (state.genderFilter && p.gender !== state.genderFilter) continue;
       if (Store.isFeatureEnabled('tags') && state.tagFilter && (!p.tags || p.tags.indexOf(state.tagFilter) === -1)) continue;
       filtered.push(p);
@@ -73,11 +69,6 @@ window.PatientsView = (function() {
     html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
     html += '<input type="text" id="patient-search" placeholder="Search by name, phone, or email..." value="' + Utils.escapeHtml(state.search) + '">';
     html += '</div>';
-    html += '<select class="filter-select" id="patient-status-filter">';
-    html += '<option value="">All Status</option>';
-    html += '<option value="active"' + (state.statusFilter === 'active' ? ' selected' : '') + '>Active</option>';
-    html += '<option value="completed"' + (state.statusFilter === 'completed' ? ' selected' : '') + '>Completed</option>';
-    html += '</select>';
     html += '<select class="filter-select" id="patient-gender-filter">';
     html += '<option value="">All Gender</option>';
     html += '<option value="male"' + (state.genderFilter === 'male' ? ' selected' : '') + '>Male</option>';
@@ -101,15 +92,14 @@ window.PatientsView = (function() {
     html += '<div class="card"><div class="table-wrapper">';
     html += '<table class="data-table patients-table"><thead><tr>';
     var tagsEnabled = Store.isFeatureEnabled('tags');
-    html += '<th>Patient</th><th>Contact</th><th>Diagnosis</th>' + (tagsEnabled ? '<th>Tags</th>' : '') + '<th>Status</th><th>Actions</th>';
+    html += '<th>Patient</th><th>Contact</th>' + (tagsEnabled ? '<th>Tags</th>' : '') + '<th>Actions</th>';
     html += '</tr></thead><tbody>';
 
     if (pageItems.length === 0) {
-      html += '<tr class="no-hover"><td colspan="' + (tagsEnabled ? '6' : '5') + '"><div class="empty-state"><p>No patients found</p></div></td></tr>';
+      html += '<tr class="no-hover"><td colspan="' + (tagsEnabled ? '4' : '3') + '"><div class="empty-state"><p>No patients found</p></div></td></tr>';
     } else {
       for (var j = 0; j < pageItems.length; j++) {
         var pt = pageItems[j];
-        var statusCls = pt.status === 'active' ? 'badge-success' : 'badge-gray';
         html += '<tr data-patient-id="' + pt.id + '">';
         html += '<td><div style="display:flex;align-items:center;gap:0.6rem;">';
         html += '<div class="patient-avatar" style="width:32px;height:32px;font-size:0.75rem;">' + Utils.getInitials(pt.name) + '</div>';
@@ -118,7 +108,6 @@ window.PatientsView = (function() {
         html += '</div></div></td>';
         html += '<td><div style="font-size:0.82rem;">' + Utils.escapeHtml((pt.phoneCode || Utils.getPhoneCode()) + ' ' + (pt.phone || '-')) + '</div>';
         html += '<div style="font-size:0.75rem;color:var(--gray-500);">' + Utils.escapeHtml(pt.email || '') + '</div></td>';
-        html += '<td title="' + Utils.escapeHtml(pt.diagnosis || '') + '">' + Utils.escapeHtml(pt.diagnosis || '-') + '</td>';
         if (tagsEnabled) {
           html += '<td>';
           if (pt.tags && pt.tags.length > 0) {
@@ -133,7 +122,6 @@ window.PatientsView = (function() {
           }
           html += '</td>';
         }
-        html += '<td><span class="badge ' + statusCls + '">' + (pt.status || 'active') + '</span></td>';
         html += '<td><div class="btn-group">';
         html += '<button class="btn btn-sm btn-ghost view-patient-btn" data-id="' + pt.id + '" title="View">View</button>';
         html += '<button class="btn btn-sm btn-ghost delete-patient-btn" data-id="' + pt.id + '" title="Delete" style="color:var(--danger);">Delete</button>';
@@ -285,14 +273,6 @@ window.PatientsView = (function() {
     }
 
     // Filters
-    var statusFilter = document.getElementById('patient-status-filter');
-    if (statusFilter) {
-      statusFilter.addEventListener('change', function() {
-        state.statusFilter = this.value;
-        state.page = 1;
-        renderList(container);
-      });
-    }
     var genderFilter = document.getElementById('patient-gender-filter');
     if (genderFilter) {
       genderFilter.addEventListener('change', function() {

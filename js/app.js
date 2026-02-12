@@ -234,7 +234,8 @@
     // Feature gate map: route key -> feature key
     var featureMap = {
       'billing': 'billing',
-      'messaging': 'messaging'
+      'messaging': 'messaging',
+      'tags': 'tags'
     };
 
     // Loop all nav links with data-route
@@ -290,7 +291,8 @@
     // Route guard: redirect disabled features to dashboard
     var featureRouteMap = {
       'billing': 'billing',
-      'messaging': 'messaging'
+      'messaging': 'messaging',
+      'tags': 'tags'
     };
     if (featureRouteMap[parts[0]] && !Store.isFeatureEnabled(featureRouteMap[parts[0]])) {
       navigate('/dashboard');
@@ -329,6 +331,9 @@
     } else if (parts[0] === 'patients' && parts.length === 2) {
       pageTitle.textContent = 'Patient Details';
       window.PatientDetailView.render(content, parts[1]);
+    } else if (parts[0] === 'tags') {
+      pageTitle.textContent = 'Tags';
+      window.TagsView.render(content);
     } else if (parts[0] === 'appointments') {
       pageTitle.textContent = 'Appointments';
       window.AppointmentsView.render(content);
