@@ -261,7 +261,7 @@ window.SettingsView = (function() {
     for (var r = 0; r < allRolesGuide.length; r++) {
       var rg = allRolesGuide[r];
       var defPages = (rg.defaultPages || []).join(', ') || 'dashboard';
-      html += '<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;' + (r < allRolesGuide.length - 1 ? 'border-bottom:1px solid var(--border-color);' : '') + '">';
+      html += '<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;' + (r < allRolesGuide.length - 1 ? 'border-bottom:1px solid var(--border);' : '') + '">';
       html += '<span class="badge ' + rg.badge + '" style="min-width:110px;text-align:center;flex-shrink:0;">' + Utils.escapeHtml(rg.label) + '</span>';
       html += '<div>';
       html += '<div style="font-size:0.85em;color:var(--text-muted);">' + Utils.escapeHtml(rg.description) + '</div>';
@@ -509,7 +509,7 @@ window.SettingsView = (function() {
     html += '<p style="color:var(--text-muted);font-size:0.85em;margin-bottom:12px;">These roles cannot be edited or deleted.</p>';
     for (var i = 0; i < BUILTIN_ROLES.length; i++) {
       var br = BUILTIN_ROLES[i];
-      html += '<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;' + (i < BUILTIN_ROLES.length - 1 ? 'border-bottom:1px solid var(--border-color);' : '') + '">';
+      html += '<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;' + (i < BUILTIN_ROLES.length - 1 ? 'border-bottom:1px solid var(--border);' : '') + '">';
       html += '<span class="badge ' + br.badge + '" style="min-width:110px;text-align:center;flex-shrink:0;">' + Utils.escapeHtml(br.label) + '</span>';
       html += '<div>';
       html += '<div style="font-size:0.85em;">' + Utils.escapeHtml(br.description) + '</div>';
@@ -535,7 +535,7 @@ window.SettingsView = (function() {
       for (var c = 0; c < custom.length; c++) {
         var cr = custom[c];
         var defPages = (cr.defaultPages || []).join(', ') || 'dashboard';
-        html += '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:8px 0;' + (c < custom.length - 1 ? 'border-bottom:1px solid var(--border-color);' : '') + '">';
+        html += '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:8px 0;' + (c < custom.length - 1 ? 'border-bottom:1px solid var(--border);' : '') + '">';
         html += '<div style="display:flex;align-items:flex-start;gap:8px;">';
         html += '<span class="badge ' + (cr.badge || 'badge-success') + '" style="min-width:110px;text-align:center;flex-shrink:0;">' + Utils.escapeHtml(cr.label) + '</span>';
         html += '<div>';
@@ -771,15 +771,15 @@ window.SettingsView = (function() {
       var f = featureList[i];
       var isOn = features[f.key] !== false;
 
-      html += '<div class="settings-toggle-row" style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border-color);">';
+      html += '<div class="settings-toggle-row">';
       html += '<div>';
       html += '<div style="font-weight:500;">' + Utils.escapeHtml(f.label) + '</div>';
       html += '<div style="font-size:0.85em;color:var(--text-muted);">' + Utils.escapeHtml(f.description) + '</div>';
       html += '</div>';
-      html += '<label class="toggle-switch" style="position:relative;display:inline-block;width:48px;height:26px;flex-shrink:0;margin-left:16px;">';
-      html += '<input type="checkbox" class="feature-toggle" data-feature="' + f.key + '"' + (isOn ? ' checked' : '') + ' style="opacity:0;width:0;height:0;">';
-      html += '<span class="toggle-slider" style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:' + (isOn ? 'var(--primary)' : '#ccc') + ';border-radius:26px;transition:0.3s;"></span>';
-      html += '<span class="toggle-knob" style="position:absolute;content:\'\';height:20px;width:20px;left:' + (isOn ? '25px' : '3px') + ';bottom:3px;background-color:white;border-radius:50%;transition:0.3s;pointer-events:none;"></span>';
+      html += '<label class="toggle-switch">';
+      html += '<input type="checkbox" class="feature-toggle" data-feature="' + f.key + '"' + (isOn ? ' checked' : '') + '>';
+      html += '<span class="toggle-slider"></span>';
+      html += '<span class="toggle-knob"></span>';
       html += '</label>';
       html += '</div>';
     }
@@ -969,15 +969,6 @@ window.SettingsView = (function() {
           }
           settings.features[featureKey] = toggle.checked;
           Store.saveClinicSettings(settings);
-
-          var slider = toggle.parentNode.querySelector('.toggle-slider');
-          var knob = toggle.parentNode.querySelector('.toggle-knob');
-          if (slider) {
-            slider.style.backgroundColor = toggle.checked ? 'var(--primary)' : '#ccc';
-          }
-          if (knob) {
-            knob.style.left = toggle.checked ? '25px' : '3px';
-          }
 
           var label = featureKey.replace(/([A-Z])/g, ' $1');
           label = label.charAt(0).toUpperCase() + label.slice(1);

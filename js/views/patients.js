@@ -51,7 +51,7 @@ window.PatientsView = (function() {
       }
       if (state.statusFilter && p.status !== state.statusFilter) continue;
       if (state.genderFilter && p.gender !== state.genderFilter) continue;
-      if (state.tagFilter && (!p.tags || p.tags.indexOf(state.tagFilter) === -1)) continue;
+      if (Store.isFeatureEnabled('tags') && state.tagFilter && (!p.tags || p.tags.indexOf(state.tagFilter) === -1)) continue;
       filtered.push(p);
     }
 
@@ -83,13 +83,15 @@ window.PatientsView = (function() {
     html += '<option value="male"' + (state.genderFilter === 'male' ? ' selected' : '') + '>Male</option>';
     html += '<option value="female"' + (state.genderFilter === 'female' ? ' selected' : '') + '>Female</option>';
     html += '</select>';
-    var allTags = Store.getTags();
-    html += '<select class="filter-select" id="patient-tag-filter">';
-    html += '<option value="">All Tags</option>';
-    for (var t = 0; t < allTags.length; t++) {
-      html += '<option value="' + allTags[t].id + '"' + (state.tagFilter === allTags[t].id ? ' selected' : '') + '>' + Utils.escapeHtml(allTags[t].name) + '</option>';
+    if (Store.isFeatureEnabled('tags')) {
+      var allTags = Store.getTags();
+      html += '<select class="filter-select" id="patient-tag-filter">';
+      html += '<option value="">All Tags</option>';
+      for (var t = 0; t < allTags.length; t++) {
+        html += '<option value="' + allTags[t].id + '"' + (state.tagFilter === allTags[t].id ? ' selected' : '') + '>' + Utils.escapeHtml(allTags[t].name) + '</option>';
+      }
+      html += '</select>';
     }
-    html += '</select>';
     html += '<button class="btn btn-primary" id="add-patient-btn">';
     html += '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
     html += 'Add Patient</button>';
@@ -98,11 +100,12 @@ window.PatientsView = (function() {
     // Table
     html += '<div class="card"><div class="table-wrapper">';
     html += '<table class="data-table patients-table"><thead><tr>';
-    html += '<th>Patient</th><th>Contact</th><th>Diagnosis</th><th>Tags</th><th>Status</th><th>Actions</th>';
+    var tagsEnabled = Store.isFeatureEnabled('tags');
+    html += '<th>Patient</th><th>Contact</th><th>Diagnosis</th>' + (tagsEnabled ? '<th>Tags</th>' : '') + '<th>Status</th><th>Actions</th>';
     html += '</tr></thead><tbody>';
 
     if (pageItems.length === 0) {
-      html += '<tr class="no-hover"><td colspan="6"><div class="empty-state"><p>No patients found</p></div></td></tr>';
+      html += '<tr class="no-hover"><td colspan="' + (tagsEnabled ? '6' : '5') + '"><div class="empty-state"><p>No patients found</p></div></td></tr>';
     } else {
       for (var j = 0; j < pageItems.length; j++) {
         var pt = pageItems[j];
@@ -116,18 +119,20 @@ window.PatientsView = (function() {
         html += '<td><div style="font-size:0.82rem;">' + Utils.escapeHtml((pt.phoneCode || Utils.getPhoneCode()) + ' ' + (pt.phone || '-')) + '</div>';
         html += '<div style="font-size:0.75rem;color:var(--gray-500);">' + Utils.escapeHtml(pt.email || '') + '</div></td>';
         html += '<td title="' + Utils.escapeHtml(pt.diagnosis || '') + '">' + Utils.escapeHtml(pt.diagnosis || '-') + '</td>';
-        html += '<td>';
-        if (pt.tags && pt.tags.length > 0) {
-          for (var tIdx = 0; tIdx < pt.tags.length; tIdx++) {
-            var tagObj = Store.getTag(pt.tags[tIdx]);
-            if (tagObj) {
-              html += '<span class="tag-badge" style="background:' + tagObj.color + ';">' + Utils.escapeHtml(tagObj.name) + '</span>';
+        if (tagsEnabled) {
+          html += '<td>';
+          if (pt.tags && pt.tags.length > 0) {
+            for (var tIdx = 0; tIdx < pt.tags.length; tIdx++) {
+              var tagObj = Store.getTag(pt.tags[tIdx]);
+              if (tagObj) {
+                html += '<span class="tag-badge" style="background:' + tagObj.color + ';">' + Utils.escapeHtml(tagObj.name) + '</span>';
+              }
             }
+          } else {
+            html += '<span style="color:var(--gray-400);font-size:0.78rem;">-</span>';
           }
-        } else {
-          html += '<span style="color:var(--gray-400);font-size:0.78rem;">-</span>';
+          html += '</td>';
         }
-        html += '</td>';
         html += '<td><span class="badge ' + statusCls + '">' + (pt.status || 'active') + '</span></td>';
         html += '<td><div class="btn-group">';
         html += '<button class="btn btn-sm btn-ghost view-patient-btn" data-id="' + pt.id + '" title="View">View</button>';

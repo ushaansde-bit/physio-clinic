@@ -355,6 +355,10 @@ window.PatientDetailView = (function() {
   }
 
   // ==================== EDIT PATIENT INFO (inline) ====================
+  function editSectionLabel(text) {
+    return '<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--gray-400);margin:1.25rem 0 0.5rem;padding-bottom:0.35rem;border-bottom:1px solid var(--border);">' + text + '</div>';
+  }
+
   function renderEditPatientForm(patient) {
     var html = '<div class="inline-form-card mb-2">';
     html += '<div class="inline-form-header">';
@@ -366,9 +370,11 @@ window.PatientDetailView = (function() {
     html += '<div class="inline-form-body">';
     html += '<form id="edit-patient-form">';
 
+    // -- Personal --
+    html += editSectionLabel('Personal');
     html += '<div class="form-group"><label>Full Name</label>';
     html += '<input type="text" name="name" value="' + Utils.escapeHtml(patient.name || '') + '" required></div>';
-    html += '<div class="form-row-3">';
+    html += '<div class="form-row">';
     html += '<div class="form-group"><label>Date of Birth</label>';
     html += Utils.dobPickerHtml(patient.dob || '');
     html += '</div>';
@@ -379,13 +385,7 @@ window.PatientDetailView = (function() {
     html += '<option value="female"' + (patient.gender === 'female' ? ' selected' : '') + '>Female</option>';
     html += '<option value="other"' + (patient.gender === 'other' ? ' selected' : '') + '>Other</option>';
     html += '</select></div>';
-    html += '<div class="form-group"><label>Status</label>';
-    html += '<select name="status">';
-    html += '<option value="active"' + (patient.status === 'active' ? ' selected' : '') + '>Active</option>';
-    html += '<option value="completed"' + (patient.status === 'completed' ? ' selected' : '') + '>Completed</option>';
-    html += '</select></div>';
     html += '</div>';
-
     html += '<div class="form-row">';
     html += '<div class="form-group"><label>Phone</label>';
     html += '<div class="phone-input-wrap">';
@@ -401,23 +401,20 @@ window.PatientDetailView = (function() {
     html += '<div class="form-group"><label>Insurance</label>';
     html += '<input type="text" name="insurance" value="' + Utils.escapeHtml(patient.insurance || '') + '"></div>';
     html += '</div>';
+    html += '<div class="form-group"><label>Status</label>';
+    html += '<select name="status" style="max-width:200px;">';
+    html += '<option value="active"' + (patient.status === 'active' ? ' selected' : '') + '>Active</option>';
+    html += '<option value="completed"' + (patient.status === 'completed' ? ' selected' : '') + '>Completed</option>';
+    html += '</select></div>';
 
+    // -- Clinical --
+    html += editSectionLabel('Clinical');
     html += '<div class="form-group"><label>Diagnosis ' + Utils.micHtml('ep-diagnosis') + '</label>';
     html += '<textarea id="ep-diagnosis" name="diagnosis" rows="2" data-ac="diagnosis">' + Utils.escapeHtml(patient.diagnosis || '') + '</textarea></div>';
     html += '<div class="form-group"><label>Treatment Plan ' + Utils.micHtml('ep-treatplan') + '</label>';
     html += '<textarea id="ep-treatplan" name="treatmentPlan" rows="3" data-ac="treatmentPlan">' + Utils.escapeHtml(patient.treatmentPlan || '') + '</textarea></div>';
     html += '<div class="form-group"><label>Notes ' + Utils.micHtml('ep-notes') + '</label>';
     html += '<textarea id="ep-notes" name="notes" rows="2">' + Utils.escapeHtml(patient.notes || '') + '</textarea></div>';
-
-    html += '<div class="form-row">';
-    html += '<div class="form-group"><label>Emergency Contact</label>';
-    html += '<input type="text" name="emergencyContact" value="' + Utils.escapeHtml(patient.emergencyContact || '') + '"></div>';
-    html += '<div class="form-group"><label>Emergency Phone</label>';
-    html += '<div class="phone-input-wrap">';
-    html += '<input type="text" name="emergencyPhoneCode" class="phone-code-input" value="' + Utils.escapeHtml(patient.emergencyPhoneCode || Utils.getPhoneCode()) + '" maxlength="5">';
-    html += '<input type="tel" name="emergencyPhone" class="phone-number-input" value="' + Utils.escapeHtml(patient.emergencyPhone || '') + '" maxlength="' + Utils.getPhoneDigits() + '">';
-    html += '</div></div>';
-    html += '</div>';
 
     // Body diagram
     if (Store.isFeatureEnabled('bodyDiagram')) {
@@ -440,6 +437,18 @@ window.PatientDetailView = (function() {
       }
       html += '</div></div>';
     }
+
+    // -- Emergency --
+    html += editSectionLabel('Emergency Contact');
+    html += '<div class="form-row">';
+    html += '<div class="form-group"><label>Contact Name</label>';
+    html += '<input type="text" name="emergencyContact" value="' + Utils.escapeHtml(patient.emergencyContact || '') + '"></div>';
+    html += '<div class="form-group"><label>Contact Phone</label>';
+    html += '<div class="phone-input-wrap">';
+    html += '<input type="text" name="emergencyPhoneCode" class="phone-code-input" value="' + Utils.escapeHtml(patient.emergencyPhoneCode || Utils.getPhoneCode()) + '" maxlength="5">';
+    html += '<input type="tel" name="emergencyPhone" class="phone-number-input" value="' + Utils.escapeHtml(patient.emergencyPhone || '') + '" maxlength="' + Utils.getPhoneDigits() + '">';
+    html += '</div></div>';
+    html += '</div>';
 
     html += '</form>';
     html += '</div>';
