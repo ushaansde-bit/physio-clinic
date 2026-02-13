@@ -604,12 +604,6 @@
             <input type="tel" id="c-phone" placeholder="9876543210" required>
           </div>
         </div>
-        <div class="form-group">
-          <label for="c-slug">Booking Slug</label>
-          <input type="text" id="c-slug" placeholder="e.g. dr-smith" required>
-          <div class="form-hint">Used for online booking URL</div>
-          <div class="slug-preview" id="c-slug-preview"></div>
-        </div>
         <div class="form-row">
           <div class="form-group">
             <label for="c-username">Username</label>
@@ -1041,7 +1035,6 @@
 
         // Actions
         html += '<div class="clinic-card-actions">';
-        html += '<button class="btn btn-primary btn-sm" onclick="enterClinic(\'' + escapeHtml(cid) + '\')">Enter Clinic</button>';
         html += '<button class="btn btn-secondary btn-sm" onclick="toggleFeatureEditor(\'' + escapeHtml(cid) + '\')">Features</button>';
         html += '<button class="btn btn-secondary btn-sm" onclick="openResetPasswordModal(\'' + escapeHtml(cid) + '\')">Reset Password</button>';
         html += '<button class="btn btn-danger-ghost btn-sm" onclick="confirmDeleteClinic(\'' + escapeHtml(cid) + '\')">Delete</button>';
@@ -1148,39 +1141,6 @@
     function previewBooking(slug) {
       var url = window.location.origin + window.location.pathname.replace('admin.html', '') + 'book1/?c=' + encodeURIComponent(slug);
       window.open(url, '_blank');
-    }
-
-    // --- Enter Clinic ---
-    function enterClinic(clinicId) {
-      // Find first admin user in that clinic
-      db.collection('clinics').doc(clinicId).collection('users')
-        .where('role', '==', 'admin')
-        .limit(1)
-        .get()
-        .then(function(snap) {
-          if (snap.empty) {
-            // Fallback: any user
-            return db.collection('clinics').doc(clinicId).collection('users').limit(1).get();
-          }
-          return snap;
-        })
-        .then(function(snap) {
-          if (snap.empty) {
-            showToast('No users found for this clinic.', 'error');
-            return;
-          }
-          var user = snap.docs[0].data();
-
-          // Set session to impersonate this clinic
-          sessionStorage.setItem('physio_clinicId', clinicId);
-          sessionStorage.setItem('physio_session', JSON.stringify(user));
-          sessionStorage.setItem('physio_from_admin', '1');
-
-          window.location.href = 'index.html';
-        })
-        .catch(function(err) {
-          showToast('Failed to enter clinic: ' + (err.message || 'Unknown error'), 'error');
-        });
     }
 
     // --- Toggle Feature Editor ---
@@ -1321,13 +1281,97 @@
         html += '</div>';
         html += '</div>';
         html += '<div class="clinic-card-actions">';
+        html += '<button class="btn btn-secondary btn-sm" onclick="viewDeletedClinicData(\'' + escapeHtml(cid) + '\', this)">View Data</button>';
         html += '<button class="btn btn-primary btn-sm" onclick="restoreClinic(\'' + escapeHtml(cid) + '\')">Restore</button>';
         html += '<button class="btn btn-danger-ghost btn-sm" onclick="confirmPermDeleteClinic(\'' + escapeHtml(cid) + '\')">Delete Forever</button>';
         html += '</div>';
+        html += '<div class="clinic-data-panel" id="data-panel-' + escapeHtml(cid) + '" style="display:none;padding:0.75rem 1.25rem 1rem;border-top:1px solid #f3f4f6;background:#f9fafb;font-size:0.82rem;color:#374151;"></div>';
         html += '</div>';
       });
 
       list.innerHTML = html;
+    }
+
+    // --- View Deleted Clinic Data ---
+    function viewDeletedClinicData(clinicId, btn) {
+      var panel = document.getElementById('data-panel-' + clinicId);
+      if (!panel) return;
+
+      // Toggle panel if already loaded
+      if (panel.getAttribute('data-loaded') === '1') {
+        panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Loading...';
+      panel.style.display = 'block';
+      panel.innerHTML = '<div class="loading-center" style="padding:0.5rem;"><span class="spinner spinner-dark"></span> Fetching data...</div>';
+
+      var subcollections = [
+        { name: 'users', label: 'Users' },
+        { name: 'patients', label: 'Patients' },
+        { name: 'appointments', label: 'Appointments' },
+        { name: 'sessions', label: 'Sessions' },
+        { name: 'exercises', label: 'Exercises' },
+        { name: 'billing', label: 'Invoices' },
+        { name: 'tags', label: 'Tags' },
+        { name: 'prescriptions', label: 'Prescriptions' },
+        { name: 'message_templates', label: 'Message Templates' },
+        { name: 'message_log', label: 'Message Log' },
+        { name: 'online_bookings', label: 'Online Bookings' }
+      ];
+
+      var results = {};
+      var loaded = 0;
+
+      subcollections.forEach(function(sub) {
+        db.collection('clinics').doc(clinicId).collection(sub.name).get()
+          .then(function(snap) {
+            results[sub.name] = { label: sub.label, count: snap.size, docs: [] };
+            if (sub.name === 'patients' || sub.name === 'users') {
+              snap.docs.forEach(function(doc) {
+                var d = doc.data();
+                results[sub.name].docs.push(d.name || d.username || doc.id);
+              });
+            }
+          })
+          .catch(function() {
+            results[sub.name] = { label: sub.label, count: '?', docs: [] };
+          })
+          .finally(function() {
+            loaded++;
+            if (loaded >= subcollections.length) {
+              renderDataPanel(panel, results);
+              btn.disabled = false;
+              btn.textContent = 'View Data';
+              panel.setAttribute('data-loaded', '1');
+            }
+          });
+      });
+    }
+
+    function renderDataPanel(panel, results) {
+      var html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:0.5rem;margin-bottom:0.5rem;">';
+      for (var key in results) {
+        if (!results.hasOwnProperty(key)) continue;
+        var r = results[key];
+        html += '<div style="background:#fff;border-radius:6px;padding:0.5rem 0.75rem;border:1px solid #e5e7eb;">';
+        html += '<div style="font-weight:600;color:#111827;">' + r.count + '</div>';
+        html += '<div style="font-size:0.72rem;color:#6b7280;">' + escapeHtml(r.label) + '</div>';
+        html += '</div>';
+      }
+      html += '</div>';
+
+      // Show patient/user names if any
+      if (results.patients && results.patients.docs.length > 0) {
+        html += '<div style="margin-top:0.4rem;"><strong>Patients:</strong> ' + results.patients.docs.map(escapeHtml).join(', ') + '</div>';
+      }
+      if (results.users && results.users.docs.length > 0) {
+        html += '<div style="margin-top:0.25rem;"><strong>Users:</strong> ' + results.users.docs.map(escapeHtml).join(', ') + '</div>';
+      }
+
+      panel.innerHTML = html;
     }
 
     // --- Restore Clinic ---
@@ -1500,17 +1544,6 @@
       if (e.target === this) closeCreateModal();
     });
 
-    // Slug auto-format
-    document.getElementById('c-slug').addEventListener('input', function() {
-      var val = this.value
-        .toLowerCase()
-        .replace(/\s+/g, '-')
-        .replace(/[^a-z0-9\-]/g, '')
-        .replace(/-{2,}/g, '-');
-      this.value = val;
-      document.getElementById('c-slug-preview').textContent = val ? 'Booking URL: .../' + val : '';
-    });
-
     // Submit create form
     document.getElementById('create-form').addEventListener('submit', function(e) {
       e.preventDefault();
@@ -1519,11 +1552,11 @@
       var doctorName = document.getElementById('c-doctor-name').value.trim();
       var email = document.getElementById('c-email').value.trim();
       var phone = document.getElementById('c-phone').value.trim();
-      var slug = document.getElementById('c-slug').value.trim();
+      var slug = phone.replace(/\D/g, '');
       var username = document.getElementById('c-username').value.trim();
       var password = document.getElementById('c-password').value;
 
-      if (!clinicName || !doctorName || !email || !phone || !slug || !username || !password) {
+      if (!clinicName || !doctorName || !email || !phone || !username || !password) {
         showToast('Please fill in all fields.', 'error');
         return;
       }
@@ -1533,8 +1566,8 @@
         return;
       }
 
-      if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)) {
-        showToast('Slug must be lowercase letters, numbers, and hyphens only.', 'error');
+      if (slug.length < 10) {
+        showToast('Please enter a valid 10-digit phone number.', 'error');
         return;
       }
 
@@ -1552,7 +1585,7 @@
       db.collection('booking_slugs').doc(slug).get()
         .then(function(doc) {
           if (doc.exists) {
-            showToast('This slug is already taken.', 'error');
+            showToast('A clinic with this phone number already exists.', 'error');
             return Promise.reject('slug_taken');
           }
 

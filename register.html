@@ -261,13 +261,6 @@
           </div>
         </div>
 
-        <div class="form-group">
-          <label for="booking-slug">Booking Slug</label>
-          <input type="text" id="booking-slug" placeholder="e.g. dr-smith" required>
-          <div class="form-hint">Used for online booking URL, e.g. dr-smith</div>
-          <div class="slug-preview" id="slug-preview"></div>
-        </div>
-
         <div class="form-row">
           <div class="form-group">
             <label for="username">Username</label>
@@ -301,10 +294,10 @@
           <h2>Registration Submitted!</h2>
           <p>Your clinic registration has been submitted and is <strong>pending admin approval</strong>. You will be able to log in once approved.</p>
           <div class="clinic-code-box">
-            <div class="label">Your Clinic Code (save this for login)</div>
+            <div class="label">Your Clinic Code (your phone number)</div>
             <div class="code" id="success-clinic-slug"></div>
           </div>
-          <p style="font-size:0.8rem;color:#6b7280;margin-bottom:1rem;">Remember this code — you'll need it every time you log in after approval.</p>
+          <p style="font-size:0.8rem;color:#6b7280;margin-bottom:1rem;">Use your phone number as the clinic code every time you log in.</p>
           <a href="index.html" class="btn btn-primary">Back to Login</a>
         </div>
       </div>
@@ -357,24 +350,6 @@
       return div.innerHTML;
     }
 
-    // --- Slug Auto-Format ---
-    var slugInput = document.getElementById('booking-slug');
-    var slugPreview = document.getElementById('slug-preview');
-
-    slugInput.addEventListener('input', function() {
-      var val = this.value
-        .toLowerCase()
-        .replace(/\s+/g, '-')
-        .replace(/[^a-z0-9\-]/g, '')
-        .replace(/-{2,}/g, '-');
-      this.value = val;
-      if (val) {
-        slugPreview.textContent = 'Booking URL: .../' + val;
-      } else {
-        slugPreview.textContent = '';
-      }
-    });
-
     // --- Form Submission ---
     var form = document.getElementById('register-form');
     var registerBtn = document.getElementById('register-btn');
@@ -394,13 +369,13 @@
       var doctorName = document.getElementById('doctor-name').value.trim();
       var email = document.getElementById('email').value.trim();
       var phone = document.getElementById('phone').value.trim();
-      var slug = document.getElementById('booking-slug').value.trim();
+      var slug = phone.replace(/\D/g, '');
       var username = document.getElementById('username').value.trim();
       var password = document.getElementById('password').value;
       var confirmPassword = document.getElementById('confirm-password').value;
 
       // Validate required fields
-      if (!clinicName || !doctorName || !email || !phone || !slug || !username || !password || !confirmPassword) {
+      if (!clinicName || !doctorName || !email || !phone || !username || !password || !confirmPassword) {
         showToast('Please fill in all required fields.', 'error');
         return;
       }
@@ -412,15 +387,9 @@
         return;
       }
 
-      // Validate phone
-      if (!/^\d{7,15}$/.test(phone.replace(/[\s\-\+]/g, ''))) {
-        showToast('Please enter a valid phone number.', 'error');
-        return;
-      }
-
-      // Validate slug format
-      if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)) {
-        showToast('Slug must be lowercase letters, numbers, and hyphens only (e.g. dr-smith).', 'error');
+      // Validate phone (10 digits)
+      if (slug.length < 10) {
+        showToast('Please enter a valid 10-digit phone number.', 'error');
         return;
       }
 
@@ -442,7 +411,7 @@
       db.collection('booking_slugs').doc(slug).get()
         .then(function(doc) {
           if (doc.exists) {
-            showToast('This booking slug is already taken. Please choose a different one.', 'error');
+            showToast('A clinic with this phone number already exists.', 'error');
             setLoading(false);
             return Promise.reject('slug_taken');
           }
@@ -534,11 +503,10 @@
 
           setLoading(false);
 
-          // Show success state with the booking slug (what users type at login)
-          var usedSlug = document.getElementById('booking-slug').value.trim();
+          // Show success state with phone number as clinic code
           document.getElementById('register-form').style.display = 'none';
           document.getElementById('success-state').style.display = 'block';
-          document.getElementById('success-clinic-slug').textContent = usedSlug;
+          document.getElementById('success-clinic-slug').textContent = document.getElementById('phone').value.trim();
 
           showToast('Clinic registered successfully!', 'success');
         })

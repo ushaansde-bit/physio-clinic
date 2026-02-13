@@ -54,14 +54,14 @@
       id: clinicId,
       name: 'My Clinic',
       ownerName: 'Dr. Priya Sharma',
-      bookingSlug: 'default',
+      bookingSlug: '1234567890',
       features: Store.getDefaultFeatures(),
       createdAt: new Date().toISOString()
     };
     localStorage.setItem('physio_clinic_default', JSON.stringify(defaultClinic));
 
-    // Create slug lookup for default
-    localStorage.setItem('physio_slug_default', clinicId);
+    // Create slug lookup for default clinic code
+    localStorage.setItem('physio_slug_1234567890', clinicId);
 
     localStorage.setItem('physio_multitenant_migrated', '1');
     console.log('[App] Migrated legacy localStorage keys to default clinic');
@@ -102,12 +102,12 @@
                 id: 'default',
                 name: 'My Clinic',
                 ownerName: 'Dr. Priya Sharma',
-                bookingSlug: 'default',
+                bookingSlug: '1234567890',
                 features: Store.getDefaultFeatures(),
                 createdAt: new Date().toISOString()
               };
               db.collection('clinics').doc('default').set(clinicData, { merge: true });
-              db.collection('booking_slugs').doc('default').set({ clinicId: 'default', createdAt: new Date().toISOString() });
+              db.collection('booking_slugs').doc('1234567890').set({ clinicId: 'default', createdAt: new Date().toISOString() });
             }
           });
         }

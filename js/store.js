@@ -588,6 +588,8 @@ window.Store = (function() {
 
   // --- Seed Data (70 Indian-named patients, 3 months of comprehensive data) ---
   function seed() {
+    var cid = sessionStorage.getItem('physio_clinicId') || 'default';
+    if (cid !== 'default') return; // Only seed demo data for default clinic
     if (localStorage.getItem(KEYS.users)) return; // Already seeded
 
     // Users
