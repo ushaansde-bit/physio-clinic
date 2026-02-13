@@ -561,7 +561,7 @@
       <!-- Toolbar -->
       <div class="toolbar">
         <h2>Active Clinics</h2>
-        <button class="btn btn-primary btn-sm" onclick="openCreateModal()">+ New Clinic</button>
+        <button class="btn btn-ghost btn-sm" onclick="toggleTrash()" style="color:#6b7280;">Trash <span id="trash-badge" style="background:#f3f4f6;color:#6b7280;font-size:0.7rem;padding:1px 6px;border-radius:8px;margin-left:2px;">0</span></button>
       </div>
 
       <!-- Clinic List -->
@@ -1001,7 +1001,7 @@
         // Booking URL row
         var bookingSlug = clinic.bookingSlug || '';
         if (bookingSlug) {
-          var bookingUrl = window.location.origin + window.location.pathname.replace('admin.html', '') + 'book1/?c=' + encodeURIComponent(bookingSlug);
+          var bookingUrl = window.location.origin + window.location.pathname.replace('admin.html', '') + 'book1/index.html?c=' + encodeURIComponent(bookingSlug);
           html += '<div class="booking-url-row">';
           html += '<span class="url-text" id="burl-' + escapeHtml(cid) + '">' + escapeHtml(bookingUrl) + '</span>';
           html += '<button class="btn-icon" onclick="copyBookingUrl(\'' + escapeHtml(cid) + '\')" title="Copy link">Copy</button>';
@@ -1139,7 +1139,7 @@
     }
 
     function previewBooking(slug) {
-      var url = window.location.origin + window.location.pathname.replace('admin.html', '') + 'book1/?c=' + encodeURIComponent(slug);
+      var url = window.location.origin + window.location.pathname.replace('admin.html', '') + 'book1/index.html?c=' + encodeURIComponent(slug);
       window.open(url, '_blank');
     }
 
@@ -1252,12 +1252,32 @@
         });
     }
 
+    // --- Toggle Trash Section ---
+    function toggleTrash() {
+      var section = document.getElementById('deleted-section');
+      var deleted = clinicsData.filter(function(c) { return c._deleted; });
+      if (section.style.display === 'none' || section.style.display === '') {
+        if (deleted.length === 0) {
+          section.style.display = 'block';
+          document.getElementById('deleted-list').innerHTML = '<div style="text-align:center;padding:1.5rem;color:#6b7280;">Trash is empty</div>';
+          document.getElementById('deleted-count').textContent = '0';
+        } else {
+          renderDeletedClinics();
+        }
+        section.scrollIntoView({ behavior: 'smooth' });
+      } else {
+        section.style.display = 'none';
+      }
+    }
+
     // --- Render Deleted Clinics ---
     function renderDeletedClinics() {
       var deleted = clinicsData.filter(function(c) { return c._deleted; });
       var section = document.getElementById('deleted-section');
       var list = document.getElementById('deleted-list');
       var countEl = document.getElementById('deleted-count');
+      var trashBadge = document.getElementById('trash-badge');
+      if (trashBadge) trashBadge.textContent = deleted.length;
 
       if (deleted.length === 0) {
         section.style.display = 'none';
