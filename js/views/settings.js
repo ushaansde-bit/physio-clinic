@@ -211,11 +211,11 @@ window.SettingsView = (function() {
     html += '</div>';
     html += '<div class="card-body"><div class="table-wrapper">';
     html += '<table class="data-table"><thead><tr>';
-    html += '<th>Name</th><th>Role</th><th>Phone</th><th>Email</th><th>Actions</th>';
+    html += '<th>Name</th><th>Username</th><th>Role</th><th>Phone</th><th>Email</th><th>Actions</th>';
     html += '</tr></thead><tbody>';
 
     if (users.length === 0) {
-      html += '<tr class="no-hover"><td colspan="5"><div class="empty-state"><p>No staff members found</p></div></td></tr>';
+      html += '<tr class="no-hover"><td colspan="6"><div class="empty-state"><p>No staff members found</p></div></td></tr>';
     } else {
       for (var i = 0; i < users.length; i++) {
         var u = users[i];
@@ -225,6 +225,7 @@ window.SettingsView = (function() {
 
         html += '<tr class="no-hover">';
         html += '<td style="font-weight:500;">' + Utils.escapeHtml(u.name) + (isSelf ? ' <span class="text-muted">(you)</span>' : '') + '</td>';
+        html += '<td><code>' + Utils.escapeHtml(u.username || '-') + '</code></td>';
         html += '<td><span class="badge ' + roleBadge + '">' + Utils.escapeHtml(roleLabel) + '</span></td>';
         html += '<td>' + Utils.escapeHtml(u.phone || '-') + '</td>';
         html += '<td>' + Utils.escapeHtml(u.email || '-') + '</td>';
@@ -287,6 +288,17 @@ window.SettingsView = (function() {
     html += '<div class="form-group">';
     html += '<label>Email</label>';
     html += '<input type="email" name="email" placeholder="e.g. priya@clinic.com" value="' + Utils.escapeHtml(isEdit ? user.email || '' : '') + '">';
+    html += '</div>';
+    html += '</div>';
+
+    html += '<div class="form-row">';
+    html += '<div class="form-group">';
+    html += '<label>Username <span style="color:var(--danger);">*</span></label>';
+    html += '<input type="text" name="username" required placeholder="e.g. priya" value="' + Utils.escapeHtml(isEdit ? user.username || '' : '') + '">';
+    html += '</div>';
+    html += '<div class="form-group">';
+    html += '<label>Password' + (isEdit ? '' : ' <span style="color:var(--danger);">*</span>') + '</label>';
+    html += '<input type="password" name="password" placeholder="' + (isEdit ? 'Leave blank to keep current' : 'Min 4 characters') + '"' + (isEdit ? '' : ' required') + '>';
     html += '</div>';
     html += '</div>';
 
@@ -418,19 +430,47 @@ window.SettingsView = (function() {
           return;
         }
 
+        var username = (data.username || '').trim();
+        if (!username) {
+          Utils.toast('Username is required', 'error');
+          return;
+        }
+
+        // Check username uniqueness
+        var existingUser = Store.getUserByUsername(username);
+        if (existingUser && (!isEdit || existingUser.id !== state.staffEditId)) {
+          Utils.toast('Username "' + username + '" is already taken', 'error');
+          return;
+        }
+
+        var passwordVal = data.password || '';
+        if (!isEdit && passwordVal.length < 4) {
+          Utils.toast('Password must be at least 4 characters', 'error');
+          return;
+        }
+        if (isEdit && passwordVal && passwordVal.length < 4) {
+          Utils.toast('Password must be at least 4 characters', 'error');
+          return;
+        }
+
         var role = data.role || (isEdit ? user.role : 'physiotherapist');
         var allowedPages = role === 'admin' ? null : (isSelf ? user.allowedPages : getCheckedPages());
         var billingPerms = role === 'admin' ? null : (isSelf ? user.billingPermissions : getCheckedBillingPerms());
 
         if (isEdit) {
-          Store.update(Store.KEYS.users, state.staffEditId, {
+          var updateData = {
             name: data.name,
+            username: username,
             role: role,
             phone: data.phone || '',
             email: data.email || '',
             allowedPages: allowedPages,
             billingPermissions: billingPerms
-          });
+          };
+          if (passwordVal) {
+            updateData.password = passwordVal;
+          }
+          Store.update(Store.KEYS.users, state.staffEditId, updateData);
 
           // If editing self, update session
           if (isSelf) {
@@ -449,6 +489,8 @@ window.SettingsView = (function() {
         } else {
           Store.create(Store.KEYS.users, {
             name: data.name,
+            username: username,
+            password: passwordVal,
             role: role,
             phone: data.phone || '',
             email: data.email || '',
@@ -766,7 +808,7 @@ window.SettingsView = (function() {
     var ownerEmail = settings.ownerEmail || '-';
     var ownerPhone = settings.ownerPhone || '-';
     var slug = settings.bookingSlug || '';
-    var bookingUrl = slug ? (window.location.origin + window.location.pathname.replace('index.html', '') + 'book1/?c=' + slug) : '';
+    var bookingUrl = slug ? (window.location.origin + window.location.pathname.replace('index.html', '') + 'book1/index.html?c=' + slug) : '';
 
     var html = '';
     html += '<div class="card mb-2">';
@@ -783,7 +825,7 @@ window.SettingsView = (function() {
     if (bookingUrl) {
       html += '<div style="margin-top:1rem;padding:0.75rem;background:var(--bg-secondary);border-radius:var(--radius);font-size:0.85em;">';
       html += '<strong>Online Booking URL</strong><br>';
-      html += '<code style="word-break:break-all;">' + Utils.escapeHtml(bookingUrl) + '</code>';
+      html += '<a href="' + Utils.escapeHtml(bookingUrl) + '" target="_blank" style="word-break:break-all;color:var(--primary);">' + Utils.escapeHtml(bookingUrl) + '</a>';
       html += '</div>';
     }
 
