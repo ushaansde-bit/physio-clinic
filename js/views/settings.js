@@ -179,7 +179,6 @@ window.SettingsView = (function() {
     html += '<button class="tab-btn' + (state.tab === 'features' ? ' active' : '') + '" data-tab="features">Features</button>';
     html += '<button class="tab-btn' + (state.tab === 'clinic' ? ' active' : '') + '" data-tab="clinic">Clinic</button>';
     html += '<button class="tab-btn' + (state.tab === 'trash' ? ' active' : '') + '" data-tab="trash">Trash</button>';
-    html += '<button class="tab-btn' + (state.tab === 'backup' ? ' active' : '') + '" data-tab="backup">Backup</button>';
     html += '</div>';
 
     if (state.tab === 'staff') {
@@ -192,8 +191,6 @@ window.SettingsView = (function() {
       html += renderClinicInfo();
     } else if (state.tab === 'trash') {
       html += renderTrash();
-    } else if (state.tab === 'backup') {
-      html += renderBackup();
     }
 
     container.innerHTML = html;

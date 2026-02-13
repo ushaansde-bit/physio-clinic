@@ -456,6 +456,25 @@ window.AppointmentsView = (function() {
     var _duplicateConfirmed = false;
     var _pastDateConfirmed = false;
     var _conflictConfirmed = false;
+
+    // Reset warnings when key fields change
+    var form = document.getElementById('appt-form');
+    var _resetWarnings = function() {
+      _pastDateConfirmed = false;
+      _conflictConfirmed = false;
+      _duplicateConfirmed = false;
+      var w = document.getElementById('conflict-warning');
+      if (w) { w.style.display = 'none'; w.innerHTML = ''; }
+    };
+    var dateInput = form.querySelector('[name="date"]');
+    var timeInput = form.querySelector('[name="time"]');
+    var patientInput = form.querySelector('[name="patientId"]');
+    var durationInput = form.querySelector('[name="duration"]');
+    if (dateInput) dateInput.addEventListener('change', _resetWarnings);
+    if (timeInput) timeInput.addEventListener('change', _resetWarnings);
+    if (patientInput) patientInput.addEventListener('change', _resetWarnings);
+    if (durationInput) durationInput.addEventListener('change', _resetWarnings);
+
     document.getElementById('appt-form-save').onclick = function() {
       var form = document.getElementById('appt-form');
       var data = Utils.getFormData(form);
