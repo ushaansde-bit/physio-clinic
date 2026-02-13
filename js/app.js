@@ -321,6 +321,13 @@
       }
     }
 
+    // Cleanup all stale view click handlers before rendering new view
+    if (window._viewCleanups) {
+      for (var ci = 0; ci < window._viewCleanups.length; ci++) {
+        window._viewCleanups[ci](content);
+      }
+    }
+
     // Route matching
     if (parts[0] === 'dashboard' || parts.length === 0) {
       pageTitle.textContent = 'Dashboard';

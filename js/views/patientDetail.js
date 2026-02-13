@@ -20,6 +20,7 @@ window.PatientDetailView = (function() {
     bookingView: 'list',     // list | form
     appointmentsView: 'list', // list | form
     appointmentsEditId: null,
+    nextVisitAppt: null,
     printExpanded: false,
     rxPrintExpanded: false,
     editingPatient: false
@@ -37,6 +38,7 @@ window.PatientDetailView = (function() {
     sub.bookingView = 'list';
     sub.appointmentsView = 'list';
     sub.appointmentsEditId = null;
+    sub.nextVisitAppt = null;
     sub.printExpanded = false;
     sub.rxPrintExpanded = false;
     sub.editingPatient = false;
@@ -216,6 +218,28 @@ window.PatientDetailView = (function() {
     past.sort(function(a, b) { return a.date > b.date ? -1 : a.date < b.date ? 1 : (a.time > b.time ? -1 : 1); });
 
     var html = '';
+
+    // Next visit prompt
+    if (sub.nextVisitAppt) {
+      var nva = sub.nextVisitAppt;
+      html += '<div class="inline-form-card mb-2" id="next-visit-prompt">';
+      html += '<div class="inline-form-header"><h3>Appointment Completed</h3></div>';
+      html += '<div class="inline-form-body">';
+      html += '<p style="font-size:0.9rem;color:var(--gray-700);margin-bottom:0.75rem;">Schedule the next visit for ' + Utils.escapeHtml(patient.name) + '?</p>';
+      html += '<div class="quick-date-btns">';
+      html += '<button class="btn btn-sm btn-secondary nv-quick-btn" data-days="1">Tomorrow</button>';
+      html += '<button class="btn btn-sm btn-secondary nv-quick-btn" data-days="3">+3 Days</button>';
+      html += '<button class="btn btn-sm btn-secondary nv-quick-btn" data-days="7">+1 Week</button>';
+      html += '<button class="btn btn-sm btn-secondary nv-quick-btn" data-days="14">+2 Weeks</button>';
+      html += '<button class="btn btn-sm btn-secondary nv-quick-btn" data-days="30">+1 Month</button>';
+      html += '</div>';
+      html += '</div>';
+      html += '<div class="inline-form-actions">';
+      html += '<button class="btn btn-secondary" id="nv-dismiss">No, Thanks</button>';
+      html += '<button class="btn btn-primary" id="nv-custom">Custom Date</button>';
+      html += '</div></div>';
+    }
+
     html += '<div class="card mb-2"><div class="card-header"><h3>Appointments</h3>';
     html += '<button class="btn btn-sm btn-primary" id="add-appt-btn">';
     html += '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:0.25rem;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
@@ -315,6 +339,7 @@ window.PatientDetailView = (function() {
     html += '</div>';
     html += '<div class="form-group"><label>Notes</label>';
     html += '<textarea name="notes" rows="2">' + Utils.escapeHtml(defaultNotes || '') + '</textarea></div>';
+    html += '<div id="appt-warning" style="display:none;" class="login-error"></div>';
     html += '</form>';
     html += '</div>';
 
@@ -568,12 +593,6 @@ window.PatientDetailView = (function() {
     }
 
     var exercises = Store.getExercisesByPatient(patient.id);
-    var active = [];
-    var inactive = [];
-    for (var i = 0; i < exercises.length; i++) {
-      if (exercises[i].status === 'active') active.push(exercises[i]);
-      else inactive.push(exercises[i]);
-    }
 
     var html = '<div class="flex-between mb-2">';
     html += '<h3 style="font-size:1rem;">Home Exercise Program (' + exercises.length + ')</h3>';
@@ -587,17 +606,8 @@ window.PatientDetailView = (function() {
     if (exercises.length === 0) {
       html += '<div class="empty-state"><p>No exercises prescribed</p></div>';
     } else {
-      if (active.length > 0) {
-        html += '<h4 style="font-size:0.85rem;color:var(--gray-500);margin-bottom:0.5rem;">Active Exercises</h4>';
-        for (var j = 0; j < active.length; j++) {
-          html += exerciseCard(active[j]);
-        }
-      }
-      if (inactive.length > 0) {
-        html += '<h4 style="font-size:0.85rem;color:var(--gray-500);margin:1rem 0 0.5rem;">Discontinued</h4>';
-        for (var k = 0; k < inactive.length; k++) {
-          html += exerciseCard(inactive[k]);
-        }
+      for (var j = 0; j < exercises.length; j++) {
+        html += exerciseCard(exercises[j]);
       }
     }
 
@@ -607,8 +617,8 @@ window.PatientDetailView = (function() {
     html += '<p><strong>Patient:</strong> ' + Utils.escapeHtml(patient.name) + '</p>';
     html += '<p><strong>Date:</strong> ' + Utils.formatDate(Utils.today()) + '</p>';
     html += '<hr style="margin:1rem 0;">';
-    for (var l = 0; l < active.length; l++) {
-      var ex = active[l];
+    for (var l = 0; l < exercises.length; l++) {
+      var ex = exercises[l];
       html += '<div style="margin-bottom:1rem;page-break-inside:avoid;">';
       html += '<h4>' + (l + 1) + '. ' + Utils.escapeHtml(ex.name) + '</h4>';
       html += '<p>' + ex.sets + ' sets x ' + ex.reps + ' reps | Hold: ' + (ex.hold || '-') + ' | Frequency: ' + (ex.frequency || '-') + '</p>';
@@ -647,11 +657,6 @@ window.PatientDetailView = (function() {
     html += '</div>';
     html += '<div class="form-group"><label>Instructions ' + Utils.micHtml('ef-instructions') + '</label>';
     html += '<textarea id="ef-instructions" name="instructions" rows="4" placeholder="Step-by-step instructions for the patient...">' + Utils.escapeHtml(exercise ? exercise.instructions || '' : '') + '</textarea></div>';
-    html += '<div class="form-group"><label>Status</label>';
-    html += '<select name="status">';
-    html += '<option value="active"' + (exercise && exercise.status === 'active' ? ' selected' : '') + '>Active</option>';
-    html += '<option value="discontinued"' + (exercise && exercise.status === 'discontinued' ? ' selected' : '') + '>Discontinued</option>';
-    html += '</select></div>';
     html += '</form>';
     html += '</div>';
     html += '<div class="inline-form-actions">';
@@ -1285,12 +1290,57 @@ window.PatientDetailView = (function() {
       var completeApptBtn = e.target.closest('.complete-appt-btn');
       if (completeApptBtn) {
         var caid = completeApptBtn.getAttribute('data-id');
-        Store.updateAppointment(caid, { status: 'completed' });
-        Store.logActivity('Appointment completed: ' + patient.name);
-        Utils.toast('Appointment completed', 'success');
+        var completedAppt = Store.getAppointment(caid);
+        var doComplete = function() {
+          Store.updateAppointment(caid, { status: 'completed' });
+          Store.logActivity('Appointment completed: ' + patient.name);
+          Utils.toast('Appointment completed', 'success');
+          sub.nextVisitAppt = completedAppt;
+          renderDetail(container, Store.getPatient(patient.id));
+        };
+        if (completedAppt && completedAppt.date > Utils.today()) {
+          Utils.inlineConfirm(container, 'This appointment is on ' + Utils.formatDate(completedAppt.date) + ' (future date). Mark as completed?', doComplete);
+        } else {
+          doComplete();
+        }
+        return;
+      }
+      // Next visit quick date buttons
+      var nvQuickBtn = e.target.closest('.nv-quick-btn');
+      if (nvQuickBtn && sub.nextVisitAppt) {
+        var days = parseInt(nvQuickBtn.getAttribute('data-days'), 10);
+        var nva = sub.nextVisitAppt;
+        var nextDate = Utils.toDateString(Utils.addDays(new Date(), days));
+        Store.createAppointment({
+          patientId: patient.id,
+          patientName: patient.name,
+          date: nextDate,
+          time: nva.time || '09:00',
+          type: nva.type || 'Follow-up',
+          duration: nva.duration || '30',
+          status: 'scheduled',
+          notes: ''
+        });
+        Utils.toast('Next visit booked for ' + Utils.formatDate(nextDate), 'success');
+        sub.nextVisitAppt = null;
         renderDetail(container, Store.getPatient(patient.id));
         return;
       }
+      // Dismiss next visit prompt
+      if (e.target.closest('#nv-dismiss')) {
+        sub.nextVisitAppt = null;
+        renderDetail(container, patient);
+        return;
+      }
+      // Custom date → open appointment form
+      if (e.target.closest('#nv-custom')) {
+        sub.nextVisitAppt = null;
+        sub.appointmentsView = 'form';
+        sub.appointmentsEditId = null;
+        renderDetail(container, patient);
+        return;
+      }
+
       var cancelApptBtn = e.target.closest('.cancel-appt-btn');
       if (cancelApptBtn) {
         var canid = cancelApptBtn.getAttribute('data-id');
@@ -1493,6 +1543,7 @@ window.PatientDetailView = (function() {
         }
         var data = Utils.getFormData(form);
         data.patientId = patient.id;
+        data.status = 'active';
         var exercise = sub.exercisesEditId ? Store.getExercises().filter(function(e) { return e.id === sub.exercisesEditId; })[0] : null;
         if (exercise) {
           Store.updateExercise(exercise.id, data);
@@ -1621,6 +1672,15 @@ window.PatientDetailView = (function() {
           data.tags.push(activePills[tc].getAttribute('data-tag-id'));
         }
 
+        // Phone uniqueness check (skip if same patient)
+        if (data.phone && data.phone.trim()) {
+          var existingByPhone = Store.getPatientByPhone(data.phone);
+          if (existingByPhone && existingByPhone.id !== patient.id) {
+            Utils.toast('Phone number already exists for ' + existingByPhone.name, 'error');
+            return;
+          }
+        }
+
         Store.updatePatient(patient.id, data);
         Utils.toast('Patient updated', 'success');
         sub.editingPatient = false;
@@ -1653,12 +1713,54 @@ window.PatientDetailView = (function() {
     if (apptBack) apptBack.onclick = function() { sub.appointmentsView = 'list'; sub.appointmentsEditId = null; renderDetail(container, patient); };
     if (apptCancel) apptCancel.onclick = function() { sub.appointmentsView = 'list'; sub.appointmentsEditId = null; renderDetail(container, patient); };
     if (apptSave) {
+      var _pastDateOk = false;
+      var _conflictOk = false;
       apptSave.onclick = function() {
         var form = document.getElementById('appt-form');
         var data = Utils.getFormData(form);
         if (!data.date || !data.time) {
           Utils.toast('Date and time are required', 'error');
           return;
+        }
+        // Past date warning
+        if (!_pastDateOk && data.date < Utils.today()) {
+          var wEl = document.getElementById('appt-warning');
+          wEl.innerHTML = 'This date is in the past (' + Utils.formatDate(data.date) + '). Are you sure?' +
+            '<br><button type="button" class="btn btn-sm btn-primary" id="past-ok" style="margin-top:0.4rem;">Yes, continue</button> ' +
+            '<button type="button" class="btn btn-sm btn-ghost" id="past-no" style="margin-top:0.4rem;">Change date</button>';
+          wEl.style.display = 'block';
+          document.getElementById('past-ok').onclick = function(e) {
+            e.preventDefault();
+            _pastDateOk = true;
+            document.getElementById('appt-form-save').click();
+          };
+          document.getElementById('past-no').onclick = function(e) {
+            e.preventDefault();
+            wEl.style.display = 'none';
+          };
+          return;
+        }
+        // Conflict check (warning, not hard block)
+        var editId = sub.appointmentsEditId || null;
+        if (!_conflictOk) {
+          var conflict = Store.hasConflict(data.date, data.time, data.duration, editId);
+          if (conflict) {
+            var cEl = document.getElementById('appt-warning');
+            cEl.innerHTML = 'Time conflict: <strong>' + Utils.escapeHtml(conflict.patientName) + '</strong> already booked at ' + Utils.formatTime(conflict.time) + ' (' + conflict.duration + ' min). Book anyway?' +
+              '<br><button type="button" class="btn btn-sm btn-warning" id="conflict-ok" style="margin-top:0.4rem;">Yes, double-book</button> ' +
+              '<button type="button" class="btn btn-sm btn-ghost" id="conflict-no" style="margin-top:0.4rem;">Change time</button>';
+            cEl.style.display = 'block';
+            document.getElementById('conflict-ok').onclick = function(e) {
+              e.preventDefault();
+              _conflictOk = true;
+              document.getElementById('appt-form-save').click();
+            };
+            document.getElementById('conflict-no').onclick = function(e) {
+              e.preventDefault();
+              cEl.style.display = 'none';
+            };
+            return;
+          }
         }
         data.patientId = patient.id;
         data.patientName = patient.name;
@@ -1759,6 +1861,15 @@ window.PatientDetailView = (function() {
       };
     }
   }
+
+  // Register cleanup so router can remove stale handlers
+  if (!window._viewCleanups) window._viewCleanups = [];
+  window._viewCleanups.push(function(container) {
+    if (_clickHandler) {
+      container.removeEventListener('click', _clickHandler);
+      _clickHandler = null;
+    }
+  });
 
   return { render: render };
 })();

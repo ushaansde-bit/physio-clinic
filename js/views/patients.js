@@ -9,6 +9,7 @@ window.PatientsView = (function() {
     search: '',
     genderFilter: '',
     tagFilter: '',
+    sortBy: 'name-asc',  // name-asc | name-desc | recent | next-appt | last-visit
     page: 1,
     perPage: 10,
     subView: 'list',  // 'list' | 'form'
@@ -51,8 +52,47 @@ window.PatientsView = (function() {
       filtered.push(p);
     }
 
-    // Sort by name
-    filtered.sort(function(a, b) { return a.name.localeCompare(b.name); });
+    // Sort
+    var allAppts = null; // lazy-load for sort modes that need appointments
+    if (state.sortBy === 'next-appt' || state.sortBy === 'last-visit') {
+      allAppts = Store.getAppointments();
+    }
+    filtered.sort(function(a, b) {
+      if (state.sortBy === 'name-desc') return b.name.localeCompare(a.name);
+      if (state.sortBy === 'recent') return (b.createdAt || '').localeCompare(a.createdAt || '');
+      if (state.sortBy === 'next-appt') {
+        var today = Utils.today();
+        var aNext = '', bNext = '';
+        for (var i = 0; i < allAppts.length; i++) {
+          if (allAppts[i].patientId === a.id && allAppts[i].status === 'scheduled' && allAppts[i].date >= today) {
+            if (!aNext || allAppts[i].date < aNext) aNext = allAppts[i].date;
+          }
+          if (allAppts[i].patientId === b.id && allAppts[i].status === 'scheduled' && allAppts[i].date >= today) {
+            if (!bNext || allAppts[i].date < bNext) bNext = allAppts[i].date;
+          }
+        }
+        if (aNext && !bNext) return -1;
+        if (!aNext && bNext) return 1;
+        if (!aNext && !bNext) return a.name.localeCompare(b.name);
+        return aNext < bNext ? -1 : aNext > bNext ? 1 : 0;
+      }
+      if (state.sortBy === 'last-visit') {
+        var aLast = '', bLast = '';
+        for (var j = 0; j < allAppts.length; j++) {
+          if (allAppts[j].patientId === a.id && allAppts[j].status === 'completed') {
+            if (!aLast || allAppts[j].date > aLast) aLast = allAppts[j].date;
+          }
+          if (allAppts[j].patientId === b.id && allAppts[j].status === 'completed') {
+            if (!bLast || allAppts[j].date > bLast) bLast = allAppts[j].date;
+          }
+        }
+        if (aLast && !bLast) return 1;
+        if (!aLast && bLast) return -1;
+        if (!aLast && !bLast) return a.name.localeCompare(b.name);
+        return aLast < bLast ? -1 : aLast > bLast ? 1 : 0;
+      }
+      return a.name.localeCompare(b.name); // default: name-asc
+    });
 
     // Pagination
     var total = filtered.length;
@@ -83,6 +123,13 @@ window.PatientsView = (function() {
       }
       html += '</select>';
     }
+    html += '<select class="filter-select" id="patient-sort">';
+    html += '<option value="name-asc"' + (state.sortBy === 'name-asc' ? ' selected' : '') + '>Name A-Z</option>';
+    html += '<option value="name-desc"' + (state.sortBy === 'name-desc' ? ' selected' : '') + '>Name Z-A</option>';
+    html += '<option value="recent"' + (state.sortBy === 'recent' ? ' selected' : '') + '>Recently Added</option>';
+    html += '<option value="next-appt"' + (state.sortBy === 'next-appt' ? ' selected' : '') + '>Next Appointment</option>';
+    html += '<option value="last-visit"' + (state.sortBy === 'last-visit' ? ' selected' : '') + '>Last Visited</option>';
+    html += '</select>';
     html += '<button class="btn btn-primary" id="add-patient-btn">';
     html += '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
     html += 'Add Patient</button>';
@@ -175,8 +222,23 @@ window.PatientsView = (function() {
     html += '</select></div>';
     html += '</div>';
     html += phoneField('Phone', 'phone', 'phoneCode', '', '');
+    // Tags
+    if (Store.isFeatureEnabled('tags')) {
+      var allTags = Store.getTags();
+      if (allTags.length > 0) {
+        html += '<div class="form-group"><label>Tags</label><div class="tag-pill-group">';
+        for (var ti = 0; ti < allTags.length; ti++) {
+          var tagColor = allTags[ti].color || '#6b7280';
+          html += '<button type="button" class="tag-pill" data-tag-id="' + allTags[ti].id + '" data-color="' + tagColor + '">';
+          html += '<span class="tag-pill-dot" style="background:' + tagColor + ';"></span>';
+          html += Utils.escapeHtml(allTags[ti].name);
+          html += '</button>';
+        }
+        html += '</div></div>';
+      }
+    }
     html += '</form>';
-    html += '<p style="font-size:0.78rem;color:var(--gray-400);margin-top:0.5rem;">You can add diagnosis, tags, and other details after saving.</p>';
+    html += '<p style="font-size:0.78rem;color:var(--gray-400);margin-top:0.5rem;">You can add diagnosis and other details after saving.</p>';
     html += '</div>';
     html += '<div class="inline-form-actions">';
     html += '<button class="btn btn-secondary" id="form-cancel-btn">Cancel</button>';
@@ -230,6 +292,24 @@ window.PatientsView = (function() {
       })(phoneWraps[pi]);
     }
 
+    // Tag pill toggles
+    var tagPills = container.querySelectorAll('#patient-form .tag-pill');
+    for (var tp = 0; tp < tagPills.length; tp++) {
+      tagPills[tp].addEventListener('click', function() {
+        var color = this.getAttribute('data-color');
+        this.classList.toggle('active');
+        if (this.classList.contains('active')) {
+          this.style.background = color;
+          this.style.color = '#fff';
+          this.style.borderColor = color;
+        } else {
+          this.style.background = '';
+          this.style.color = '';
+          this.style.borderColor = '';
+        }
+      });
+    }
+
     // Back/Cancel
     document.getElementById('form-back-btn').onclick = function() {
       state.subView = 'list'; state.editId = null; renderView(container);
@@ -247,8 +327,21 @@ window.PatientsView = (function() {
         return;
       }
       var data = Utils.getFormData(form);
+      // Phone uniqueness check
+      if (data.phone && data.phone.trim()) {
+        var existing = Store.getPatientByPhone(data.phone);
+        if (existing) {
+          Utils.toast('Phone number already exists for ' + existing.name, 'error');
+          return;
+        }
+      }
       data.status = 'active';
+      // Collect selected tags
+      var activePills = form.querySelectorAll('.tag-pill.active');
       data.tags = [];
+      for (var tc = 0; tc < activePills.length; tc++) {
+        data.tags.push(activePills[tc].getAttribute('data-tag-id'));
+      }
       data.bodyRegions = [];
       var created = Store.createPatient(data);
       Utils.toast('Patient created', 'success');
@@ -285,6 +378,14 @@ window.PatientsView = (function() {
     if (tagFilter) {
       tagFilter.addEventListener('change', function() {
         state.tagFilter = this.value;
+        state.page = 1;
+        renderList(container);
+      });
+    }
+    var sortSelect = document.getElementById('patient-sort');
+    if (sortSelect) {
+      sortSelect.addEventListener('change', function() {
+        state.sortBy = this.value;
         state.page = 1;
         renderList(container);
       });
@@ -357,6 +458,15 @@ window.PatientsView = (function() {
       '<input type="' + type + '" name="' + name + '" value="' + Utils.escapeHtml(value || '') + '"' +
       (required ? ' required' : '') + '></div>';
   }
+
+  // Register cleanup so router can remove stale handlers
+  if (!window._viewCleanups) window._viewCleanups = [];
+  window._viewCleanups.push(function(container) {
+    if (_clickHandler) {
+      container.removeEventListener('click', _clickHandler);
+      _clickHandler = null;
+    }
+  });
 
   return { render: render };
 })();

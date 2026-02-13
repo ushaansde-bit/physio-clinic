@@ -12,6 +12,7 @@ window.AppointmentsView = (function() {
     dateTo: '',
     statusFilter: '',
     typeFilter: '',
+    patientSearch: '',
     page: 1,
     perPage: 10,
     calMonth: new Date().getMonth(),
@@ -29,10 +30,12 @@ window.AppointmentsView = (function() {
   function render(container) {
     var pendingPatient = state.prefillPatient || '';
     var pendingSubView = pendingPatient ? 'form' : 'list';
+    state.view = 'list';
     state.dateFrom = Utils.today();
     state.dateTo = '';
     state.statusFilter = '';
     state.typeFilter = '';
+    state.patientSearch = '';
     state.page = 1;
     state.subView = pendingSubView;
     state.editId = null;
@@ -64,14 +67,34 @@ window.AppointmentsView = (function() {
       html += renderNextVisitPrompt();
     }
 
-    // View toggle + New button
+    // Toolbar
     html += '<div class="toolbar">';
     html += '<div class="view-toggle">';
     html += '<button class="view-btn' + (state.view === 'list' ? ' active' : '') + '" data-view="list">List</button>';
     html += '<button class="view-btn' + (state.view === 'month' ? ' active' : '') + '" data-view="month">Month</button>';
     html += '<button class="view-btn' + (state.view === 'week' ? ' active' : '') + '" data-view="week">Week</button>';
     html += '</div>';
-    html += '<div style="flex:1;"></div>';
+    if (state.view === 'list') {
+      html += '<div class="search-input">';
+      html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
+      html += '<input type="text" id="appt-patient-search" placeholder="Search by name or phone..." value="' + Utils.escapeHtml(state.patientSearch) + '">';
+      html += '</div>';
+      html += '<input type="date" class="filter-select" id="appt-date-from" value="' + state.dateFrom + '">';
+      html += '<input type="date" class="filter-select" id="appt-date-to" value="' + state.dateTo + '">';
+      html += '<select class="filter-select" id="appt-status-filter">';
+      html += '<option value="">All Status</option>';
+      html += '<option value="scheduled"' + (state.statusFilter === 'scheduled' ? ' selected' : '') + '>Scheduled</option>';
+      html += '<option value="completed"' + (state.statusFilter === 'completed' ? ' selected' : '') + '>Completed</option>';
+      html += '<option value="cancelled"' + (state.statusFilter === 'cancelled' ? ' selected' : '') + '>Cancelled</option>';
+      html += '<option value="no-show"' + (state.statusFilter === 'no-show' ? ' selected' : '') + '>No-Show</option>';
+      html += '</select>';
+      html += '<select class="filter-select" id="appt-type-filter">';
+      html += '<option value="">All Types</option>';
+      html += '<option value="Initial Evaluation"' + (state.typeFilter === 'Initial Evaluation' ? ' selected' : '') + '>Initial Evaluation</option>';
+      html += '<option value="Treatment"' + (state.typeFilter === 'Treatment' ? ' selected' : '') + '>Treatment</option>';
+      html += '<option value="Follow-up"' + (state.typeFilter === 'Follow-up' ? ' selected' : '') + '>Follow-up</option>';
+      html += '</select>';
+    }
     html += '<button class="btn btn-primary" id="add-appt-btn">';
     html += '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
     html += 'New Appointment</button>';
@@ -126,6 +149,13 @@ window.AppointmentsView = (function() {
       if (state.dateTo && a.date > state.dateTo) continue;
       if (state.statusFilter && a.status !== state.statusFilter) continue;
       if (state.typeFilter && a.type !== state.typeFilter) continue;
+      if (state.patientSearch) {
+        var q = state.patientSearch.toLowerCase();
+        var patient = Store.getPatient(a.patientId);
+        var patientPhone = patient ? (patient.phone || '') : '';
+        if ((a.patientName || '').toLowerCase().indexOf(q) === -1 &&
+            patientPhone.indexOf(q) === -1) continue;
+      }
       filtered.push(a);
     }
 
@@ -136,29 +166,6 @@ window.AppointmentsView = (function() {
     });
 
     var html = '';
-
-    // Filters
-    html += '<div class="toolbar">';
-    html += '<div class="form-group" style="margin-bottom:0;">';
-    html += '<input type="date" class="filter-select" id="appt-date-from" value="' + state.dateFrom + '" placeholder="From">';
-    html += '</div>';
-    html += '<div class="form-group" style="margin-bottom:0;">';
-    html += '<input type="date" class="filter-select" id="appt-date-to" value="' + state.dateTo + '" placeholder="To">';
-    html += '</div>';
-    html += '<select class="filter-select" id="appt-status-filter">';
-    html += '<option value="">All Status</option>';
-    html += '<option value="scheduled"' + (state.statusFilter === 'scheduled' ? ' selected' : '') + '>Scheduled</option>';
-    html += '<option value="completed"' + (state.statusFilter === 'completed' ? ' selected' : '') + '>Completed</option>';
-    html += '<option value="cancelled"' + (state.statusFilter === 'cancelled' ? ' selected' : '') + '>Cancelled</option>';
-    html += '<option value="no-show"' + (state.statusFilter === 'no-show' ? ' selected' : '') + '>No-Show</option>';
-    html += '</select>';
-    html += '<select class="filter-select" id="appt-type-filter">';
-    html += '<option value="">All Types</option>';
-    html += '<option value="Initial Evaluation"' + (state.typeFilter === 'Initial Evaluation' ? ' selected' : '') + '>Initial Evaluation</option>';
-    html += '<option value="Treatment"' + (state.typeFilter === 'Treatment' ? ' selected' : '') + '>Treatment</option>';
-    html += '<option value="Follow-up"' + (state.typeFilter === 'Follow-up' ? ' selected' : '') + '>Follow-up</option>';
-    html += '</select>';
-    html += '</div>';
 
     // Table
     html += '<div class="card"><div class="table-wrapper">';
@@ -447,6 +454,8 @@ window.AppointmentsView = (function() {
 
     // Save
     var _duplicateConfirmed = false;
+    var _pastDateConfirmed = false;
+    var _conflictConfirmed = false;
     document.getElementById('appt-form-save').onclick = function() {
       var form = document.getElementById('appt-form');
       var data = Utils.getFormData(form);
@@ -456,13 +465,45 @@ window.AppointmentsView = (function() {
         return;
       }
 
-      // Conflict check
-      var conflict = Store.hasConflict(data.date, data.time, data.duration, appt ? appt.id : null);
-      if (conflict) {
-        var warningEl = document.getElementById('conflict-warning');
-        warningEl.textContent = 'Conflict: ' + conflict.patientName + ' already has an appointment at ' + Utils.formatTime(conflict.time) + ' (' + conflict.duration + ' min)';
-        warningEl.style.display = 'block';
+      // Past date warning
+      if (!_pastDateConfirmed && data.date < Utils.today()) {
+        var warningEl0 = document.getElementById('conflict-warning');
+        warningEl0.innerHTML = 'This date is in the past (' + Utils.formatDate(data.date) + '). Are you sure?' +
+          '<br><button type="button" class="btn btn-sm btn-primary" id="past-date-confirm" style="margin-top:0.4rem;">Yes, continue</button> ' +
+          '<button type="button" class="btn btn-sm btn-ghost" id="past-date-cancel" style="margin-top:0.4rem;">Change date</button>';
+        warningEl0.style.display = 'block';
+        document.getElementById('past-date-confirm').onclick = function(e) {
+          e.preventDefault();
+          _pastDateConfirmed = true;
+          document.getElementById('appt-form-save').click();
+        };
+        document.getElementById('past-date-cancel').onclick = function(e) {
+          e.preventDefault();
+          warningEl0.style.display = 'none';
+        };
         return;
+      }
+
+      // Conflict check (warning, not hard block)
+      if (!_conflictConfirmed) {
+        var conflict = Store.hasConflict(data.date, data.time, data.duration, appt ? appt.id : null);
+        if (conflict) {
+          var warningEl = document.getElementById('conflict-warning');
+          warningEl.innerHTML = 'Time conflict: <strong>' + Utils.escapeHtml(conflict.patientName) + '</strong> already booked at ' + Utils.formatTime(conflict.time) + ' (' + conflict.duration + ' min). Book anyway?' +
+            '<br><button type="button" class="btn btn-sm btn-warning" id="conflict-proceed" style="margin-top:0.4rem;">Yes, double-book</button> ' +
+            '<button type="button" class="btn btn-sm btn-ghost" id="conflict-cancel" style="margin-top:0.4rem;">Change time</button>';
+          warningEl.style.display = 'block';
+          document.getElementById('conflict-proceed').onclick = function(e) {
+            e.preventDefault();
+            _conflictConfirmed = true;
+            document.getElementById('appt-form-save').click();
+          };
+          document.getElementById('conflict-cancel').onclick = function(e) {
+            e.preventDefault();
+            warningEl.style.display = 'none';
+          };
+          return;
+        }
       }
 
       // Duplicate future appointment check
@@ -471,15 +512,17 @@ window.AppointmentsView = (function() {
         if (existing) {
           var warningEl2 = document.getElementById('conflict-warning');
           warningEl2.innerHTML = 'Patient already has a scheduled appointment on <strong>' + Utils.formatDate(existing.date) + '</strong> at <strong>' + Utils.formatTime(existing.time) + '</strong>. ' +
-            '<br><button class="btn btn-sm btn-warning" id="dup-cancel-old" style="margin-top:0.4rem;">Cancel old & create new</button> ' +
-            '<button class="btn btn-sm btn-ghost" id="dup-keep-both" style="margin-top:0.4rem;">Keep both</button>';
+            '<br><button type="button" class="btn btn-sm btn-warning" id="dup-cancel-old" style="margin-top:0.4rem;">Cancel old & create new</button> ' +
+            '<button type="button" class="btn btn-sm btn-ghost" id="dup-keep-both" style="margin-top:0.4rem;">Keep both</button>';
           warningEl2.style.display = 'block';
-          document.getElementById('dup-cancel-old').onclick = function() {
+          document.getElementById('dup-cancel-old').onclick = function(e) {
+            e.preventDefault();
             Store.updateAppointment(existing.id, { status: 'cancelled' });
             _duplicateConfirmed = true;
             document.getElementById('appt-form-save').click();
           };
-          document.getElementById('dup-keep-both').onclick = function() {
+          document.getElementById('dup-keep-both').onclick = function(e) {
+            e.preventDefault();
             _duplicateConfirmed = true;
             document.getElementById('appt-form-save').click();
           };
@@ -759,12 +802,20 @@ window.AppointmentsView = (function() {
       // Quick actions on list
       var completeBtn = e.target.closest('.complete-appt-btn');
       if (completeBtn) {
-        var completedAppt = Store.getAppointment(completeBtn.getAttribute('data-id'));
-        Store.updateAppointment(completeBtn.getAttribute('data-id'), { status: 'completed' });
-        Store.logActivity('Appointment completed');
-        Utils.toast('Appointment completed', 'success');
-        if (completedAppt) state.nextVisitAppt = completedAppt;
-        renderView(container);
+        var compId = completeBtn.getAttribute('data-id');
+        var compAppt = Store.getAppointment(compId);
+        var doComplete = function() {
+          Store.updateAppointment(compId, { status: 'completed' });
+          Store.logActivity('Appointment completed');
+          Utils.toast('Appointment completed', 'success');
+          if (compAppt) state.nextVisitAppt = compAppt;
+          renderView(container);
+        };
+        if (compAppt && compAppt.date > Utils.today()) {
+          Utils.inlineConfirm(container, 'This appointment is on ' + Utils.formatDate(compAppt.date) + ' (future date). Mark as completed?', doComplete);
+        } else {
+          doComplete();
+        }
         return;
       }
       var cancelBtn = e.target.closest('.cancel-appt-btn');
@@ -823,6 +874,19 @@ window.AppointmentsView = (function() {
     container.addEventListener('click', _clickHandler);
 
     // List filters
+    var patientSearch = document.getElementById('appt-patient-search');
+    var _searchTimeout;
+    if (patientSearch) {
+      patientSearch.addEventListener('input', function() {
+        var self = this;
+        clearTimeout(_searchTimeout);
+        _searchTimeout = setTimeout(function() {
+          state.patientSearch = self.value;
+          state.page = 1;
+          renderView(container);
+        }, 300);
+      });
+    }
     var dateFrom = document.getElementById('appt-date-from');
     if (dateFrom) {
       dateFrom.addEventListener('change', function() {
@@ -864,6 +928,15 @@ window.AppointmentsView = (function() {
     if (status === 'no-show') return 'badge-warning';
     return 'badge-gray';
   }
+
+  // Register cleanup so router can remove stale handlers
+  if (!window._viewCleanups) window._viewCleanups = [];
+  window._viewCleanups.push(function(container) {
+    if (_clickHandler) {
+      container.removeEventListener('click', _clickHandler);
+      _clickHandler = null;
+    }
+  });
 
   return {
     render: render,

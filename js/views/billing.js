@@ -320,5 +320,14 @@ window.BillingView = (function() {
     container.addEventListener('click', _clickHandler);
   }
 
+  // Register cleanup so router can remove stale handlers
+  if (!window._viewCleanups) window._viewCleanups = [];
+  window._viewCleanups.push(function(container) {
+    if (_clickHandler) {
+      container.removeEventListener('click', _clickHandler);
+      _clickHandler = null;
+    }
+  });
+
   return { render: render };
 })();
