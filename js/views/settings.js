@@ -722,7 +722,7 @@ window.SettingsView = (function() {
       { key: 'soapNotes', label: 'SOAP Notes', description: 'Session documentation with SOAP format' },
       { key: 'bodyDiagram', label: 'Body Diagram', description: 'Visual body region marking for patients' },
       { key: 'onlineBooking', label: 'Online Booking', description: 'Allow patients to book appointments online' },
-      { key: 'tags', label: 'Tags', description: 'Patient categorization and filtering with tags' }
+      { key: 'tags', label: 'Tags', description: 'Patient categorization and filtering with tags', nav: true }
     ];
 
     var enabledCount = 0;
