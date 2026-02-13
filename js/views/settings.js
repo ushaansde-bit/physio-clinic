@@ -854,7 +854,7 @@ window.SettingsView = (function() {
     html += '<div class="card mb-2">';
     html += '<div class="card-header"><h3>Export Backup</h3></div>';
     html += '<div class="card-body">';
-    html += '<p class="text-muted" style="margin-bottom:1rem;">Download all clinic data as a JSON file.</p>';
+    html += '<p class="text-muted" style="margin-bottom:1rem;">Download all clinic data as an Excel file.</p>';
     html += '<button class="btn btn-primary" id="export-backup-btn">';
     html += '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
     html += ' Export Backup</button>';
@@ -1049,21 +1049,108 @@ window.SettingsView = (function() {
         return;
       }
 
-      // Export backup
+      // Export backup as Excel
       if (e.target.closest('#export-backup-btn')) {
         var backup = Store.exportBackup();
-        var json = JSON.stringify(backup, null, 2);
-        var blob = new Blob([json], { type: 'application/json' });
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement('a');
+
+        // Column definitions per sheet (key → header label)
+        var sheetDefs = {
+          patients: { sheetName: 'Patients', cols: [
+            { key: 'name', h: 'Name' }, { key: 'phone', h: 'Phone' }, { key: 'email', h: 'Email' },
+            { key: 'gender', h: 'Gender' }, { key: 'dob', h: 'Date of Birth' }, { key: 'address', h: 'Address' },
+            { key: 'diagnosis', h: 'Diagnosis' }, { key: 'treatmentPlan', h: 'Treatment Plan' },
+            { key: 'status', h: 'Status' }, { key: 'insurance', h: 'Insurance' },
+            { key: 'emergencyContact', h: 'Emergency Contact' }, { key: 'emergencyPhone', h: 'Emergency Phone' },
+            { key: 'notes', h: 'Notes' }, { key: 'createdAt', h: 'Created' }
+          ]},
+          appointments: { sheetName: 'Appointments', cols: [
+            { key: 'patientName', h: 'Patient' }, { key: 'date', h: 'Date' }, { key: 'time', h: 'Time' },
+            { key: 'duration', h: 'Duration (min)' }, { key: 'type', h: 'Type' }, { key: 'status', h: 'Status' },
+            { key: 'notes', h: 'Notes' }, { key: 'createdAt', h: 'Created' }
+          ]},
+          sessions: { sheetName: 'Sessions', cols: [
+            { key: 'patientId', h: 'Patient ID' }, { key: 'date', h: 'Date' },
+            { key: 'painScore', h: 'Pain Score' }, { key: 'functionScore', h: 'Function Score' },
+            { key: 'subjective', h: 'Subjective' }, { key: 'objective', h: 'Objective' },
+            { key: 'assessment', h: 'Assessment' }, { key: 'plan', h: 'Plan' }, { key: 'createdAt', h: 'Created' }
+          ]},
+          exercises: { sheetName: 'Exercises', cols: [
+            { key: 'patientId', h: 'Patient ID' }, { key: 'name', h: 'Exercise' },
+            { key: 'sets', h: 'Sets' }, { key: 'reps', h: 'Reps' }, { key: 'hold', h: 'Hold' },
+            { key: 'frequency', h: 'Frequency' }, { key: 'instructions', h: 'Instructions' },
+            { key: 'status', h: 'Status' }, { key: 'createdAt', h: 'Created' }
+          ]},
+          billing: { sheetName: 'Billing', cols: [
+            { key: 'patientId', h: 'Patient ID' }, { key: 'date', h: 'Date' },
+            { key: 'description', h: 'Description' }, { key: 'amount', h: 'Amount' },
+            { key: 'status', h: 'Status' }, { key: 'paidDate', h: 'Paid Date' }, { key: 'createdAt', h: 'Created' }
+          ]},
+          prescriptions: { sheetName: 'Prescriptions', cols: [
+            { key: 'patientId', h: 'Patient ID' }, { key: 'date', h: 'Date' },
+            { key: 'medication', h: 'Medication' }, { key: 'dosage', h: 'Dosage' },
+            { key: 'route', h: 'Route' }, { key: 'frequency', h: 'Frequency' },
+            { key: 'duration', h: 'Duration' }, { key: 'instructions', h: 'Instructions' },
+            { key: 'prescribedBy', h: 'Prescribed By' }, { key: 'status', h: 'Status' }, { key: 'createdAt', h: 'Created' }
+          ]},
+          users: { sheetName: 'Staff', cols: [
+            { key: 'name', h: 'Name' }, { key: 'role', h: 'Role' },
+            { key: 'phone', h: 'Phone' }, { key: 'email', h: 'Email' }
+          ]},
+          tags: { sheetName: 'Tags', cols: [
+            { key: 'name', h: 'Name' }, { key: 'color', h: 'Color' }, { key: 'createdAt', h: 'Created' }
+          ]},
+          messageTemplates: { sheetName: 'Message Templates', cols: [
+            { key: 'name', h: 'Name' }, { key: 'text', h: 'Template Text' }, { key: 'createdAt', h: 'Created' }
+          ]},
+          messageLog: { sheetName: 'Message Log', cols: [
+            { key: 'patientName', h: 'Patient' }, { key: 'phone', h: 'Phone' },
+            { key: 'templateName', h: 'Template' }, { key: 'message', h: 'Message' }, { key: 'createdAt', h: 'Sent At' }
+          ]},
+          activityLog: { sheetName: 'Activity Log', cols: [
+            { key: 'text', h: 'Activity' }, { key: 'time', h: 'Time' }
+          ]}
+        };
+
+        // Build patient name lookup for session/exercise/billing/prescription patient IDs
+        var patientNames = {};
+        var pts = backup.data.patients || [];
+        for (var pi = 0; pi < pts.length; pi++) {
+          patientNames[pts[pi].id] = pts[pi].name;
+        }
+
+        var wb = XLSX.utils.book_new();
+        for (var dataKey in sheetDefs) {
+          if (!sheetDefs.hasOwnProperty(dataKey)) continue;
+          var def = sheetDefs[dataKey];
+          var items = backup.data[dataKey] || [];
+          // Filter out soft-deleted items
+          var rows = [];
+          for (var ri = 0; ri < items.length; ri++) {
+            if (items[ri]._deleted) continue;
+            var row = {};
+            for (var ci = 0; ci < def.cols.length; ci++) {
+              var col = def.cols[ci];
+              var val = items[ri][col.key];
+              // Resolve patientId to name
+              if (col.key === 'patientId' && patientNames[val]) val = patientNames[val];
+              row[col.h] = val !== undefined && val !== null ? val : '';
+            }
+            rows.push(row);
+          }
+          if (rows.length === 0) {
+            // Add empty sheet with headers
+            var headers = [];
+            for (var hi = 0; hi < def.cols.length; hi++) headers.push(def.cols[hi].h);
+            rows = [{}];
+            for (var hj = 0; hj < headers.length; hj++) rows[0][headers[hj]] = '';
+          }
+          var ws = XLSX.utils.json_to_sheet(rows);
+          XLSX.utils.book_append_sheet(wb, ws, def.sheetName);
+        }
+
         var dateStr = new Date().toISOString().split('T')[0];
-        a.href = url;
-        a.download = 'clinic-backup-' + dateStr + '.json';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        Utils.toast('Backup exported', 'success');
+        XLSX.writeFile(wb, 'clinic-backup-' + dateStr + '.xlsx');
+        Utils.toast('Backup exported as Excel', 'success');
         return;
       }
 

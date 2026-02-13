@@ -292,6 +292,7 @@ window.PatientDetailView = (function() {
     if (appt.status === 'completed') {
       html += '<button class="btn btn-sm btn-primary start-session-btn" data-id="' + appt.id + '" data-date="' + appt.date + '">Session Note</button>';
     }
+    html += '<button class="btn btn-sm btn-ghost delete-appt-btn" data-id="' + appt.id + '" style="color:var(--danger);">Delete</button>';
     html += '</div>';
     html += '</div>';
     return html;
@@ -1350,6 +1351,17 @@ window.PatientDetailView = (function() {
           Utils.toast('Appointment cancelled', 'warning');
           renderDetail(container, Store.getPatient(patient.id));
         });
+        return;
+      }
+      var deleteApptBtn = e.target.closest('.delete-appt-btn');
+      if (deleteApptBtn) {
+        var daid = deleteApptBtn.getAttribute('data-id');
+        Utils.inlineConfirm(container, 'Delete this appointment? It will be moved to trash.', function() {
+          Store.deleteAppointment(daid);
+          Store.logActivity('Appointment deleted: ' + patient.name);
+          Utils.toast('Appointment deleted', 'success');
+          renderDetail(container, Store.getPatient(patient.id));
+        }, { danger: true });
         return;
       }
       var startSessionBtn = e.target.closest('.start-session-btn');
