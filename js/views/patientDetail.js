@@ -18,6 +18,8 @@ window.PatientDetailView = (function() {
     billingView: 'list',     // list | form | detail
     billingViewId: null,
     bookingView: 'list',     // list | form
+    appointmentsView: 'list', // list | form
+    appointmentsEditId: null,
     printExpanded: false,
     rxPrintExpanded: false,
     editingPatient: false
@@ -33,6 +35,8 @@ window.PatientDetailView = (function() {
     sub.billingView = 'list';
     sub.billingViewId = null;
     sub.bookingView = 'list';
+    sub.appointmentsView = 'list';
+    sub.appointmentsEditId = null;
     sub.printExpanded = false;
     sub.rxPrintExpanded = false;
     sub.editingPatient = false;
@@ -111,6 +115,7 @@ window.PatientDetailView = (function() {
     // Tabs
     html += '<div class="tabs">';
     html += tabBtn('overview', 'Overview');
+    html += tabBtn('appointments', 'Appointments');
     html += tabBtn('sessions', 'Diagnosis & Treatment');
     if (Store.isFeatureEnabled('exercises')) html += tabBtn('exercises', 'HEP');
     if (Store.isFeatureEnabled('prescriptions')) html += tabBtn('prescriptions', 'Prescriptions');
@@ -120,6 +125,10 @@ window.PatientDetailView = (function() {
     // Tab content
     html += '<div id="tab-overview" class="tab-content' + (activeTab === 'overview' ? ' active' : '') + '">';
     html += renderOverview(patient);
+    html += '</div>';
+
+    html += '<div id="tab-appointments" class="tab-content' + (activeTab === 'appointments' ? ' active' : '') + '">';
+    html += renderAppointments(patient);
     html += '</div>';
 
     html += '<div id="tab-sessions" class="tab-content' + (activeTab === 'sessions' ? ' active' : '') + '">';
@@ -187,6 +196,133 @@ window.PatientDetailView = (function() {
 
   function infoItem(label, value) {
     return '<div class="info-item"><label>' + label + '</label><span>' + Utils.escapeHtml(value || '-') + '</span></div>';
+  }
+
+  // ==================== APPOINTMENTS TAB ====================
+  function renderAppointments(patient) {
+    if (sub.appointmentsView === 'form') {
+      return renderAppointmentForm(patient);
+    }
+
+    var appts = Store.getAppointmentsByPatient(patient.id);
+    // Sort: upcoming (scheduled) first by date asc, then past by date desc
+    var upcoming = [];
+    var past = [];
+    for (var i = 0; i < appts.length; i++) {
+      if (appts[i].status === 'scheduled') upcoming.push(appts[i]);
+      else past.push(appts[i]);
+    }
+    upcoming.sort(function(a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : (a.time < b.time ? -1 : 1); });
+    past.sort(function(a, b) { return a.date > b.date ? -1 : a.date < b.date ? 1 : (a.time > b.time ? -1 : 1); });
+
+    var html = '';
+    html += '<div class="card mb-2"><div class="card-header"><h3>Appointments</h3>';
+    html += '<button class="btn btn-sm btn-primary" id="add-appt-btn">';
+    html += '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:0.25rem;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
+    html += 'Book Appointment</button>';
+    html += '</div><div class="card-body">';
+
+    if (appts.length === 0) {
+      html += '<div class="empty-state" style="padding:2rem 1rem;"><p>No appointments yet</p></div>';
+    } else {
+      // Upcoming
+      if (upcoming.length > 0) {
+        html += '<div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--gray-400);margin-bottom:0.5rem;">Upcoming</div>';
+        for (var u = 0; u < upcoming.length; u++) {
+          html += renderApptRow(upcoming[u]);
+        }
+      }
+      // Past
+      if (past.length > 0) {
+        html += '<div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--gray-400);margin:1rem 0 0.5rem;">Past</div>';
+        for (var p = 0; p < past.length; p++) {
+          html += renderApptRow(past[p]);
+        }
+      }
+    }
+    html += '</div></div>';
+    return html;
+  }
+
+  function apptStatusBadge(status) {
+    var cls = 'badge-gray';
+    if (status === 'scheduled') cls = 'badge-info';
+    else if (status === 'completed') cls = 'badge-success';
+    else if (status === 'cancelled') cls = 'badge-danger';
+    else if (status === 'no-show') cls = 'badge-warning';
+    return '<span class="badge ' + cls + '">' + status + '</span>';
+  }
+
+  function renderApptRow(appt) {
+    var html = '<div class="list-item" style="display:flex;align-items:center;justify-content:space-between;padding:0.6rem 0;border-bottom:1px solid var(--border);">';
+    html += '<div style="flex:1;">';
+    html += '<div style="font-weight:600;font-size:0.9rem;">' + Utils.formatDate(appt.date) + ' at ' + Utils.formatTime(appt.time) + '</div>';
+    html += '<div style="font-size:0.8rem;color:var(--gray-500);">' + Utils.escapeHtml(appt.type) + ' &middot; ' + appt.duration + ' min' + (appt.notes ? ' &middot; ' + Utils.escapeHtml(appt.notes) : '') + '</div>';
+    html += '</div>';
+    html += '<div style="display:flex;align-items:center;gap:0.5rem;">';
+    html += apptStatusBadge(appt.status);
+    if (appt.status === 'scheduled') {
+      html += '<button class="btn btn-sm btn-success complete-appt-btn" data-id="' + appt.id + '">Complete</button>';
+      html += '<button class="btn btn-sm btn-warning cancel-appt-btn" data-id="' + appt.id + '">Cancel</button>';
+    }
+    if (appt.status === 'completed') {
+      html += '<button class="btn btn-sm btn-primary start-session-btn" data-id="' + appt.id + '" data-date="' + appt.date + '">Session Note</button>';
+    }
+    html += '</div>';
+    html += '</div>';
+    return html;
+  }
+
+  function renderAppointmentForm(patient) {
+    var appt = sub.appointmentsEditId ? Store.getAppointment(sub.appointmentsEditId) : null;
+    var title = appt ? 'Edit Appointment' : 'Book Appointment';
+    var defaultDate = appt ? appt.date : Utils.today();
+    var defaultTime = appt ? appt.time : '09:00';
+    var defaultType = appt ? appt.type : 'Treatment';
+    var defaultDuration = appt ? appt.duration : '30';
+    var defaultNotes = appt ? appt.notes : '';
+
+    var html = '<div class="inline-form-card">';
+    html += '<div class="inline-form-header">';
+    html += '<button class="back-btn" id="appt-form-back">';
+    html += '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>';
+    html += '</button>';
+    html += '<h3>' + title + '</h3>';
+    html += '</div>';
+
+    html += '<div class="inline-form-body">';
+    html += '<form id="appt-form">';
+    html += '<div class="form-row">';
+    html += '<div class="form-group"><label>Date</label>';
+    html += '<input type="date" name="date" value="' + defaultDate + '" required></div>';
+    html += '<div class="form-group"><label>Time</label>';
+    html += '<input type="time" name="time" value="' + defaultTime + '" required></div>';
+    html += '</div>';
+    html += '<div class="form-row">';
+    html += '<div class="form-group"><label>Type</label>';
+    html += '<select name="type" required>';
+    html += '<option value="Initial Evaluation"' + (defaultType === 'Initial Evaluation' ? ' selected' : '') + '>Initial Evaluation</option>';
+    html += '<option value="Treatment"' + (defaultType === 'Treatment' ? ' selected' : '') + '>Treatment</option>';
+    html += '<option value="Follow-up"' + (defaultType === 'Follow-up' ? ' selected' : '') + '>Follow-up</option>';
+    html += '</select></div>';
+    html += '<div class="form-group"><label>Duration (min)</label>';
+    html += '<select name="duration" required>';
+    var durations = ['15','30','45','60','90'];
+    for (var d = 0; d < durations.length; d++) {
+      html += '<option value="' + durations[d] + '"' + (durations[d] === String(defaultDuration) ? ' selected' : '') + '>' + durations[d] + ' min</option>';
+    }
+    html += '</select></div>';
+    html += '</div>';
+    html += '<div class="form-group"><label>Notes</label>';
+    html += '<textarea name="notes" rows="2">' + Utils.escapeHtml(defaultNotes || '') + '</textarea></div>';
+    html += '</form>';
+    html += '</div>';
+
+    html += '<div class="inline-form-actions">';
+    html += '<button class="btn btn-secondary" id="appt-form-cancel">Cancel</button>';
+    html += '<button class="btn btn-primary" id="appt-form-save">' + (appt ? 'Update' : 'Book Appointment') + '</button>';
+    html += '</div></div>';
+    return html;
   }
 
   // ==================== EDIT PATIENT SECTION (inline per-card) ====================
@@ -1139,6 +1275,45 @@ window.PatientDetailView = (function() {
         return;
       }
 
+      // === Appointments ===
+      if (e.target.closest('#add-appt-btn')) {
+        sub.appointmentsView = 'form';
+        sub.appointmentsEditId = null;
+        renderDetail(container, patient);
+        return;
+      }
+      var completeApptBtn = e.target.closest('.complete-appt-btn');
+      if (completeApptBtn) {
+        var caid = completeApptBtn.getAttribute('data-id');
+        Store.updateAppointment(caid, { status: 'completed' });
+        Store.logActivity('Appointment completed: ' + patient.name);
+        Utils.toast('Appointment completed', 'success');
+        renderDetail(container, Store.getPatient(patient.id));
+        return;
+      }
+      var cancelApptBtn = e.target.closest('.cancel-appt-btn');
+      if (cancelApptBtn) {
+        var canid = cancelApptBtn.getAttribute('data-id');
+        Utils.inlineConfirm(container, 'Cancel this appointment?', function() {
+          Store.updateAppointment(canid, { status: 'cancelled' });
+          Store.logActivity('Appointment cancelled: ' + patient.name);
+          Utils.toast('Appointment cancelled', 'warning');
+          renderDetail(container, Store.getPatient(patient.id));
+        });
+        return;
+      }
+      var startSessionBtn = e.target.closest('.start-session-btn');
+      if (startSessionBtn) {
+        var sessDate = startSessionBtn.getAttribute('data-date');
+        activeTab = 'sessions';
+        resetSub();
+        sub.sessionsView = 'form';
+        sub.sessionsEditId = null;
+        _sessionDateParam = sessDate || null;
+        renderDetail(container, patient);
+        return;
+      }
+
       // === Sessions ===
       if (e.target.closest('#add-session-btn')) {
         sub.sessionsView = 'form';
@@ -1469,6 +1644,37 @@ window.PatientDetailView = (function() {
           }
         });
       }
+    }
+
+    // Appointment form
+    var apptBack = document.getElementById('appt-form-back');
+    var apptCancel = document.getElementById('appt-form-cancel');
+    var apptSave = document.getElementById('appt-form-save');
+    if (apptBack) apptBack.onclick = function() { sub.appointmentsView = 'list'; sub.appointmentsEditId = null; renderDetail(container, patient); };
+    if (apptCancel) apptCancel.onclick = function() { sub.appointmentsView = 'list'; sub.appointmentsEditId = null; renderDetail(container, patient); };
+    if (apptSave) {
+      apptSave.onclick = function() {
+        var form = document.getElementById('appt-form');
+        var data = Utils.getFormData(form);
+        if (!data.date || !data.time) {
+          Utils.toast('Date and time are required', 'error');
+          return;
+        }
+        data.patientId = patient.id;
+        data.patientName = patient.name;
+        var existing = sub.appointmentsEditId ? Store.getAppointment(sub.appointmentsEditId) : null;
+        data.status = existing ? existing.status : 'scheduled';
+        if (existing) {
+          Store.updateAppointment(existing.id, data);
+          Utils.toast('Appointment updated', 'success');
+        } else {
+          Store.createAppointment(data);
+          Utils.toast('Appointment booked', 'success');
+        }
+        sub.appointmentsView = 'list';
+        sub.appointmentsEditId = null;
+        renderDetail(container, Store.getPatient(patient.id));
+      };
     }
 
     // Print options panel

@@ -21,21 +21,25 @@ window.AppointmentsView = (function() {
     detailId: null,
     prefillDate: '',
     prefillTime: '',
+    prefillPatient: '',
     rescheduleFrom: null,
     nextVisitAppt: null   // set after completing, for inline next-visit prompt
   };
 
   function render(container) {
+    var pendingPatient = state.prefillPatient || '';
+    var pendingSubView = pendingPatient ? 'form' : 'list';
     state.dateFrom = Utils.today();
     state.dateTo = '';
     state.statusFilter = '';
     state.typeFilter = '';
     state.page = 1;
-    state.subView = 'list';
+    state.subView = pendingSubView;
     state.editId = null;
     state.detailId = null;
     state.prefillDate = '';
     state.prefillTime = '';
+    state.prefillPatient = pendingPatient;
     state.rescheduleFrom = null;
     state.nextVisitAppt = null;
     renderView(container);
@@ -375,7 +379,7 @@ window.AppointmentsView = (function() {
 
     var defaultDate = state.prefillDate || (appt ? appt.date : (rescheduleFrom ? '' : Utils.today()));
     var defaultTime = state.prefillTime || (appt ? appt.time : (rescheduleFrom ? rescheduleFrom.time : '09:00'));
-    var defaultPatient = appt ? appt.patientId : (rescheduleFrom ? rescheduleFrom.patientId : '');
+    var defaultPatient = appt ? appt.patientId : (rescheduleFrom ? rescheduleFrom.patientId : (state.prefillPatient || ''));
     var defaultType = appt ? appt.type : (rescheduleFrom ? rescheduleFrom.type : 'Treatment');
     var defaultDuration = appt ? appt.duration : (rescheduleFrom ? rescheduleFrom.duration : '30');
     var defaultNotes = appt ? appt.notes : (rescheduleFrom ? rescheduleFrom.notes : '');
@@ -598,6 +602,7 @@ window.AppointmentsView = (function() {
     state.detailId = null;
     state.prefillDate = '';
     state.prefillTime = '';
+    state.prefillPatient = '';
     state.rescheduleFrom = null;
     renderView(container);
   }
@@ -860,5 +865,15 @@ window.AppointmentsView = (function() {
     return 'badge-gray';
   }
 
-  return { render: render };
+  return {
+    render: render,
+    bookForPatient: function(patientId) {
+      state.prefillPatient = patientId;
+      state.prefillDate = '';
+      state.prefillTime = '';
+      state.subView = 'form';
+      state.editId = null;
+      state.rescheduleFrom = null;
+    }
+  };
 })();
