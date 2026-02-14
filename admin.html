@@ -1505,18 +1505,33 @@
             return;
           }
 
+          // Store user data for reference
+          var usersMap = {};
+          snap.docs.forEach(function(doc) {
+            usersMap[doc.id] = doc.data();
+          });
+
           var html = '<div class="form-group">';
           html += '<label>Select User</label>';
           html += '<select id="reset-pw-user" style="width:100%;padding:0.6rem 0.75rem;border:1px solid #d1d5db;border-radius:8px;">';
           snap.docs.forEach(function(doc) {
             var u = doc.data();
-            html += '<option value="' + doc.id + '">' + escapeHtml(u.name || u.username || doc.id) + ' (' + escapeHtml(u.role || 'staff') + ')</option>';
+            var display = escapeHtml(u.name || u.username || doc.id);
+            var uname = u.username ? ' — login: ' + escapeHtml(u.username) : ' — no username set';
+            html += '<option value="' + doc.id + '">' + display + ' (' + escapeHtml(u.role || 'staff') + ')' + uname + '</option>';
           });
           html += '</select></div>';
 
           html += '<div class="form-group">';
+          html += '<label>Set Username (for login)</label>';
+          html += '<input type="text" id="reset-pw-username" placeholder="Username for login" style="width:100%;padding:0.6rem 0.75rem;border:1px solid #d1d5db;border-radius:8px;">';
+          html += '<div style="font-size:0.75rem;color:#6b7280;margin-top:0.25rem;">Leave blank to keep current username</div>';
+          html += '</div>';
+
+          html += '<div class="form-group">';
           html += '<label>New Password</label>';
-          html += '<input type="password" id="reset-pw-new" placeholder="Enter new password" required style="width:100%;padding:0.6rem 0.75rem;border:1px solid #d1d5db;border-radius:8px;">';
+          html += '<input type="text" id="reset-pw-new" placeholder="Enter new password" style="width:100%;padding:0.6rem 0.75rem;border:1px solid #d1d5db;border-radius:8px;">';
+          html += '<div style="font-size:0.75rem;color:#6b7280;margin-top:0.25rem;">Min 4 characters. Shown in plain text for easy copy.</div>';
           html += '</div>';
 
           html += '<div class="modal-footer">';
@@ -1526,9 +1541,19 @@
 
           body.innerHTML = html;
 
+          // Pre-fill username when user is selected
+          var userSelect = document.getElementById('reset-pw-user');
+          function fillUsername() {
+            var u = usersMap[userSelect.value];
+            document.getElementById('reset-pw-username').value = u ? (u.username || '') : '';
+          }
+          fillUsername();
+          userSelect.addEventListener('change', fillUsername);
+
           document.getElementById('reset-pw-save-btn').addEventListener('click', function() {
             var userId = document.getElementById('reset-pw-user').value;
-            var newPw = document.getElementById('reset-pw-new').value;
+            var newPw = document.getElementById('reset-pw-new').value.trim();
+            var newUsername = document.getElementById('reset-pw-username').value.trim();
             if (!newPw || newPw.length < 4) {
               showToast('Password must be at least 4 characters.', 'error');
               return;
@@ -1537,11 +1562,17 @@
             this.disabled = true;
             this.textContent = 'Resetting...';
 
-            db.collection('clinics').doc(cid).collection('users').doc(userId).update({
-              password: newPw
-            })
+            // Build update object — always set password + username
+            var updateData = { password: newPw };
+            if (newUsername) {
+              updateData.username = newUsername;
+            }
+
+            db.collection('clinics').doc(cid).collection('users').doc(userId).update(updateData)
               .then(function() {
-                showToast('Password reset successfully!', 'success');
+                var msg = 'Password reset successfully!';
+                if (newUsername) msg += ' Username: ' + newUsername;
+                showToast(msg, 'success');
                 closeResetPwModal();
               })
               .catch(function(err) {
