@@ -801,27 +801,53 @@ window.SettingsView = (function() {
     // Online Booking Configuration
     if (features.onlineBooking !== false) {
       var booking = settings.booking || {};
-      // Read sessions into open/close/break format
-      var bSessions;
-      if (booking.sessions && booking.sessions.length > 0) {
-        bSessions = booking.sessions;
-      } else if (booking.startHour !== undefined) {
-        var lsh = parseInt(booking.startHour, 10);
-        var leh = parseInt(booking.endHour, 10);
-        bSessions = [{ start: (lsh < 10 ? '0' : '') + lsh + ':00', end: (leh < 10 ? '0' : '') + leh + ':00' }];
-      } else {
-        bSessions = [{ start: '08:00', end: '17:00' }];
-      }
-      var bOpens = bSessions[0] ? bSessions[0].start : '08:00';
-      var bCloses = bSessions.length > 1 ? bSessions[1].end : bSessions[0].end;
-      var bBreakFrom = bSessions.length > 1 ? bSessions[0].end : '';
-      var bBreakTo = bSessions.length > 1 ? bSessions[1].start : '';
       var bMaxPerSlot = booking.maxPerSlot !== undefined ? parseInt(booking.maxPerSlot, 10) : 1;
       var bSlotDuration = booking.slotDuration !== undefined ? parseInt(booking.slotDuration, 10) : 30;
 
-      // Generate time options in 30-min steps (6:00 AM to 11:00 PM)
+      // Parse existing sessions into morning/afternoon/evening slots
+      var slotDefaults = {
+        morning:   { enabled: true,  start: '08:00', end: '12:00' },
+        afternoon: { enabled: false, start: '13:00', end: '17:00' },
+        evening:   { enabled: false, start: '18:00', end: '20:00' }
+      };
+
+      // Map saved sessions back to slots by start time
+      var existingSessions = [];
+      if (booking.sessions && booking.sessions.length > 0) {
+        existingSessions = booking.sessions;
+      } else if (booking.startHour !== undefined) {
+        var lsh = parseInt(booking.startHour, 10);
+        var leh = parseInt(booking.endHour, 10);
+        existingSessions = [{ start: (lsh < 10 ? '0' : '') + lsh + ':00', end: (leh < 10 ? '0' : '') + leh + ':00' }];
+      }
+
+      if (existingSessions.length > 0) {
+        // Reset all to disabled, then enable matched ones
+        slotDefaults.morning.enabled = false;
+        slotDefaults.afternoon.enabled = false;
+        slotDefaults.evening.enabled = false;
+        for (var es = 0; es < existingSessions.length; es++) {
+          var sParts = existingSessions[es].start.split(':');
+          var sHour = parseInt(sParts[0], 10);
+          if (sHour < 12) {
+            slotDefaults.morning.enabled = true;
+            slotDefaults.morning.start = existingSessions[es].start;
+            slotDefaults.morning.end = existingSessions[es].end;
+          } else if (sHour < 17) {
+            slotDefaults.afternoon.enabled = true;
+            slotDefaults.afternoon.start = existingSessions[es].start;
+            slotDefaults.afternoon.end = existingSessions[es].end;
+          } else {
+            slotDefaults.evening.enabled = true;
+            slotDefaults.evening.start = existingSessions[es].start;
+            slotDefaults.evening.end = existingSessions[es].end;
+          }
+        }
+      }
+
+      // Generate time options in 30-min steps (5:00 AM to 11:00 PM)
       var timeOpts = [];
-      for (var th = 6; th <= 23; th++) {
+      for (var th = 5; th <= 23; th++) {
         for (var tm = 0; tm < 60; tm += 30) {
           if (th === 23 && tm > 0) continue;
           var tv = (th < 10 ? '0' : '') + th + ':' + (tm === 0 ? '00' : '30');
@@ -832,9 +858,8 @@ window.SettingsView = (function() {
         }
       }
 
-      function bookingSelect(name, selectedVal, includeOff) {
-        var s = '<select name="' + name + '">';
-        if (includeOff) s += '<option value="">No break</option>';
+      function bookingTimeSelect(name, selectedVal) {
+        var s = '<select name="' + name + '" style="width:100%;">';
         for (var oi = 0; oi < timeOpts.length; oi++) {
           s += '<option value="' + timeOpts[oi].value + '"' + (timeOpts[oi].value === selectedVal ? ' selected' : '') + '>' + timeOpts[oi].label + '</option>';
         }
@@ -842,24 +867,47 @@ window.SettingsView = (function() {
         return s;
       }
 
+      var sessionSlots = [
+        { key: 'morning',   label: 'Morning',   icon: '\u2600', defaults: slotDefaults.morning },
+        { key: 'afternoon', label: 'Afternoon',  icon: '\u26C5', defaults: slotDefaults.afternoon },
+        { key: 'evening',   label: 'Evening',    icon: '\uD83C\uDF19', defaults: slotDefaults.evening }
+      ];
+
       html += '<div class="card mb-2">';
       html += '<div class="card-header"><h3>Online Booking Settings</h3></div>';
       html += '<div class="card-body">';
       html += '<form id="booking-config-form">';
 
-      // Clinic Hours
-      html += '<div style="font-weight:600;font-size:0.9em;margin-bottom:0.4rem;padding:0.3rem 0;border-bottom:1px solid var(--border);">Clinic Hours</div>';
-      html += '<div class="form-row">';
-      html += '<div class="form-group"><label>Opens at</label>' + bookingSelect('opens', bOpens, false) + '</div>';
-      html += '<div class="form-group"><label>Closes at</label>' + bookingSelect('closes', bCloses, false) + '</div>';
-      html += '</div>';
+      // Session rows
+      html += '<div style="font-weight:600;font-size:0.9em;margin-bottom:0.5rem;padding:0.3rem 0;border-bottom:1px solid var(--border);">Clinic Sessions</div>';
+      html += '<p style="font-size:0.82em;color:var(--text-muted);margin-bottom:0.75rem;">Enable the time slots when your clinic is open for appointments.</p>';
 
-      // Break Time
-      html += '<div style="font-weight:600;font-size:0.9em;margin-bottom:0.4rem;margin-top:1rem;padding:0.3rem 0;border-bottom:1px solid var(--border);">Break Time <span style="color:var(--text-muted);font-weight:400;font-size:0.85em;">(no appointments during break)</span></div>';
-      html += '<div class="form-row">';
-      html += '<div class="form-group"><label>Break from</label>' + bookingSelect('breakFrom', bBreakFrom, true) + '</div>';
-      html += '<div class="form-group"><label>Break to</label>' + bookingSelect('breakTo', bBreakTo, true) + '</div>';
-      html += '</div>';
+      for (var si = 0; si < sessionSlots.length; si++) {
+        var ss = sessionSlots[si];
+        var isEnabled = ss.defaults.enabled;
+
+        html += '<div class="booking-session-row" style="background:var(--bg-secondary);border-radius:var(--radius);padding:0.75rem;margin-bottom:0.5rem;' + (isEnabled ? '' : 'opacity:0.6;') + '" id="session-row-' + ss.key + '">';
+
+        // Header with toggle
+        html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:' + (isEnabled ? '0.5rem' : '0') + ';">';
+        html += '<div style="font-weight:600;font-size:0.9em;">' + ss.icon + ' ' + ss.label + '</div>';
+        html += '<label class="toggle-switch" style="margin:0;">';
+        html += '<input type="checkbox" class="session-toggle" data-session="' + ss.key + '"' + (isEnabled ? ' checked' : '') + '>';
+        html += '<span class="toggle-slider"></span>';
+        html += '<span class="toggle-knob"></span>';
+        html += '</label>';
+        html += '</div>';
+
+        // Time range (shown when enabled)
+        html += '<div class="session-times" id="session-times-' + ss.key + '" style="' + (isEnabled ? '' : 'display:none;') + '">';
+        html += '<div class="form-row" style="margin-bottom:0;">';
+        html += '<div class="form-group" style="margin-bottom:0;"><label style="font-size:0.8em;">From</label>' + bookingTimeSelect(ss.key + '_start', ss.defaults.start) + '</div>';
+        html += '<div class="form-group" style="margin-bottom:0;"><label style="font-size:0.8em;">To</label>' + bookingTimeSelect(ss.key + '_end', ss.defaults.end) + '</div>';
+        html += '</div>';
+        html += '</div>';
+
+        html += '</div>';
+      }
 
       // Slot settings
       html += '<div style="font-weight:600;font-size:0.9em;margin-bottom:0.4rem;margin-top:1rem;padding:0.3rem 0;border-bottom:1px solid var(--border);">Slot Settings</div>';
@@ -1035,31 +1083,46 @@ window.SettingsView = (function() {
       })(toggles[f]);
     }
 
+    // Session toggle interactivity
+    var sessionToggles = container.querySelectorAll('.session-toggle');
+    for (var st = 0; st < sessionToggles.length; st++) {
+      (function(toggle) {
+        toggle.addEventListener('change', function() {
+          var key = toggle.getAttribute('data-session');
+          var row = document.getElementById('session-row-' + key);
+          var times = document.getElementById('session-times-' + key);
+          if (row) row.style.opacity = toggle.checked ? '1' : '0.6';
+          if (times) times.style.display = toggle.checked ? '' : 'none';
+        });
+      })(sessionToggles[st]);
+    }
+
     // Booking config save
     var saveBookingBtn = container.querySelector('#save-booking-config');
     if (saveBookingBtn) {
       saveBookingBtn.addEventListener('click', function() {
         var form = document.getElementById('booking-config-form');
         var data = Utils.getFormData(form);
-        var opens = data.opens;
-        var closes = data.closes;
-        var breakFrom = data.breakFrom;
-        var breakTo = data.breakTo;
+        var sessionKeys = ['morning', 'afternoon', 'evening'];
+        var sessions = [];
 
-        if (!opens || !closes || opens >= closes) {
-          Utils.toast('Please set valid opening and closing hours', 'error');
-          return;
+        for (var sk = 0; sk < sessionKeys.length; sk++) {
+          var key = sessionKeys[sk];
+          var toggle = container.querySelector('.session-toggle[data-session="' + key + '"]');
+          if (!toggle || !toggle.checked) continue;
+
+          var start = data[key + '_start'];
+          var end = data[key + '_end'];
+          if (!start || !end || start >= end) {
+            Utils.toast(key.charAt(0).toUpperCase() + key.slice(1) + ': "From" must be before "To"', 'error');
+            return;
+          }
+          sessions.push({ start: start, end: end });
         }
 
-        // Build sessions from hours + break
-        var sessions = [];
-        if (breakFrom && breakTo && breakFrom < breakTo && breakFrom > opens && breakTo < closes) {
-          // Two sessions with break in between
-          sessions.push({ start: opens, end: breakFrom });
-          sessions.push({ start: breakTo, end: closes });
-        } else {
-          // Single session, no break
-          sessions.push({ start: opens, end: closes });
+        if (sessions.length === 0) {
+          Utils.toast('Please enable at least one session', 'error');
+          return;
         }
 
         var settings = Store.getClinicSettings();
