@@ -206,6 +206,28 @@ body {
 .cal-day.selected .cal-dot { background: var(--white); }
 .cal-day.disabled .cal-dot { background: var(--gray-300); }
 
+/* --- Session Headers --- */
+.session-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  margin-bottom: 0.4rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--border);
+}
+.session-header:first-child { margin-top: 0; }
+.session-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--primary-dark);
+}
+.session-range {
+  font-size: 0.75rem;
+  color: var(--gray-500);
+  font-weight: 400;
+}
+
 /* --- Time Slots --- */
 .time-label {
   font-size: 0.85rem;
@@ -507,7 +529,7 @@ body {
     <div class="card" style="margin-top:0.75rem; flex:1;">
       <div class="time-label" id="time-label">Available Times</div>
       <div class="time-placeholder" id="time-placeholder">Select a date to see available times</div>
-      <div class="time-grid" id="time-grid"></div>
+      <div id="time-grid"></div>
       <div class="selection-summary" id="selection-summary"></div>
     </div>
   </div>
@@ -980,8 +1002,14 @@ body {
   }
 
   // ============ TIME SLOTS ============
-  function generateTimeSlots(dateStr) {
-    var slots = [];
+  function getSessionLabel(startMins) {
+    if (startMins < 720) return 'Morning';  // before 12 PM
+    if (startMins < 1020) return 'Afternoon'; // 12 PM - 5 PM
+    return 'Evening'; // 5 PM+
+  }
+
+  function generateSessionGroups(dateStr) {
+    var groups = [];
     var now = new Date();
     var isToday = dateStr === todayStr();
     var currentMinutes = now.getHours() * 60 + now.getMinutes();
@@ -991,6 +1019,9 @@ body {
     for (var s = 0; s < sessions.length; s++) {
       var sessStart = timeToMinutes(sessions[s].start);
       var sessEnd = timeToMinutes(sessions[s].end);
+      var label = getSessionLabel(sessStart);
+      var timeRange = formatTime(sessions[s].start) + ' – ' + formatTime(sessions[s].end);
+      var slots = [];
 
       for (var mins = sessStart; mins < sessEnd; mins += stepMin) {
         var h = Math.floor(mins / 60);
@@ -1007,8 +1038,22 @@ body {
 
         slots.push({ time: time, label: formatTime(time), available: available });
       }
+
+      groups.push({ label: label, timeRange: timeRange, slots: slots });
     }
-    return slots;
+    return groups;
+  }
+
+  // Flat slot list for calendar dot check
+  function generateTimeSlots(dateStr) {
+    var groups = generateSessionGroups(dateStr);
+    var all = [];
+    for (var g = 0; g < groups.length; g++) {
+      for (var s = 0; s < groups[g].slots.length; s++) {
+        all.push(groups[g].slots[s]);
+      }
+    }
+    return all;
   }
 
   function renderTimeSlots() {
@@ -1024,14 +1069,28 @@ body {
     $timePlaceholder.style.display = 'none';
     $timeLabel.textContent = 'Available times for ' + formatDate(state.selectedDate);
 
-    var slots = generateTimeSlots(state.selectedDate);
+    var groups = generateSessionGroups(state.selectedDate);
     var html = '';
-    for (var i = 0; i < slots.length; i++) {
-      var s = slots[i];
-      var cls = 'time-slot';
-      if (!s.available) cls += ' unavailable';
-      if (state.selectedTime === s.time) cls += ' selected';
-      html += '<div class="' + cls + '" data-time="' + s.time + '">' + s.label + '</div>';
+    for (var g = 0; g < groups.length; g++) {
+      var grp = groups[g];
+      if (grp.slots.length === 0) continue;
+
+      // Session header
+      html += '<div class="session-header">';
+      html += '<span class="session-label">' + escapeHtml(grp.label) + '</span>';
+      html += '<span class="session-range">' + escapeHtml(grp.timeRange) + '</span>';
+      html += '</div>';
+
+      // Slot grid for this session
+      html += '<div class="time-grid">';
+      for (var i = 0; i < grp.slots.length; i++) {
+        var s = grp.slots[i];
+        var cls = 'time-slot';
+        if (!s.available) cls += ' unavailable';
+        if (state.selectedTime === s.time) cls += ' selected';
+        html += '<div class="' + cls + '" data-time="' + s.time + '">' + s.label + '</div>';
+      }
+      html += '</div>';
     }
     $timeGrid.innerHTML = html;
     updateBookButton();
@@ -1372,47 +1431,57 @@ body {
     $mainGrid.style.display = 'none';
     $loadingState.style.display = 'block';
 
-    fbDb.collection('booking_slugs').doc(clinicSlug).get().then(function(doc) {
-      if (!doc.exists) {
-        showError('No clinic found for "' + escapeHtml(clinicSlug) + '". Please check your booking link.');
-        return;
-      }
-      clinicId = doc.data().clinicId;
+    function initClinic(clinicDoc) {
+      if (clinicDoc && clinicDoc.exists) {
+        var clinicData = clinicDoc.data();
 
-      // Read clinic doc for name and feature check
-      return fbDb.collection('clinics').doc(clinicId).get().then(function(clinicDoc) {
-        if (clinicDoc.exists) {
-          var clinicData = clinicDoc.data();
-
-          // Check if online booking is enabled
-          if (clinicData.features && clinicData.features.onlineBooking === false) {
-            showError('Online booking is currently disabled for this clinic.');
-            return;
-          }
-
-          // Set clinic name in header
-          $headerName.textContent = clinicData.name || 'PhysioClinic';
-
-          // Load per-clinic booking config
-          if (clinicData.booking) {
-            if (clinicData.booking.sessions && clinicData.booking.sessions.length > 0) {
-              bookingConfig.sessions = clinicData.booking.sessions;
-            } else if (clinicData.booking.startHour !== undefined) {
-              // Legacy single-range format
-              var sh = parseInt(clinicData.booking.startHour, 10);
-              var eh = parseInt(clinicData.booking.endHour, 10);
-              bookingConfig.sessions = [{ start: (sh < 10 ? '0' : '') + sh + ':00', end: (eh < 10 ? '0' : '') + eh + ':00' }];
-            }
-            if (clinicData.booking.maxPerSlot !== undefined) bookingConfig.maxPerSlot = parseInt(clinicData.booking.maxPerSlot, 10);
-            if (clinicData.booking.slotDuration !== undefined) bookingConfig.slotDuration = parseInt(clinicData.booking.slotDuration, 10);
-          }
+        if (clinicData.features && clinicData.features.onlineBooking === false) {
+          showError('Online booking is currently disabled for this clinic.');
+          return;
         }
 
-        startApp();
+        $headerName.textContent = clinicData.name || 'PhysioClinic';
+
+        if (clinicData.booking) {
+          if (clinicData.booking.sessions && clinicData.booking.sessions.length > 0) {
+            bookingConfig.sessions = clinicData.booking.sessions;
+          } else if (clinicData.booking.startHour !== undefined) {
+            var sh = parseInt(clinicData.booking.startHour, 10);
+            var eh = parseInt(clinicData.booking.endHour, 10);
+            bookingConfig.sessions = [{ start: (sh < 10 ? '0' : '') + sh + ':00', end: (eh < 10 ? '0' : '') + eh + ':00' }];
+          }
+          if (clinicData.booking.maxPerSlot !== undefined) bookingConfig.maxPerSlot = parseInt(clinicData.booking.maxPerSlot, 10);
+          if (clinicData.booking.slotDuration !== undefined) bookingConfig.slotDuration = parseInt(clinicData.booking.slotDuration, 10);
+        }
+      }
+      startApp();
+    }
+
+    // Resolve slug: try booking_slugs first, fallback to querying clinics by bookingSlug
+    fbDb.collection('booking_slugs').doc(clinicSlug).get().then(function(doc) {
+      if (doc.exists) {
+        clinicId = doc.data().clinicId;
+        return fbDb.collection('clinics').doc(clinicId).get();
+      }
+      // Fallback: slug doc missing — query clinics by bookingSlug field
+      return fbDb.collection('clinics').where('bookingSlug', '==', clinicSlug).limit(1).get().then(function(snap) {
+        if (snap.empty || snap.docs[0].data()._deleted) {
+          showError('No clinic found for "' + escapeHtml(clinicSlug) + '". Please check your booking link.');
+          return Promise.reject('not_found');
+        }
+        clinicId = snap.docs[0].id;
+        // Auto-repair: recreate the missing booking_slugs doc
+        fbDb.collection('booking_slugs').doc(clinicSlug).set({
+          clinicId: clinicId,
+          createdAt: new Date().toISOString()
+        }).catch(function() {});
+        return fbDb.collection('clinics').doc(clinicId).get();
       });
+    }).then(function(clinicDoc) {
+      initClinic(clinicDoc);
     }).catch(function(err) {
+      if (err === 'not_found') return;
       console.error('[Book1] Clinic resolution failed:', err);
-      // Fallback: use slug as clinicId
       clinicId = clinicSlug;
       $headerName.textContent = 'PhysioClinic';
       startApp();

@@ -1523,9 +1523,9 @@
           html += '</select></div>';
 
           html += '<div class="form-group">';
-          html += '<label>Set Username (for login)</label>';
+          html += '<label>Username (for login) <span style="color:#ef4444;">*</span></label>';
           html += '<input type="text" id="reset-pw-username" placeholder="Username for login" style="width:100%;padding:0.6rem 0.75rem;border:1px solid #d1d5db;border-radius:8px;">';
-          html += '<div style="font-size:0.75rem;color:#6b7280;margin-top:0.25rem;">Leave blank to keep current username</div>';
+          html += '<div style="font-size:0.75rem;color:#6b7280;margin-top:0.25rem;">Required — this is what the user enters to log in</div>';
           html += '</div>';
 
           html += '<div class="form-group">';
@@ -1554,28 +1554,31 @@
             var userId = document.getElementById('reset-pw-user').value;
             var newPw = document.getElementById('reset-pw-new').value.trim();
             var newUsername = document.getElementById('reset-pw-username').value.trim();
+
+            if (!newUsername) {
+              showToast('Username is required for login.', 'error');
+              return;
+            }
             if (!newPw || newPw.length < 4) {
               showToast('Password must be at least 4 characters.', 'error');
               return;
             }
             var cid = this.getAttribute('data-clinic');
-            this.disabled = true;
-            this.textContent = 'Resetting...';
+            var saveBtn = this;
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Resetting...';
 
-            // Build update object — always set password + username
-            var updateData = { password: newPw };
-            if (newUsername) {
-              updateData.username = newUsername;
-            }
+            // Always set both username and password
+            var updateData = { password: newPw, username: newUsername };
 
             db.collection('clinics').doc(cid).collection('users').doc(userId).update(updateData)
               .then(function() {
-                var msg = 'Password reset successfully!';
-                if (newUsername) msg += ' Username: ' + newUsername;
-                showToast(msg, 'success');
+                showToast('Password reset! Username: ' + newUsername, 'success');
                 closeResetPwModal();
               })
               .catch(function(err) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Reset Password';
                 showToast('Failed: ' + (err.message || 'Unknown error'), 'error');
               });
           });
@@ -1600,7 +1603,6 @@
     function openCreateModal() {
       document.getElementById('create-modal').classList.add('open');
       document.getElementById('create-form').reset();
-      document.getElementById('c-slug-preview').textContent = '';
     }
 
     function closeCreateModal() {

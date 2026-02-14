@@ -110,7 +110,24 @@ window.FirebaseSync = (function() {
   function resolveSlug(slug) {
     if (!db) return Promise.resolve(null);
     return db.collection('booking_slugs').doc(slug).get().then(function(doc) {
-      return doc.exists ? doc.data().clinicId : null;
+      if (doc.exists) return doc.data().clinicId;
+      // Fallback: query clinics by bookingSlug field (self-healing for missing slug docs)
+      return db.collection('clinics').where('bookingSlug', '==', slug).limit(1).get().then(function(snap) {
+        if (snap.empty) return null;
+        var clinicDoc = snap.docs[0];
+        var clinicData = clinicDoc.data();
+        // Skip deleted clinics
+        if (clinicData._deleted) return null;
+        var clinicId = clinicDoc.id;
+        // Auto-repair: recreate the missing booking_slugs doc
+        db.collection('booking_slugs').doc(slug).set({
+          clinicId: clinicId,
+          createdAt: new Date().toISOString()
+        }).then(function() {
+          console.log('[FirebaseSync] Auto-repaired missing booking_slug for ' + slug);
+        }).catch(function() {});
+        return clinicId;
+      });
     });
   }
 
