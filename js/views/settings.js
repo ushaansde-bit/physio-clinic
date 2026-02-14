@@ -801,27 +801,58 @@ window.SettingsView = (function() {
     // Online Booking Configuration
     if (features.onlineBooking !== false) {
       var booking = settings.booking || {};
-      var bStartHour = booking.startHour !== undefined ? booking.startHour : 8;
-      var bEndHour = booking.endHour !== undefined ? booking.endHour : 17;
+      var bSessions = booking.sessions || [{ start: '08:00', end: '17:00' }];
       var bMaxPerSlot = booking.maxPerSlot !== undefined ? booking.maxPerSlot : 1;
+      var bSlotDuration = booking.slotDuration !== undefined ? booking.slotDuration : 30;
+      // Ensure at least 2 session rows for Morning + Evening
+      if (bSessions.length < 2) bSessions.push({ start: '', end: '' });
+
+      // Generate time options in 30-min steps (6:00 AM to 10:00 PM)
+      var timeOpts = [];
+      for (var th = 6; th <= 22; th++) {
+        for (var tm = 0; tm < 60; tm += 30) {
+          if (th === 22 && tm > 0) continue;
+          var tv = (th < 10 ? '0' : '') + th + ':' + (tm === 0 ? '00' : '30');
+          var tAP = th >= 12 ? 'PM' : 'AM';
+          var tH12 = th % 12 || 12;
+          var tLabel = tH12 + ':' + (tm === 0 ? '00' : '30') + ' ' + tAP;
+          timeOpts.push({ value: tv, label: tLabel });
+        }
+      }
 
       html += '<div class="card mb-2">';
       html += '<div class="card-header"><h3>Online Booking Settings</h3></div>';
       html += '<div class="card-body">';
       html += '<form id="booking-config-form">';
-      html += '<div class="form-row">';
-      html += '<div class="form-group"><label>Start Hour</label>';
-      html += '<select name="startHour">';
-      for (var sh = 6; sh <= 12; sh++) {
-        var shLabel = (sh <= 12 ? sh : sh - 12) + ':00 ' + (sh < 12 ? 'AM' : 'PM');
-        html += '<option value="' + sh + '"' + (sh === bStartHour ? ' selected' : '') + '>' + shLabel + '</option>';
+
+      var sessLabels = ['Morning Session', 'Evening Session'];
+      for (var si = 0; si < 2; si++) {
+        var sess = bSessions[si] || { start: '', end: '' };
+        html += '<div style="font-weight:500;font-size:0.9em;margin-bottom:0.3rem;' + (si > 0 ? 'margin-top:0.75rem;' : '') + '">' + sessLabels[si] + (si > 0 ? ' <span style="color:var(--text-muted);font-weight:400;">(optional)</span>' : '') + '</div>';
+        html += '<div class="form-row">';
+        html += '<div class="form-group"><label>Start</label>';
+        html += '<select name="sess' + si + 'Start">';
+        html += '<option value="">Off</option>';
+        for (var oi = 0; oi < timeOpts.length; oi++) {
+          html += '<option value="' + timeOpts[oi].value + '"' + (timeOpts[oi].value === sess.start ? ' selected' : '') + '>' + timeOpts[oi].label + '</option>';
+        }
+        html += '</select></div>';
+        html += '<div class="form-group"><label>End</label>';
+        html += '<select name="sess' + si + 'End">';
+        html += '<option value="">Off</option>';
+        for (var oj = 0; oj < timeOpts.length; oj++) {
+          html += '<option value="' + timeOpts[oj].value + '"' + (timeOpts[oj].value === sess.end ? ' selected' : '') + '>' + timeOpts[oj].label + '</option>';
+        }
+        html += '</select></div>';
+        html += '</div>';
       }
-      html += '</select></div>';
-      html += '<div class="form-group"><label>End Hour</label>';
-      html += '<select name="endHour">';
-      for (var eh = 12; eh <= 21; eh++) {
-        var ehLabel = (eh <= 12 ? eh : eh - 12) + ':00 ' + (eh < 12 ? 'AM' : 'PM');
-        html += '<option value="' + eh + '"' + (eh === bEndHour ? ' selected' : '') + '>' + ehLabel + '</option>';
+
+      html += '<div class="form-row" style="margin-top:0.75rem;">';
+      html += '<div class="form-group"><label>Slot Duration</label>';
+      html += '<select name="slotDuration">';
+      var durations = [15, 20, 30, 45, 60];
+      for (var di = 0; di < durations.length; di++) {
+        html += '<option value="' + durations[di] + '"' + (durations[di] === bSlotDuration ? ' selected' : '') + '>' + durations[di] + ' min</option>';
       }
       html += '</select></div>';
       html += '<div class="form-group"><label>Max per Slot</label>';
@@ -994,10 +1025,22 @@ window.SettingsView = (function() {
       saveBookingBtn.addEventListener('click', function() {
         var form = document.getElementById('booking-config-form');
         var data = Utils.getFormData(form);
+        var sessions = [];
+        for (var si = 0; si < 2; si++) {
+          var sStart = data['sess' + si + 'Start'];
+          var sEnd = data['sess' + si + 'End'];
+          if (sStart && sEnd && sStart < sEnd) {
+            sessions.push({ start: sStart, end: sEnd });
+          }
+        }
+        if (sessions.length === 0) {
+          Utils.toast('At least one session with valid start/end is required', 'error');
+          return;
+        }
         var settings = Store.getClinicSettings();
         settings.booking = {
-          startHour: parseInt(data.startHour, 10),
-          endHour: parseInt(data.endHour, 10),
+          sessions: sessions,
+          slotDuration: parseInt(data.slotDuration, 10),
           maxPerSlot: parseInt(data.maxPerSlot, 10)
         };
         Store.saveClinicSettings(settings);

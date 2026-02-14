@@ -889,8 +889,7 @@ body {
 
   // ============ BOOKING CONFIG (per-clinic, loaded from Firestore) ============
   var bookingConfig = {
-    startHour: 8,
-    endHour: 17,
+    sessions: [{ start: '08:00', end: '17:00' }],
     maxPerSlot: 1,
     slotDuration: 30
   };
@@ -987,15 +986,16 @@ body {
     var isToday = dateStr === todayStr();
     var currentMinutes = now.getHours() * 60 + now.getMinutes();
     var stepMin = bookingConfig.slotDuration || 30;
-    var startH = bookingConfig.startHour || 8;
-    var endH = bookingConfig.endHour || 17;
+    var sessions = bookingConfig.sessions || [{ start: '08:00', end: '17:00' }];
 
-    for (var h = startH; h <= endH; h++) {
-      for (var m = 0; m < 60; m += stepMin) {
-        // Don't generate slots past end hour
-        if (h === endH && m > 0) continue;
+    for (var s = 0; s < sessions.length; s++) {
+      var sessStart = timeToMinutes(sessions[s].start);
+      var sessEnd = timeToMinutes(sessions[s].end);
+
+      for (var mins = sessStart; mins < sessEnd; mins += stepMin) {
+        var h = Math.floor(mins / 60);
+        var m = mins % 60;
         var time = (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
-        var mins = h * 60 + m;
         var available = true;
 
         if (isToday && mins <= currentMinutes) {
@@ -1180,7 +1180,7 @@ body {
       patientName: patient.name,
       date: state.selectedDate,
       time: state.selectedTime,
-      duration: '30',
+      duration: String(bookingConfig.slotDuration),
       type: 'Treatment',
       status: 'scheduled',
       notes: buildNotesString(reason, extraNotes),
@@ -1197,7 +1197,7 @@ body {
       '<div class="row"><span class="label">Patient</span><span class="value">' + escapeHtml(patient.name) + '</span></div>' +
       '<div class="row"><span class="label">Date</span><span class="value">' + formatDate(appt.date) + '</span></div>' +
       '<div class="row"><span class="label">Time</span><span class="value">' + formatTime(appt.time) + '</span></div>' +
-      '<div class="row"><span class="label">Duration</span><span class="value">30 minutes</span></div>' +
+      '<div class="row"><span class="label">Duration</span><span class="value">' + bookingConfig.slotDuration + ' minutes</span></div>' +
       (reason ? '<div class="row"><span class="label">Reason</span><span class="value">' + escapeHtml(reason) + '</span></div>' : '');
 
     $panelForm.classList.add('hidden');
@@ -1395,8 +1395,14 @@ body {
 
           // Load per-clinic booking config
           if (clinicData.booking) {
-            if (clinicData.booking.startHour !== undefined) bookingConfig.startHour = parseInt(clinicData.booking.startHour, 10);
-            if (clinicData.booking.endHour !== undefined) bookingConfig.endHour = parseInt(clinicData.booking.endHour, 10);
+            if (clinicData.booking.sessions && clinicData.booking.sessions.length > 0) {
+              bookingConfig.sessions = clinicData.booking.sessions;
+            } else if (clinicData.booking.startHour !== undefined) {
+              // Legacy single-range format
+              var sh = parseInt(clinicData.booking.startHour, 10);
+              var eh = parseInt(clinicData.booking.endHour, 10);
+              bookingConfig.sessions = [{ start: (sh < 10 ? '0' : '') + sh + ':00', end: (eh < 10 ? '0' : '') + eh + ':00' }];
+            }
             if (clinicData.booking.maxPerSlot !== undefined) bookingConfig.maxPerSlot = parseInt(clinicData.booking.maxPerSlot, 10);
             if (clinicData.booking.slotDuration !== undefined) bookingConfig.slotDuration = parseInt(clinicData.booking.slotDuration, 10);
           }
