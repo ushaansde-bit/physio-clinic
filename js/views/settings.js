@@ -797,6 +797,45 @@ window.SettingsView = (function() {
     }
 
     html += '</div></div>';
+
+    // Online Booking Configuration
+    if (features.onlineBooking !== false) {
+      var booking = settings.booking || {};
+      var bStartHour = booking.startHour !== undefined ? booking.startHour : 8;
+      var bEndHour = booking.endHour !== undefined ? booking.endHour : 17;
+      var bMaxPerSlot = booking.maxPerSlot !== undefined ? booking.maxPerSlot : 1;
+
+      html += '<div class="card mb-2">';
+      html += '<div class="card-header"><h3>Online Booking Settings</h3></div>';
+      html += '<div class="card-body">';
+      html += '<form id="booking-config-form">';
+      html += '<div class="form-row">';
+      html += '<div class="form-group"><label>Start Hour</label>';
+      html += '<select name="startHour">';
+      for (var sh = 6; sh <= 12; sh++) {
+        var shLabel = (sh <= 12 ? sh : sh - 12) + ':00 ' + (sh < 12 ? 'AM' : 'PM');
+        html += '<option value="' + sh + '"' + (sh === bStartHour ? ' selected' : '') + '>' + shLabel + '</option>';
+      }
+      html += '</select></div>';
+      html += '<div class="form-group"><label>End Hour</label>';
+      html += '<select name="endHour">';
+      for (var eh = 12; eh <= 21; eh++) {
+        var ehLabel = (eh <= 12 ? eh : eh - 12) + ':00 ' + (eh < 12 ? 'AM' : 'PM');
+        html += '<option value="' + eh + '"' + (eh === bEndHour ? ' selected' : '') + '>' + ehLabel + '</option>';
+      }
+      html += '</select></div>';
+      html += '<div class="form-group"><label>Max per Slot</label>';
+      html += '<select name="maxPerSlot">';
+      for (var mp = 1; mp <= 10; mp++) {
+        html += '<option value="' + mp + '"' + (mp === bMaxPerSlot ? ' selected' : '') + '>' + mp + (mp === 1 ? ' patient' : ' patients') + '</option>';
+      }
+      html += '</select></div>';
+      html += '</div>';
+      html += '<button type="button" class="btn btn-primary btn-sm" id="save-booking-config">Save Booking Settings</button>';
+      html += '</form>';
+      html += '</div></div>';
+    }
+
     return html;
   }
 
@@ -947,6 +986,23 @@ window.SettingsView = (function() {
           }
         });
       })(toggles[f]);
+    }
+
+    // Booking config save
+    var saveBookingBtn = container.querySelector('#save-booking-config');
+    if (saveBookingBtn) {
+      saveBookingBtn.addEventListener('click', function() {
+        var form = document.getElementById('booking-config-form');
+        var data = Utils.getFormData(form);
+        var settings = Store.getClinicSettings();
+        settings.booking = {
+          startHour: parseInt(data.startHour, 10),
+          endHour: parseInt(data.endHour, 10),
+          maxPerSlot: parseInt(data.maxPerSlot, 10)
+        };
+        Store.saveClinicSettings(settings);
+        Utils.toast('Booking settings saved', 'success');
+      });
     }
 
     // Bind inline form events if showing a form

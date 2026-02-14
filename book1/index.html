@@ -812,19 +812,24 @@ body {
     return null;
   }
 
-  function hasConflict(date, time) {
+  function countBookingsForSlot(date, time) {
     var appts = getAll('appointments');
     var newStart = timeToMinutes(time);
-    var newEnd = newStart + 30;
+    var newEnd = newStart + bookingConfig.slotDuration;
+    var count = 0;
     for (var i = 0; i < appts.length; i++) {
       var a = appts[i];
       if (a.date === date && a.status !== 'cancelled') {
         var aStart = timeToMinutes(a.time);
-        var aEnd = aStart + (parseInt(a.duration, 10) || 30);
-        if (newStart < aEnd && newEnd > aStart) return true;
+        var aEnd = aStart + (parseInt(a.duration, 10) || bookingConfig.slotDuration);
+        if (newStart < aEnd && newEnd > aStart) count++;
       }
     }
-    return false;
+    return count;
+  }
+
+  function hasConflict(date, time) {
+    return countBookingsForSlot(date, time) >= bookingConfig.maxPerSlot;
   }
 
   function createPatient(data) {
@@ -881,6 +886,14 @@ body {
       }, 300);
     }, 3000);
   }
+
+  // ============ BOOKING CONFIG (per-clinic, loaded from Firestore) ============
+  var bookingConfig = {
+    startHour: 8,
+    endHour: 17,
+    maxPerSlot: 1,
+    slotDuration: 30
+  };
 
   // ============ APP STATE ============
   var state = {
@@ -973,11 +986,15 @@ body {
     var now = new Date();
     var isToday = dateStr === todayStr();
     var currentMinutes = now.getHours() * 60 + now.getMinutes();
+    var stepMin = bookingConfig.slotDuration || 30;
+    var startH = bookingConfig.startHour || 8;
+    var endH = bookingConfig.endHour || 17;
 
-    for (var h = 8; h <= 17; h++) {
-      for (var m = 0; m < 60; m += 30) {
-        if (h === 17 && m > 30) continue;
-        var time = (h < 10 ? '0' : '') + h + ':' + (m === 0 ? '00' : '30');
+    for (var h = startH; h <= endH; h++) {
+      for (var m = 0; m < 60; m += stepMin) {
+        // Don't generate slots past end hour
+        if (h === endH && m > 0) continue;
+        var time = (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
         var mins = h * 60 + m;
         var available = true;
 
@@ -1375,6 +1392,14 @@ body {
 
           // Set clinic name in header
           $headerName.textContent = clinicData.name || 'PhysioClinic';
+
+          // Load per-clinic booking config
+          if (clinicData.booking) {
+            if (clinicData.booking.startHour !== undefined) bookingConfig.startHour = parseInt(clinicData.booking.startHour, 10);
+            if (clinicData.booking.endHour !== undefined) bookingConfig.endHour = parseInt(clinicData.booking.endHour, 10);
+            if (clinicData.booking.maxPerSlot !== undefined) bookingConfig.maxPerSlot = parseInt(clinicData.booking.maxPerSlot, 10);
+            if (clinicData.booking.slotDuration !== undefined) bookingConfig.slotDuration = parseInt(clinicData.booking.slotDuration, 10);
+          }
         }
 
         startApp();
