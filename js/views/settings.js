@@ -801,27 +801,29 @@ window.SettingsView = (function() {
     // Online Booking Configuration
     if (features.onlineBooking !== false) {
       var booking = settings.booking || {};
+      // Read sessions into open/close/break format
       var bSessions;
       if (booking.sessions && booking.sessions.length > 0) {
         bSessions = booking.sessions;
       } else if (booking.startHour !== undefined) {
-        // Legacy single-range format
         var lsh = parseInt(booking.startHour, 10);
         var leh = parseInt(booking.endHour, 10);
         bSessions = [{ start: (lsh < 10 ? '0' : '') + lsh + ':00', end: (leh < 10 ? '0' : '') + leh + ':00' }];
       } else {
         bSessions = [{ start: '08:00', end: '17:00' }];
       }
+      var bOpens = bSessions[0] ? bSessions[0].start : '08:00';
+      var bCloses = bSessions.length > 1 ? bSessions[1].end : bSessions[0].end;
+      var bBreakFrom = bSessions.length > 1 ? bSessions[0].end : '';
+      var bBreakTo = bSessions.length > 1 ? bSessions[1].start : '';
       var bMaxPerSlot = booking.maxPerSlot !== undefined ? parseInt(booking.maxPerSlot, 10) : 1;
       var bSlotDuration = booking.slotDuration !== undefined ? parseInt(booking.slotDuration, 10) : 30;
-      // Ensure at least 2 session rows for Morning + Evening
-      if (bSessions.length < 2) bSessions.push({ start: '', end: '' });
 
-      // Generate time options in 30-min steps (6:00 AM to 10:00 PM)
+      // Generate time options in 30-min steps (6:00 AM to 11:00 PM)
       var timeOpts = [];
-      for (var th = 6; th <= 22; th++) {
+      for (var th = 6; th <= 23; th++) {
         for (var tm = 0; tm < 60; tm += 30) {
-          if (th === 22 && tm > 0) continue;
+          if (th === 23 && tm > 0) continue;
           var tv = (th < 10 ? '0' : '') + th + ':' + (tm === 0 ? '00' : '30');
           var tAP = th >= 12 ? 'PM' : 'AM';
           var tH12 = th % 12 || 12;
@@ -830,34 +832,38 @@ window.SettingsView = (function() {
         }
       }
 
+      function bookingSelect(name, selectedVal, includeOff) {
+        var s = '<select name="' + name + '">';
+        if (includeOff) s += '<option value="">No break</option>';
+        for (var oi = 0; oi < timeOpts.length; oi++) {
+          s += '<option value="' + timeOpts[oi].value + '"' + (timeOpts[oi].value === selectedVal ? ' selected' : '') + '>' + timeOpts[oi].label + '</option>';
+        }
+        s += '</select>';
+        return s;
+      }
+
       html += '<div class="card mb-2">';
       html += '<div class="card-header"><h3>Online Booking Settings</h3></div>';
       html += '<div class="card-body">';
       html += '<form id="booking-config-form">';
 
-      var sessLabels = ['Morning / Afternoon', 'Evening'];
-      for (var si = 0; si < 2; si++) {
-        var sess = bSessions[si] || { start: '', end: '' };
-        html += '<div style="font-weight:600;font-size:0.9em;margin-bottom:0.4rem;padding:0.3rem 0;border-bottom:1px solid var(--border);' + (si > 0 ? 'margin-top:1rem;' : '') + '">' + sessLabels[si] + (si > 0 ? ' <span style="color:var(--text-muted);font-weight:400;font-size:0.85em;">(leave Off if not needed)</span>' : '') + '</div>';
-        html += '<div class="form-row">';
-        html += '<div class="form-group"><label>Opens at</label>';
-        html += '<select name="sess' + si + 'Start" style="font-size:0.95em;">';
-        html += '<option value="">Off</option>';
-        for (var oi = 0; oi < timeOpts.length; oi++) {
-          html += '<option value="' + timeOpts[oi].value + '"' + (timeOpts[oi].value === sess.start ? ' selected' : '') + '>' + timeOpts[oi].label + '</option>';
-        }
-        html += '</select></div>';
-        html += '<div class="form-group"><label>Closes at</label>';
-        html += '<select name="sess' + si + 'End" style="font-size:0.95em;">';
-        html += '<option value="">Off</option>';
-        for (var oj = 0; oj < timeOpts.length; oj++) {
-          html += '<option value="' + timeOpts[oj].value + '"' + (timeOpts[oj].value === sess.end ? ' selected' : '') + '>' + timeOpts[oj].label + '</option>';
-        }
-        html += '</select></div>';
-        html += '</div>';
-      }
+      // Clinic Hours
+      html += '<div style="font-weight:600;font-size:0.9em;margin-bottom:0.4rem;padding:0.3rem 0;border-bottom:1px solid var(--border);">Clinic Hours</div>';
+      html += '<div class="form-row">';
+      html += '<div class="form-group"><label>Opens at</label>' + bookingSelect('opens', bOpens, false) + '</div>';
+      html += '<div class="form-group"><label>Closes at</label>' + bookingSelect('closes', bCloses, false) + '</div>';
+      html += '</div>';
 
-      html += '<div class="form-row" style="margin-top:0.75rem;">';
+      // Break Time
+      html += '<div style="font-weight:600;font-size:0.9em;margin-bottom:0.4rem;margin-top:1rem;padding:0.3rem 0;border-bottom:1px solid var(--border);">Break Time <span style="color:var(--text-muted);font-weight:400;font-size:0.85em;">(no appointments during break)</span></div>';
+      html += '<div class="form-row">';
+      html += '<div class="form-group"><label>Break from</label>' + bookingSelect('breakFrom', bBreakFrom, true) + '</div>';
+      html += '<div class="form-group"><label>Break to</label>' + bookingSelect('breakTo', bBreakTo, true) + '</div>';
+      html += '</div>';
+
+      // Slot settings
+      html += '<div style="font-weight:600;font-size:0.9em;margin-bottom:0.4rem;margin-top:1rem;padding:0.3rem 0;border-bottom:1px solid var(--border);">Slot Settings</div>';
+      html += '<div class="form-row">';
       html += '<div class="form-group"><label>Slot Duration</label>';
       html += '<select name="slotDuration">';
       var durations = [15, 20, 30, 45, 60];
@@ -1035,18 +1041,27 @@ window.SettingsView = (function() {
       saveBookingBtn.addEventListener('click', function() {
         var form = document.getElementById('booking-config-form');
         var data = Utils.getFormData(form);
-        var sessions = [];
-        for (var si = 0; si < 2; si++) {
-          var sStart = data['sess' + si + 'Start'];
-          var sEnd = data['sess' + si + 'End'];
-          if (sStart && sEnd && sStart < sEnd) {
-            sessions.push({ start: sStart, end: sEnd });
-          }
-        }
-        if (sessions.length === 0) {
-          Utils.toast('At least one session with valid start/end is required', 'error');
+        var opens = data.opens;
+        var closes = data.closes;
+        var breakFrom = data.breakFrom;
+        var breakTo = data.breakTo;
+
+        if (!opens || !closes || opens >= closes) {
+          Utils.toast('Please set valid opening and closing hours', 'error');
           return;
         }
+
+        // Build sessions from hours + break
+        var sessions = [];
+        if (breakFrom && breakTo && breakFrom < breakTo && breakFrom > opens && breakTo < closes) {
+          // Two sessions with break in between
+          sessions.push({ start: opens, end: breakFrom });
+          sessions.push({ start: breakTo, end: closes });
+        } else {
+          // Single session, no break
+          sessions.push({ start: opens, end: closes });
+        }
+
         var settings = Store.getClinicSettings();
         settings.booking = {
           sessions: sessions,
