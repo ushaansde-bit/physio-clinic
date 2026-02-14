@@ -79,7 +79,7 @@ window.BillingView = (function() {
       var bill = allBilling[k];
       var amt = parseFloat(bill.amount) || 0;
       if (bill.status === 'pending') totalOutstanding += amt;
-      if (bill.status === 'paid' && bill.paidDate && bill.paidDate.substring(0, 7) === monthStr) {
+      if (bill.status !== 'pending' && bill.paidDate && bill.paidDate.substring(0, 7) === monthStr) {
         paidThisMonth += amt;
       }
       if (bill.date && bill.date.substring(0, 7) === monthStr) {
@@ -114,7 +114,9 @@ window.BillingView = (function() {
     html += '<select class="filter-select" id="billing-status-filter">';
     html += '<option value="">All Status</option>';
     html += '<option value="pending"' + (state.statusFilter === 'pending' ? ' selected' : '') + '>Pending</option>';
-    html += '<option value="paid"' + (state.statusFilter === 'paid' ? ' selected' : '') + '>Paid</option>';
+    html += '<option value="gpay"' + (state.statusFilter === 'gpay' ? ' selected' : '') + '>GPay</option>';
+    html += '<option value="cash"' + (state.statusFilter === 'cash' ? ' selected' : '') + '>Cash</option>';
+    html += '<option value="card"' + (state.statusFilter === 'card' ? ' selected' : '') + '>Card</option>';
     html += '</select>';
     html += '<input type="date" class="filter-select" id="billing-date-from" value="' + state.dateFrom + '">';
     html += '<input type="date" class="filter-select" id="billing-date-to" value="' + state.dateTo + '">';
@@ -137,15 +139,17 @@ window.BillingView = (function() {
       for (var m = 0; m < pageItems.length; m++) {
         var item = pageItems[m];
         var pName = patientMap[item.patientId] || 'Unknown';
-        var statusCls = item.status === 'paid' ? 'badge-success' : 'badge-warning';
+        var itemIsPaid = item.status !== 'pending';
+        var statusCls = itemIsPaid ? 'badge-success' : 'badge-warning';
+        var sLabel = item.status === 'gpay' ? 'GPay' : item.status === 'cash' ? 'Cash' : item.status === 'card' ? 'Card' : item.status === 'paid' ? 'Paid' : 'Pending';
         html += '<tr class="no-hover">';
         html += '<td>' + Utils.formatDate(item.date) + '</td>';
         html += '<td><a href="#/patients/' + item.patientId + '" style="font-weight:500;">' + Utils.escapeHtml(pName) + '</a></td>';
         html += '<td>' + Utils.escapeHtml(item.description) + '</td>';
         html += '<td style="font-weight:600;white-space:nowrap;">' + Utils.formatCurrency(item.amount) + '</td>';
-        html += '<td><span class="badge ' + statusCls + '">' + item.status + '</span></td>';
+        html += '<td><span class="badge ' + statusCls + '">' + sLabel + '</span></td>';
         html += '<td><div class="btn-group">';
-        if (item.status === 'pending' && hasBillingPerm('billing_recordPayment')) {
+        if (!itemIsPaid && hasBillingPerm('billing_recordPayment')) {
           html += '<button class="btn btn-sm btn-success mark-paid-btn" data-id="' + item.id + '">Mark Paid</button>';
         }
         if (hasBillingPerm('billing_delete')) {
@@ -207,7 +211,9 @@ window.BillingView = (function() {
     html += '<div class="form-group"><label>Status</label>';
     html += '<select name="status">';
     html += '<option value="pending">Pending</option>';
-    html += '<option value="paid">Paid</option>';
+    html += '<option value="gpay">GPay</option>';
+    html += '<option value="cash">Cash</option>';
+    html += '<option value="card">Card</option>';
     html += '</select></div>';
     html += '</form>';
 
@@ -231,7 +237,7 @@ window.BillingView = (function() {
         Utils.toast('Please fill in all required fields', 'error');
         return;
       }
-      if (data.status === 'paid') data.paidDate = Utils.today();
+      if (data.status !== 'pending') data.paidDate = Utils.today();
       Store.createBilling(data);
       Utils.toast('Invoice created', 'success');
       state.subView = 'list';
