@@ -411,11 +411,19 @@
       db.collection('booking_slugs').doc(slug).get()
         .then(function(doc) {
           if (doc.exists) {
-            showToast('A clinic with this phone number already exists.', 'error');
-            setLoading(false);
-            return Promise.reject('slug_taken');
+            // Check if the clinic still exists and is not deleted
+            var existingClinicId = doc.data().clinicId;
+            return db.collection('clinics').doc(existingClinicId).get().then(function(clinicDoc) {
+              if (clinicDoc.exists && !clinicDoc.data()._deleted) {
+                showToast('A clinic with this phone number already exists.', 'error');
+                setLoading(false);
+                return Promise.reject('slug_taken');
+              }
+              // Slug is stale (clinic deleted) — will be overwritten by batch below
+            });
           }
-
+        })
+        .then(function() {
           // Generate IDs
           var clinicId = 'c_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
           var userId = 'u_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 6);

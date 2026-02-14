@@ -1233,10 +1233,17 @@
       document.getElementById('delete-btn-text').textContent = 'Moving to trash...';
       document.getElementById('delete-btn-spinner').style.display = 'inline-block';
 
+      var clinic = clinicsData.find(function(c) { return (c._docId || c.id) === clinicId; });
+      var slug = clinic ? clinic.bookingSlug : null;
+
       db.collection('clinics').doc(clinicId).update({
         _deleted: true,
         _deletedAt: new Date().toISOString()
       })
+        .then(function() {
+          // Free up the booking slug so the phone number can be reused
+          if (slug) return db.collection('booking_slugs').doc(slug).delete();
+        })
         .then(function() {
           showToast('Clinic moved to trash.', 'success');
           closeDeleteModal();
@@ -1396,10 +1403,20 @@
 
     // --- Restore Clinic ---
     function restoreClinic(clinicId) {
+      var clinic = clinicsData.find(function(c) { return (c._docId || c.id) === clinicId; });
+      var slug = clinic ? clinic.bookingSlug : null;
+
       db.collection('clinics').doc(clinicId).update({
         _deleted: firebase.firestore.FieldValue.delete(),
         _deletedAt: firebase.firestore.FieldValue.delete()
       })
+        .then(function() {
+          // Re-create the booking slug so the clinic is discoverable again
+          if (slug) return db.collection('booking_slugs').doc(slug).set({
+            clinicId: clinicId,
+            createdAt: new Date().toISOString()
+          });
+        })
         .then(function() {
           showToast('Clinic restored!', 'success');
           loadClinics();
@@ -1605,10 +1622,18 @@
       db.collection('booking_slugs').doc(slug).get()
         .then(function(doc) {
           if (doc.exists) {
-            showToast('A clinic with this phone number already exists.', 'error');
-            return Promise.reject('slug_taken');
+            // Check if the clinic still exists and is not deleted
+            var existingClinicId = doc.data().clinicId;
+            return db.collection('clinics').doc(existingClinicId).get().then(function(clinicDoc) {
+              if (clinicDoc.exists && !clinicDoc.data()._deleted) {
+                showToast('A clinic with this phone number already exists.', 'error');
+                return Promise.reject('slug_taken');
+              }
+              // Slug is stale (clinic deleted) — will be overwritten by batch below
+            });
           }
-
+        })
+        .then(function() {
           var clinicId = 'c_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
           var userId = 'u_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
           var createdAt = new Date().toISOString();
