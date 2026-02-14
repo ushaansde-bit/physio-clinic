@@ -179,7 +179,6 @@ window.SettingsView = (function() {
     html += '<button class="tab-btn' + (state.tab === 'features' ? ' active' : '') + '" data-tab="features">Features</button>';
     html += '<button class="tab-btn' + (state.tab === 'clinic' ? ' active' : '') + '" data-tab="clinic">Clinic</button>';
     html += '<button class="tab-btn' + (state.tab === 'trash' ? ' active' : '') + '" data-tab="trash">Trash</button>';
-    html += '<button class="tab-btn' + (state.tab === 'backup' ? ' active' : '') + '" data-tab="backup">Backup</button>';
     html += '</div>';
 
     if (state.tab === 'staff') {
@@ -192,8 +191,6 @@ window.SettingsView = (function() {
       html += renderClinicInfo();
     } else if (state.tab === 'trash') {
       html += renderTrash();
-    } else if (state.tab === 'backup') {
-      html += renderBackup();
     }
 
     container.innerHTML = html;
@@ -214,11 +211,11 @@ window.SettingsView = (function() {
     html += '</div>';
     html += '<div class="card-body"><div class="table-wrapper">';
     html += '<table class="data-table"><thead><tr>';
-    html += '<th>Name</th><th>Role</th><th>Phone</th><th>Email</th><th>Actions</th>';
+    html += '<th>Name</th><th>Username</th><th>Role</th><th>Phone</th><th>Email</th><th>Actions</th>';
     html += '</tr></thead><tbody>';
 
     if (users.length === 0) {
-      html += '<tr class="no-hover"><td colspan="5"><div class="empty-state"><p>No staff members found</p></div></td></tr>';
+      html += '<tr class="no-hover"><td colspan="6"><div class="empty-state"><p>No staff members found</p></div></td></tr>';
     } else {
       for (var i = 0; i < users.length; i++) {
         var u = users[i];
@@ -228,6 +225,7 @@ window.SettingsView = (function() {
 
         html += '<tr class="no-hover">';
         html += '<td style="font-weight:500;">' + Utils.escapeHtml(u.name) + (isSelf ? ' <span class="text-muted">(you)</span>' : '') + '</td>';
+        html += '<td><code>' + Utils.escapeHtml(u.username || '-') + '</code></td>';
         html += '<td><span class="badge ' + roleBadge + '">' + Utils.escapeHtml(roleLabel) + '</span></td>';
         html += '<td>' + Utils.escapeHtml(u.phone || '-') + '</td>';
         html += '<td>' + Utils.escapeHtml(u.email || '-') + '</td>';
@@ -290,6 +288,17 @@ window.SettingsView = (function() {
     html += '<div class="form-group">';
     html += '<label>Email</label>';
     html += '<input type="email" name="email" placeholder="e.g. priya@clinic.com" value="' + Utils.escapeHtml(isEdit ? user.email || '' : '') + '">';
+    html += '</div>';
+    html += '</div>';
+
+    html += '<div class="form-row">';
+    html += '<div class="form-group">';
+    html += '<label>Username <span style="color:var(--danger);">*</span></label>';
+    html += '<input type="text" name="username" required placeholder="e.g. priya" value="' + Utils.escapeHtml(isEdit ? user.username || '' : '') + '">';
+    html += '</div>';
+    html += '<div class="form-group">';
+    html += '<label>Password' + (isEdit ? '' : ' <span style="color:var(--danger);">*</span>') + '</label>';
+    html += '<input type="password" name="password" placeholder="' + (isEdit ? 'Leave blank to keep current' : 'Min 4 characters') + '"' + (isEdit ? '' : ' required') + '>';
     html += '</div>';
     html += '</div>';
 
@@ -421,19 +430,47 @@ window.SettingsView = (function() {
           return;
         }
 
+        var username = (data.username || '').trim();
+        if (!username) {
+          Utils.toast('Username is required', 'error');
+          return;
+        }
+
+        // Check username uniqueness
+        var existingUser = Store.getUserByUsername(username);
+        if (existingUser && (!isEdit || existingUser.id !== state.staffEditId)) {
+          Utils.toast('Username "' + username + '" is already taken', 'error');
+          return;
+        }
+
+        var passwordVal = data.password || '';
+        if (!isEdit && passwordVal.length < 4) {
+          Utils.toast('Password must be at least 4 characters', 'error');
+          return;
+        }
+        if (isEdit && passwordVal && passwordVal.length < 4) {
+          Utils.toast('Password must be at least 4 characters', 'error');
+          return;
+        }
+
         var role = data.role || (isEdit ? user.role : 'physiotherapist');
         var allowedPages = role === 'admin' ? null : (isSelf ? user.allowedPages : getCheckedPages());
         var billingPerms = role === 'admin' ? null : (isSelf ? user.billingPermissions : getCheckedBillingPerms());
 
         if (isEdit) {
-          Store.update(Store.KEYS.users, state.staffEditId, {
+          var updateData = {
             name: data.name,
+            username: username,
             role: role,
             phone: data.phone || '',
             email: data.email || '',
             allowedPages: allowedPages,
             billingPermissions: billingPerms
-          });
+          };
+          if (passwordVal) {
+            updateData.password = passwordVal;
+          }
+          Store.update(Store.KEYS.users, state.staffEditId, updateData);
 
           // If editing self, update session
           if (isSelf) {
@@ -452,6 +489,8 @@ window.SettingsView = (function() {
         } else {
           Store.create(Store.KEYS.users, {
             name: data.name,
+            username: username,
+            password: passwordVal,
             role: role,
             phone: data.phone || '',
             email: data.email || '',
@@ -725,7 +764,7 @@ window.SettingsView = (function() {
       { key: 'soapNotes', label: 'SOAP Notes', description: 'Session documentation with SOAP format' },
       { key: 'bodyDiagram', label: 'Body Diagram', description: 'Visual body region marking for patients' },
       { key: 'onlineBooking', label: 'Online Booking', description: 'Allow patients to book appointments online' },
-      { key: 'tags', label: 'Tags', description: 'Patient categorization and filtering with tags' }
+      { key: 'tags', label: 'Tags', description: 'Patient categorization and filtering with tags', nav: true }
     ];
 
     var enabledCount = 0;
@@ -769,7 +808,7 @@ window.SettingsView = (function() {
     var ownerEmail = settings.ownerEmail || '-';
     var ownerPhone = settings.ownerPhone || '-';
     var slug = settings.bookingSlug || '';
-    var bookingUrl = slug ? (window.location.origin + window.location.pathname.replace('index.html', '') + 'book1/?c=' + slug) : '';
+    var bookingUrl = slug ? (window.location.origin + window.location.pathname.replace('index.html', '') + 'book1/index.html?c=' + slug) : '';
 
     var html = '';
     html += '<div class="card mb-2">';
@@ -786,7 +825,7 @@ window.SettingsView = (function() {
     if (bookingUrl) {
       html += '<div style="margin-top:1rem;padding:0.75rem;background:var(--bg-secondary);border-radius:var(--radius);font-size:0.85em;">';
       html += '<strong>Online Booking URL</strong><br>';
-      html += '<code style="word-break:break-all;">' + Utils.escapeHtml(bookingUrl) + '</code>';
+      html += '<a href="' + Utils.escapeHtml(bookingUrl) + '" target="_blank" style="word-break:break-all;color:var(--primary);">' + Utils.escapeHtml(bookingUrl) + '</a>';
       html += '</div>';
     }
 
@@ -843,37 +882,6 @@ window.SettingsView = (function() {
     }
 
     html += '</div></div>';
-    return html;
-  }
-
-  // ==================== BACKUP ====================
-  function renderBackup() {
-    var html = '';
-
-    // Export section
-    html += '<div class="card mb-2">';
-    html += '<div class="card-header"><h3>Export Backup</h3></div>';
-    html += '<div class="card-body">';
-    html += '<p class="text-muted" style="margin-bottom:1rem;">Download all clinic data as a JSON file.</p>';
-    html += '<button class="btn btn-primary" id="export-backup-btn">';
-    html += '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
-    html += ' Export Backup</button>';
-    html += '</div></div>';
-
-    // Import section
-    html += '<div class="card mb-2">';
-    html += '<div class="card-header"><h3>Import Backup</h3></div>';
-    html += '<div class="card-body">';
-    html += '<p class="text-muted" style="margin-bottom:1rem;">Restore from a JSON backup. New items are merged \u2014 existing items are not overwritten.</p>';
-    html += '<div class="form-row">';
-    html += '<div class="form-group"><input type="file" id="import-file-input" accept=".json"></div>';
-    html += '<div class="form-group"><button class="btn btn-primary" id="import-backup-btn" disabled>';
-    html += '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>';
-    html += ' Import</button></div>';
-    html += '</div>';
-    html += '<div id="import-preview" style="display:none;"></div>';
-    html += '</div></div>';
-
     return html;
   }
 
@@ -1049,113 +1057,18 @@ window.SettingsView = (function() {
         return;
       }
 
-      // Export backup
-      if (e.target.closest('#export-backup-btn')) {
-        var backup = Store.exportBackup();
-        var json = JSON.stringify(backup, null, 2);
-        var blob = new Blob([json], { type: 'application/json' });
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement('a');
-        var dateStr = new Date().toISOString().split('T')[0];
-        a.href = url;
-        a.download = 'clinic-backup-' + dateStr + '.json';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        Utils.toast('Backup exported', 'success');
-        return;
-      }
-
-      // Import backup
-      if (e.target.closest('#import-backup-btn')) {
-        var fileInput = document.getElementById('import-file-input');
-        if (!fileInput || !fileInput.files || !fileInput.files[0]) {
-          Utils.toast('Please select a file first', 'error');
-          return;
-        }
-        var reader = new FileReader();
-        reader.onload = function(ev) {
-          try {
-            var data = JSON.parse(ev.target.result);
-            if (!data || !data.data || data.version !== 1) {
-              Utils.toast('Invalid backup file format', 'error');
-              return;
-            }
-            Utils.inlineConfirm(container, 'Import backup data? New items will be merged. Existing items will not be overwritten.', function() {
-              var counts = Store.importBackup(data);
-              if (counts.error) {
-                Utils.toast(counts.error, 'error');
-                return;
-              }
-              var parts = [];
-              for (var ct in counts) {
-                if (counts[ct] > 0) parts.push(counts[ct] + ' ' + ct);
-              }
-              var msg = parts.length > 0 ? 'Imported: ' + parts.join(', ') : 'No new items to import';
-              Utils.toast(msg, 'success');
-              renderView(container);
-            });
-          } catch(ex) {
-            Utils.toast('Error reading file: invalid JSON', 'error');
-          }
-        };
-        reader.readAsText(fileInput.files[0]);
-        return;
-      }
     };
     container.addEventListener('click', _clickHandler);
-
-    // File input change handler for import preview
-    var importInput = container.querySelector('#import-file-input');
-    if (importInput) {
-      importInput.addEventListener('change', function() {
-        var importBtn = document.getElementById('import-backup-btn');
-        var preview = document.getElementById('import-preview');
-        if (!importInput.files || !importInput.files[0]) {
-          if (importBtn) importBtn.disabled = true;
-          if (preview) preview.style.display = 'none';
-          return;
-        }
-        var reader = new FileReader();
-        reader.onload = function(ev) {
-          try {
-            var data = JSON.parse(ev.target.result);
-            if (!data || !data.data || data.version !== 1) {
-              if (preview) {
-                preview.style.display = '';
-                preview.innerHTML = '<div style="color:var(--danger);font-size:0.9em;">Invalid backup file format.</div>';
-              }
-              if (importBtn) importBtn.disabled = true;
-              return;
-            }
-            if (importBtn) importBtn.disabled = false;
-            if (preview) {
-              var html = '<div style="background:var(--bg-secondary);border-radius:8px;padding:12px;font-size:0.9em;">';
-              html += '<strong>Backup Preview</strong>';
-              html += '<div style="color:var(--text-muted);font-size:0.85em;margin-bottom:8px;">Exported: ' + (data.exportedAt ? Utils.formatDate(data.exportedAt.split('T')[0]) : 'Unknown') + '</div>';
-              var typeLabels = { patients: 'Patients', appointments: 'Appointments', sessions: 'Sessions', exercises: 'Exercises', billing: 'Invoices', prescriptions: 'Prescriptions', users: 'Staff', tags: 'Tags', messageTemplates: 'Templates', messageLog: 'Messages', activityLog: 'Activity' };
-              for (var key in data.data) {
-                if (data.data.hasOwnProperty(key) && data.data[key] && data.data[key].length > 0) {
-                  html += '<div>' + (typeLabels[key] || key) + ': <strong>' + data.data[key].length + '</strong></div>';
-                }
-              }
-              html += '</div>';
-              preview.style.display = '';
-              preview.innerHTML = html;
-            }
-          } catch(ex) {
-            if (preview) {
-              preview.style.display = '';
-              preview.innerHTML = '<div style="color:var(--danger);font-size:0.9em;">Error reading file: invalid JSON.</div>';
-            }
-            if (importBtn) importBtn.disabled = true;
-          }
-        };
-        reader.readAsText(importInput.files[0]);
-      });
-    }
   }
+
+  // Register cleanup so router can remove stale handlers
+  if (!window._viewCleanups) window._viewCleanups = [];
+  window._viewCleanups.push(function(container) {
+    if (_clickHandler) {
+      container.removeEventListener('click', _clickHandler);
+      _clickHandler = null;
+    }
+  });
 
   return { render: render };
 })();

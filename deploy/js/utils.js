@@ -66,6 +66,10 @@ window.Utils = (function() {
   function toast(message, type) {
     type = type || 'info';
     var container = document.getElementById('toast-container');
+    // Remove any existing toasts to prevent stacking
+    while (container.firstChild) {
+      container.removeChild(container.firstChild);
+    }
     var el = document.createElement('div');
     el.className = 'toast toast-' + type;
     el.innerHTML = '<span class="toast-message">' + escapeHtml(message) + '</span>';
@@ -179,6 +183,11 @@ window.Utils = (function() {
   // Inline confirm bar (replaces modal confirm)
   function inlineConfirm(container, message, onConfirm, options) {
     options = options || {};
+    // Remove any existing confirm bars first
+    var existing = container.querySelectorAll('.inline-confirm-bar');
+    for (var ec = 0; ec < existing.length; ec++) {
+      existing[ec].remove();
+    }
     var barId = 'confirm-bar-' + Date.now();
     var bar = document.createElement('div');
     bar.id = barId;
@@ -193,8 +202,8 @@ window.Utils = (function() {
     } else {
       container.prepend(bar);
     }
-    bar.querySelector('[data-confirm-cancel]').onclick = function() { bar.remove(); };
-    bar.querySelector('[data-confirm-ok]').onclick = function() { bar.remove(); onConfirm(); };
+    bar.querySelector('[data-confirm-cancel]').onclick = function(e) { e.stopPropagation(); bar.remove(); };
+    bar.querySelector('[data-confirm-ok]').onclick = function(e) { e.stopPropagation(); bar.remove(); onConfirm(); };
   }
 
   // Days of week

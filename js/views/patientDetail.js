@@ -524,10 +524,12 @@ window.PatientDetailView = (function() {
           html += '<div class="soap-section"><div class="soap-label" style="background:var(--gray-100);color:var(--gray-600);">Pain Regions</div>';
           html += '<div class="soap-text">' + BodyDiagram.renderBadges(s.bodyRegions) + '</div></div>';
         }
-        html += soapSection('Subjective', 's', s.subjective);
-        html += soapSection('Objective', 'o', s.objective);
-        html += soapSection('Assessment', 'a', s.assessment);
-        html += soapSection('Plan', 'p', s.plan);
+        if (Store.isFeatureEnabled('soapNotes')) {
+          html += soapSection('Subjective', 's', s.subjective);
+          html += soapSection('Objective', 'o', s.objective);
+          html += soapSection('Assessment', 'a', s.assessment);
+          html += soapSection('Plan', 'p', s.plan);
+        }
         html += '</div></div>';
       }
     }
@@ -558,14 +560,16 @@ window.PatientDetailView = (function() {
     html += '<div class="form-group"><label>Function Score (0-10)</label>';
     html += '<input type="number" name="functionScore" min="0" max="10" value="' + (session ? session.functionScore : '5') + '" required></div>';
     html += '</div>';
-    html += '<div class="form-group"><label>Subjective ' + Utils.micHtml('sf-subjective') + '</label>';
-    html += '<textarea id="sf-subjective" name="subjective" rows="3" data-ac="subjective" required placeholder="Patient report, symptoms, functional status...">' + Utils.escapeHtml(session ? session.subjective || '' : '') + '</textarea></div>';
-    html += '<div class="form-group"><label>Objective ' + Utils.micHtml('sf-objective') + '</label>';
-    html += '<textarea id="sf-objective" name="objective" rows="3" data-ac="objective" placeholder="Measurements, ROM, strength, observations...">' + Utils.escapeHtml(session ? session.objective || '' : '') + '</textarea></div>';
-    html += '<div class="form-group"><label>Assessment ' + Utils.micHtml('sf-assessment') + '</label>';
-    html += '<textarea id="sf-assessment" name="assessment" rows="3" data-ac="assessment" placeholder="Clinical reasoning, progress, prognosis...">' + Utils.escapeHtml(session ? session.assessment || '' : '') + '</textarea></div>';
-    html += '<div class="form-group"><label>Plan ' + Utils.micHtml('sf-plan') + '</label>';
-    html += '<textarea id="sf-plan" name="plan" rows="3" data-ac="plan" placeholder="Treatment plan, goals, next steps...">' + Utils.escapeHtml(session ? session.plan || '' : '') + '</textarea></div>';
+    if (Store.isFeatureEnabled('soapNotes')) {
+      html += '<div class="form-group"><label>Subjective ' + Utils.micHtml('sf-subjective') + '</label>';
+      html += '<textarea id="sf-subjective" name="subjective" rows="3" data-ac="subjective" required placeholder="Patient report, symptoms, functional status...">' + Utils.escapeHtml(session ? session.subjective || '' : '') + '</textarea></div>';
+      html += '<div class="form-group"><label>Objective ' + Utils.micHtml('sf-objective') + '</label>';
+      html += '<textarea id="sf-objective" name="objective" rows="3" data-ac="objective" placeholder="Measurements, ROM, strength, observations...">' + Utils.escapeHtml(session ? session.objective || '' : '') + '</textarea></div>';
+      html += '<div class="form-group"><label>Assessment ' + Utils.micHtml('sf-assessment') + '</label>';
+      html += '<textarea id="sf-assessment" name="assessment" rows="3" data-ac="assessment" placeholder="Clinical reasoning, progress, prognosis...">' + Utils.escapeHtml(session ? session.assessment || '' : '') + '</textarea></div>';
+      html += '<div class="form-group"><label>Plan ' + Utils.micHtml('sf-plan') + '</label>';
+      html += '<textarea id="sf-plan" name="plan" rows="3" data-ac="plan" placeholder="Treatment plan, goals, next steps...">' + Utils.escapeHtml(session ? session.plan || '' : '') + '</textarea></div>';
+    }
     // Body diagram for pain regions
     if (Store.isFeatureEnabled('bodyDiagram')) {
       html += '<div class="form-group">';
@@ -1144,10 +1148,12 @@ window.PatientDetailView = (function() {
             html += BodyDiagram.renderPrintHtml(sn.bodyRegions);
             html += '</div>';
           }
-          if (sn.subjective) html += '<p style="margin:0.25rem 0;font-size:0.85rem;"><strong>S:</strong> ' + Utils.escapeHtml(sn.subjective) + '</p>';
-          if (sn.objective) html += '<p style="margin:0.25rem 0;font-size:0.85rem;"><strong>O:</strong> ' + Utils.escapeHtml(sn.objective) + '</p>';
-          if (sn.assessment) html += '<p style="margin:0.25rem 0;font-size:0.85rem;"><strong>A:</strong> ' + Utils.escapeHtml(sn.assessment) + '</p>';
-          if (sn.plan) html += '<p style="margin:0.25rem 0;font-size:0.85rem;"><strong>P:</strong> ' + Utils.escapeHtml(sn.plan) + '</p>';
+          if (Store.isFeatureEnabled('soapNotes')) {
+            if (sn.subjective) html += '<p style="margin:0.25rem 0;font-size:0.85rem;"><strong>S:</strong> ' + Utils.escapeHtml(sn.subjective) + '</p>';
+            if (sn.objective) html += '<p style="margin:0.25rem 0;font-size:0.85rem;"><strong>O:</strong> ' + Utils.escapeHtml(sn.objective) + '</p>';
+            if (sn.assessment) html += '<p style="margin:0.25rem 0;font-size:0.85rem;"><strong>A:</strong> ' + Utils.escapeHtml(sn.assessment) + '</p>';
+            if (sn.plan) html += '<p style="margin:0.25rem 0;font-size:0.85rem;"><strong>P:</strong> ' + Utils.escapeHtml(sn.plan) + '</p>';
+          }
           html += '</div>';
         }
         html += '</div>';
