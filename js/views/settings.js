@@ -801,9 +801,19 @@ window.SettingsView = (function() {
     // Online Booking Configuration
     if (features.onlineBooking !== false) {
       var booking = settings.booking || {};
-      var bSessions = booking.sessions || [{ start: '08:00', end: '17:00' }];
-      var bMaxPerSlot = booking.maxPerSlot !== undefined ? booking.maxPerSlot : 1;
-      var bSlotDuration = booking.slotDuration !== undefined ? booking.slotDuration : 30;
+      var bSessions;
+      if (booking.sessions && booking.sessions.length > 0) {
+        bSessions = booking.sessions;
+      } else if (booking.startHour !== undefined) {
+        // Legacy single-range format
+        var lsh = parseInt(booking.startHour, 10);
+        var leh = parseInt(booking.endHour, 10);
+        bSessions = [{ start: (lsh < 10 ? '0' : '') + lsh + ':00', end: (leh < 10 ? '0' : '') + leh + ':00' }];
+      } else {
+        bSessions = [{ start: '08:00', end: '17:00' }];
+      }
+      var bMaxPerSlot = booking.maxPerSlot !== undefined ? parseInt(booking.maxPerSlot, 10) : 1;
+      var bSlotDuration = booking.slotDuration !== undefined ? parseInt(booking.slotDuration, 10) : 30;
       // Ensure at least 2 session rows for Morning + Evening
       if (bSessions.length < 2) bSessions.push({ start: '', end: '' });
 
@@ -825,20 +835,20 @@ window.SettingsView = (function() {
       html += '<div class="card-body">';
       html += '<form id="booking-config-form">';
 
-      var sessLabels = ['Morning Session', 'Evening Session'];
+      var sessLabels = ['Morning / Afternoon', 'Evening'];
       for (var si = 0; si < 2; si++) {
         var sess = bSessions[si] || { start: '', end: '' };
-        html += '<div style="font-weight:500;font-size:0.9em;margin-bottom:0.3rem;' + (si > 0 ? 'margin-top:0.75rem;' : '') + '">' + sessLabels[si] + (si > 0 ? ' <span style="color:var(--text-muted);font-weight:400;">(optional)</span>' : '') + '</div>';
+        html += '<div style="font-weight:600;font-size:0.9em;margin-bottom:0.4rem;padding:0.3rem 0;border-bottom:1px solid var(--border);' + (si > 0 ? 'margin-top:1rem;' : '') + '">' + sessLabels[si] + (si > 0 ? ' <span style="color:var(--text-muted);font-weight:400;font-size:0.85em;">(leave Off if not needed)</span>' : '') + '</div>';
         html += '<div class="form-row">';
-        html += '<div class="form-group"><label>Start</label>';
-        html += '<select name="sess' + si + 'Start">';
+        html += '<div class="form-group"><label>Opens at</label>';
+        html += '<select name="sess' + si + 'Start" style="font-size:0.95em;">';
         html += '<option value="">Off</option>';
         for (var oi = 0; oi < timeOpts.length; oi++) {
           html += '<option value="' + timeOpts[oi].value + '"' + (timeOpts[oi].value === sess.start ? ' selected' : '') + '>' + timeOpts[oi].label + '</option>';
         }
         html += '</select></div>';
-        html += '<div class="form-group"><label>End</label>';
-        html += '<select name="sess' + si + 'End">';
+        html += '<div class="form-group"><label>Closes at</label>';
+        html += '<select name="sess' + si + 'End" style="font-size:0.95em;">';
         html += '<option value="">Off</option>';
         for (var oj = 0; oj < timeOpts.length; oj++) {
           html += '<option value="' + timeOpts[oj].value + '"' + (timeOpts[oj].value === sess.end ? ' selected' : '') + '>' + timeOpts[oj].label + '</option>';
