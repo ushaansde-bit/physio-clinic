@@ -207,7 +207,7 @@ window.PatientsView = (function() {
     html += '<h3>Quick Add Patient</h3>';
     html += '</div>';
     html += '<div class="inline-form-body">';
-    html += '<form id="patient-form">';
+    html += '<form id="patient-form" autocomplete="off">';
     html += formField('Full Name', 'name', 'text', '', true);
     html += '<div class="form-row">';
     html += '<div class="form-group"><label>Date of Birth</label>';
@@ -448,7 +448,7 @@ window.PatientsView = (function() {
     var html = '<div class="form-group"><label>' + label + '</label>';
     html += '<div class="phone-input-wrap">';
     html += '<input type="text" name="' + codeName + '" class="phone-code-input" value="' + Utils.escapeHtml(codeVal) + '" maxlength="5" placeholder="' + Utils.escapeHtml(defaultCode) + '">';
-    html += '<input type="tel" name="' + phoneName + '" class="phone-number-input" value="' + Utils.escapeHtml(phoneVal || '') + '" maxlength="' + maxDigits + '" placeholder="Phone number (' + maxDigits + ' digits)" required>';
+    html += '<input type="tel" name="' + phoneName + '" class="phone-number-input" value="' + Utils.escapeHtml(phoneVal || '') + '" maxlength="' + maxDigits + '" placeholder="Phone number (' + maxDigits + ' digits)" autocomplete="off" required>';
     html += '</div></div>';
     return html;
   }
@@ -456,7 +456,7 @@ window.PatientsView = (function() {
   function formField(label, name, type, value, required) {
     return '<div class="form-group"><label>' + label + '</label>' +
       '<input type="' + type + '" name="' + name + '" value="' + Utils.escapeHtml(value || '') + '"' +
-      (required ? ' required' : '') + '></div>';
+      ' autocomplete="off"' + (required ? ' required' : '') + '></div>';
   }
 
   // Register cleanup so router can remove stale handlers
