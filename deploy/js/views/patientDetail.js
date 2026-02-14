@@ -649,7 +649,7 @@ window.PatientDetailView = (function() {
     html += '<div class="inline-form-body">';
     html += '<form id="exercise-form">';
     html += '<div class="form-group"><label>Exercise Name</label>';
-    html += '<input type="text" name="name" value="' + Utils.escapeHtml(exercise ? exercise.name : '') + '" required placeholder="e.g., Quad Sets"></div>';
+    html += '<input type="text" name="name" value="' + Utils.escapeHtml(exercise ? exercise.name : '') + '" required placeholder="e.g., Quad Sets" autocomplete="nope"></div>';
     html += '<div class="form-row-4">';
     html += '<div class="form-group"><label>Sets</label>';
     html += '<input type="text" name="sets" value="' + Utils.escapeHtml(exercise ? exercise.sets : '3') + '" placeholder="3" required></div>';
@@ -842,7 +842,7 @@ window.PatientDetailView = (function() {
     for (var i = 0; i < bills.length; i++) {
       var amt = parseFloat(bills[i].amount) || 0;
       total += amt;
-      if (bills[i].status === 'paid') paid += amt;
+      if (bills[i].status !== 'pending') paid += amt;
       else pending += amt;
     }
 
@@ -867,15 +867,17 @@ window.PatientDetailView = (function() {
     } else {
       for (var j = 0; j < bills.length; j++) {
         var b = bills[j];
-        var statusCls = b.status === 'paid' ? 'badge-success' : 'badge-warning';
+        var isPaid = b.status !== 'pending';
+        var statusCls = isPaid ? 'badge-success' : 'badge-warning';
+        var statusLabel = b.status === 'gpay' ? 'GPay' : b.status === 'cash' ? 'Cash' : b.status === 'card' ? 'Card' : b.status === 'paid' ? 'Paid' : 'Pending';
         html += '<tr class="no-hover">';
         html += '<td>' + Utils.formatDate(b.date) + '</td>';
         html += '<td>' + Utils.escapeHtml(b.description) + '</td>';
         html += '<td style="font-weight:600;white-space:nowrap;">' + Utils.formatCurrency(b.amount) + '</td>';
-        html += '<td><span class="badge ' + statusCls + '">' + b.status + '</span></td>';
+        html += '<td><span class="badge ' + statusCls + '">' + statusLabel + '</span></td>';
         html += '<td><div class="btn-group">';
         html += '<button class="btn btn-sm btn-ghost view-billing-btn" data-id="' + b.id + '">View</button>';
-        if (b.status === 'pending') {
+        if (!isPaid) {
           html += '<button class="btn btn-sm btn-success mark-paid-btn" data-id="' + b.id + '">Mark Paid</button>';
         }
         html += '<button class="btn btn-sm btn-ghost delete-billing-btn" data-id="' + b.id + '" style="color:var(--danger);">Delete</button>';
@@ -908,7 +910,9 @@ window.PatientDetailView = (function() {
     html += '<div class="form-group"><label>Status</label>';
     html += '<select name="status">';
     html += '<option value="pending">Pending</option>';
-    html += '<option value="paid">Paid</option>';
+    html += '<option value="gpay">GPay</option>';
+    html += '<option value="cash">Cash</option>';
+    html += '<option value="card">Card</option>';
     html += '</select></div>';
     html += '</form>';
     html += '</div>';
@@ -927,7 +931,9 @@ window.PatientDetailView = (function() {
     }
     if (!bill) { sub.billingView = 'list'; sub.billingViewId = null; return renderBilling(patient); }
 
-    var statusCls = bill.status === 'paid' ? 'badge-success' : 'badge-warning';
+    var billIsPaid = bill.status !== 'pending';
+    var statusCls = billIsPaid ? 'badge-success' : 'badge-warning';
+    var billStatusLabel = bill.status === 'gpay' ? 'GPay' : bill.status === 'cash' ? 'Cash' : bill.status === 'card' ? 'Card' : bill.status === 'paid' ? 'Paid' : 'Pending';
 
     var html = '<div class="inline-form-card">';
     html += '<div class="inline-form-header">';
@@ -940,7 +946,7 @@ window.PatientDetailView = (function() {
 
     // Invoice header
     html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">';
-    html += '<span class="badge ' + statusCls + '" style="font-size:0.85rem;padding:0.3rem 0.75rem;">' + (bill.status === 'paid' ? 'Paid' : 'Pending') + '</span>';
+    html += '<span class="badge ' + statusCls + '" style="font-size:0.85rem;padding:0.3rem 0.75rem;">' + billStatusLabel + '</span>';
     html += '<span style="font-size:0.82rem;color:var(--gray-400);">' + Utils.formatDate(bill.date) + '</span>';
     html += '</div>';
 
@@ -955,7 +961,7 @@ window.PatientDetailView = (function() {
     html += infoItem('Description', bill.description);
     html += infoItem('Date', Utils.formatDate(bill.date));
     html += infoItem('Patient', patient.name);
-    html += infoItem('Status', bill.status === 'paid' ? 'Paid' : 'Pending');
+    html += infoItem('Status', billStatusLabel);
     if (bill.paidDate) {
       html += infoItem('Paid Date', Utils.formatDate(bill.paidDate));
     }
@@ -964,7 +970,7 @@ window.PatientDetailView = (function() {
     html += '</div>';
     html += '<div class="inline-form-actions">';
     html += '<button class="btn btn-secondary" id="billing-detail-back2">Back</button>';
-    if (bill.status === 'pending') {
+    if (!billIsPaid) {
       html += '<button class="btn btn-success" id="billing-detail-mark-paid" data-id="' + bill.id + '">Mark Paid</button>';
     }
     html += '<button class="btn btn-primary" id="billing-detail-print" data-id="' + bill.id + '">';
@@ -1219,7 +1225,8 @@ window.PatientDetailView = (function() {
         html += '<h3>Invoice</h3>';
         html += '<table class="print-info-table">';
         html += '<tr><td class="lbl">Invoice Date</td><td>' + Utils.formatDate(bill.date) + '</td>';
-        html += '<td class="lbl">Status</td><td style="font-weight:600;">' + (bill.status === 'paid' ? 'PAID' : 'PENDING') + '</td></tr>';
+        var printStatus = bill.status === 'gpay' ? 'GPAY' : bill.status === 'cash' ? 'CASH' : bill.status === 'card' ? 'CARD' : bill.status === 'paid' ? 'PAID' : 'PENDING';
+        html += '<td class="lbl">Status</td><td style="font-weight:600;">' + printStatus + '</td></tr>';
         html += '<tr><td class="lbl">Description</td><td colspan="3">' + Utils.escapeHtml(bill.description) + '</td></tr>';
         html += '<tr><td class="lbl">Amount</td><td colspan="3" style="font-size:1.2em;font-weight:700;">' + Utils.formatCurrency(bill.amount) + '</td></tr>';
         if (bill.paidDate) {
@@ -1232,7 +1239,7 @@ window.PatientDetailView = (function() {
       for (var j = 0; j < bills.length; j++) {
         var amt = parseFloat(bills[j].amount) || 0;
         total += amt;
-        if (bills[j].status === 'paid') paidAmt += amt;
+        if (bills[j].status !== 'pending') paidAmt += amt;
         else pendingAmt += amt;
       }
 
@@ -1252,7 +1259,8 @@ window.PatientDetailView = (function() {
           html += '<td style="white-space:nowrap;">' + Utils.formatDate(b.date) + '</td>';
           html += '<td>' + Utils.escapeHtml(b.description) + '</td>';
           html += '<td style="text-align:right;font-weight:600;font-variant-numeric:tabular-nums;">' + Utils.formatCurrency(b.amount) + '</td>';
-          html += '<td>' + (b.status === 'paid' ? 'Paid' : 'Pending') + '</td>';
+          var pLabel = b.status === 'gpay' ? 'GPay' : b.status === 'cash' ? 'Cash' : b.status === 'card' ? 'Card' : b.status === 'paid' ? 'Paid' : 'Pending';
+          html += '<td>' + pLabel + '</td>';
           html += '</tr>';
         }
         html += '<tr style="font-weight:700;border-top:2px solid #000;"><td colspan="2" style="text-align:right;">TOTAL</td>';
@@ -1623,7 +1631,7 @@ window.PatientDetailView = (function() {
           return;
         }
         data.patientId = patient.id;
-        if (data.status === 'paid') data.paidDate = Utils.today();
+        if (data.status !== 'pending') data.paidDate = Utils.today();
         Store.createBilling(data);
         Utils.toast('Invoice created', 'success');
         sub.billingView = 'list';
