@@ -346,8 +346,26 @@ window.Store = (function() {
       }
       return null;
     },
-    createPatient: function(p) { var r = create(KEYS.patients, p); logActivity('New patient added: ' + p.name); return r; },
-    updatePatient: function(id, u) { var r = update(KEYS.patients, id, u); if(r) logActivity('Patient updated: ' + r.name); return r; },
+    createPatient: function(p) {
+      var r = create(KEYS.patients, p);
+      logActivity('New patient added: ' + p.name);
+      // Update phone index in Firestore
+      if (window.FirebaseSync && FirebaseSync.updatePatientPhoneIndex && r.phone) {
+        FirebaseSync.updatePatientPhoneIndex(null, r);
+      }
+      return r;
+    },
+    updatePatient: function(id, u) {
+      var r = update(KEYS.patients, id, u);
+      if (r) {
+        logActivity('Patient updated: ' + r.name);
+        // Update phone index in Firestore
+        if (window.FirebaseSync && FirebaseSync.updatePatientPhoneIndex && r.phone) {
+          FirebaseSync.updatePatientPhoneIndex(null, r);
+        }
+      }
+      return r;
+    },
     deletePatient: function(id) {
       var p = getById(KEYS.patients, id);
       moveToTrash(KEYS.patients, id);
@@ -579,6 +597,8 @@ window.Store = (function() {
     if (!localStorage.getItem(KEYS.prescriptions)) {
       saveAll(KEYS.prescriptions, []);
     }
+
+    // Phone index backfill is handled in app.js after Firebase init
   }
 
   function timeToMinutes(t) {

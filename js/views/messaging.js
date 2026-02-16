@@ -11,11 +11,19 @@ window.MessagingView = (function() {
     selectedPatients: [],
     messageText: '',
     selectedTemplate: '',
+    sendViaWhatsApp: true,
+    sendViaApp: false,
     waLinks: null,
     templateSubView: 'list',
     templateEditId: null,
     historyPage: 1,
-    historyPerPage: 10
+    historyPerPage: 10,
+    // Campaign state
+    campaignTags: [],
+    campaignText: '',
+    campaignType: 'campaign',
+    campaignHistory: [],
+    campaignHistoryLoaded: false
   };
 
   function render(container) {
@@ -24,10 +32,17 @@ window.MessagingView = (function() {
     state.selectedPatients = [];
     state.messageText = '';
     state.selectedTemplate = '';
+    state.sendViaWhatsApp = true;
+    state.sendViaApp = false;
     state.waLinks = null;
     state.templateSubView = 'list';
     state.templateEditId = null;
     state.historyPage = 1;
+    state.campaignTags = [];
+    state.campaignText = '';
+    state.campaignType = 'campaign';
+    state.campaignHistory = [];
+    state.campaignHistoryLoaded = false;
     renderView(container);
   }
 
@@ -37,12 +52,15 @@ window.MessagingView = (function() {
     // Tabs
     html += '<div class="tabs">';
     html += '<button class="tab-btn' + (state.tab === 'compose' ? ' active' : '') + '" data-tab="compose">Compose</button>';
+    html += '<button class="tab-btn' + (state.tab === 'campaigns' ? ' active' : '') + '" data-tab="campaigns">Campaigns</button>';
     html += '<button class="tab-btn' + (state.tab === 'templates' ? ' active' : '') + '" data-tab="templates">Templates</button>';
     html += '<button class="tab-btn' + (state.tab === 'history' ? ' active' : '') + '" data-tab="history">History</button>';
     html += '</div>';
 
     if (state.tab === 'compose') {
       html += renderCompose();
+    } else if (state.tab === 'campaigns') {
+      html += renderCampaigns();
     } else if (state.tab === 'templates') {
       if (state.templateSubView === 'form') {
         html += renderTemplateForm();
@@ -158,10 +176,30 @@ window.MessagingView = (function() {
     }
     html += '</div></div>';
 
+    // Channel selector
+    html += '<div class="form-group"><label>Send via</label>';
+    html += '<div style="display:flex;gap:1rem;margin-top:0.35rem;">';
+    html += '<label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;font-weight:500;font-size:0.88rem;">';
+    html += '<input type="checkbox" id="channel-whatsapp"' + (state.sendViaWhatsApp ? ' checked' : '') + '>';
+    html += '<svg viewBox="0 0 24 24" width="16" height="16" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.61.61l4.458-1.495A11.952 11.952 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.33 0-4.484-.763-6.227-2.053l-.436-.334-2.652.889.889-2.652-.334-.436A9.935 9.935 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>';
+    html += ' WhatsApp</label>';
+    html += '<label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;font-weight:500;font-size:0.88rem;">';
+    html += '<input type="checkbox" id="channel-app"' + (state.sendViaApp ? ' checked' : '') + '>';
+    html += '<svg viewBox="0 0 24 24" width="16" height="16" fill="var(--teal)"><rect x="5" y="1" width="14" height="22" rx="3" stroke="var(--teal)" stroke-width="1.5" fill="none"/><circle cx="12" cy="19" r="1" fill="var(--teal)"/><line x1="9" y1="4" x2="15" y2="4" stroke="var(--teal)" stroke-width="1.5" stroke-linecap="round"/></svg>';
+    html += ' Mobile App</label>';
+    html += '</div></div>';
+
     // Send button
-    html += '<button class="btn btn-whatsapp" id="send-whatsapp-btn" style="width:100%;">';
-    html += '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.61.61l4.458-1.495A11.952 11.952 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.33 0-4.484-.763-6.227-2.053l-.436-.334-2.652.889.889-2.652-.334-.436A9.935 9.935 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>';
-    html += ' Send via WhatsApp (' + state.selectedPatients.length + ')</button>';
+    var sendLabel = '';
+    if (state.sendViaWhatsApp && state.sendViaApp) sendLabel = 'Send via WhatsApp + App';
+    else if (state.sendViaApp) sendLabel = 'Send via Mobile App';
+    else sendLabel = 'Send via WhatsApp';
+    var sendBtnClass = state.sendViaWhatsApp ? 'btn-whatsapp' : 'btn-primary';
+    html += '<button class="btn ' + sendBtnClass + '" id="send-compose-btn" style="width:100%;">';
+    if (state.sendViaWhatsApp) {
+      html += '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.61.61l4.458-1.495A11.952 11.952 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.33 0-4.484-.763-6.227-2.053l-.436-.334-2.652.889.889-2.652-.334-.436A9.935 9.935 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg> ';
+    }
+    html += sendLabel + ' (' + state.selectedPatients.length + ')</button>';
 
     // Inline WhatsApp links section (for multi-patient send)
     if (state.waLinks && state.waLinks.length > 0) {
@@ -259,6 +297,120 @@ window.MessagingView = (function() {
     return html;
   }
 
+  // ==================== CAMPAIGNS TAB ====================
+  function renderCampaigns() {
+    var tags = Store.getTags();
+    var html = '';
+
+    html += '<div class="messaging-grid">';
+
+    // Left column - Campaign Compose
+    html += '<div>';
+    html += '<div class="card mb-2"><div class="card-header"><h3>Send Campaign Message</h3></div><div class="card-body">';
+    html += '<div class="form-hint" style="margin-bottom:1rem;">Send in-app messages to patients in the MobiPhysio app. Select target tags or leave empty to broadcast to all patients.</div>';
+
+    // Type selector
+    html += '<div class="form-group"><label>Message Type</label>';
+    html += '<select id="campaign-type">';
+    html += '<option value="campaign"' + (state.campaignType === 'campaign' ? ' selected' : '') + '>Campaign (Promotional)</option>';
+    html += '<option value="announcement"' + (state.campaignType === 'announcement' ? ' selected' : '') + '>Announcement (Important)</option>';
+    html += '</select></div>';
+
+    // Tag selection
+    html += '<div style="margin-bottom:0.75rem;"><label style="font-size:0.78rem;font-weight:600;color:var(--gray-500);display:block;margin-bottom:0.35rem;">Target Tags (empty = all patients)</label>';
+    html += '<div class="tag-filter-bar">';
+    for (var j = 0; j < tags.length; j++) {
+      var isActive = state.campaignTags.indexOf(tags[j].id) !== -1;
+      html += '<span class="tag-chip campaign-tag-chip' + (isActive ? ' active' : '') + '" data-tag-id="' + tags[j].id + '" style="' + (isActive ? 'background:' + tags[j].color + ';border-color:' + tags[j].color + ';' : '') + '">' + Utils.escapeHtml(tags[j].name) + '</span>';
+    }
+    html += '</div></div>';
+
+    // Count of targeted patients
+    var patients = Store.getPatients();
+    var targetCount = 0;
+    for (var ci = 0; ci < patients.length; ci++) {
+      if (patients[ci].status !== 'active') continue;
+      if (state.campaignTags.length === 0) { targetCount++; continue; }
+      for (var ct = 0; ct < state.campaignTags.length; ct++) {
+        if (patients[ci].tags && patients[ci].tags.indexOf(state.campaignTags[ct]) !== -1) {
+          targetCount++;
+          break;
+        }
+      }
+    }
+    html += '<div class="form-hint" style="margin-bottom:0.75rem;">Targeting <strong>' + targetCount + '</strong> patient' + (targetCount !== 1 ? 's' : '') + '</div>';
+
+    // Message text
+    html += '<div class="form-group"><label>Message</label>';
+    html += '<textarea id="campaign-text" rows="4" placeholder="Type your campaign message...">' + Utils.escapeHtml(state.campaignText) + '</textarea></div>';
+
+    // Send button
+    html += '<button class="btn btn-primary" id="send-campaign-btn" style="width:100%;">Send Campaign to ' + targetCount + ' Patient' + (targetCount !== 1 ? 's' : '') + '</button>';
+    html += '</div></div>';
+    html += '</div>';
+
+    // Right column - Campaign History
+    html += '<div>';
+    html += '<div class="card mb-2"><div class="card-header"><h3>Sent Campaigns</h3></div><div class="card-body">';
+    if (!state.campaignHistoryLoaded) {
+      html += '<div class="empty-state"><p>Loading campaigns...</p></div>';
+    } else if (state.campaignHistory.length === 0) {
+      html += '<div class="empty-state"><p>No campaigns sent yet</p></div>';
+    } else {
+      for (var hi = 0; hi < state.campaignHistory.length; hi++) {
+        var msg = state.campaignHistory[hi];
+        var tagNames = [];
+        if (msg.targetTags && msg.targetTags.length > 0) {
+          for (var tn = 0; tn < msg.targetTags.length; tn++) {
+            var tag = Store.getTag(msg.targetTags[tn]);
+            tagNames.push(tag ? tag.name : msg.targetTags[tn]);
+          }
+        }
+        html += '<div style="padding:0.75rem;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:0.5rem;">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem;">';
+        html += '<span class="badge ' + (msg.type === 'announcement' ? 'badge-warning' : 'badge-teal') + '">' + Utils.escapeHtml(msg.type || 'campaign') + '</span>';
+        html += '<span style="font-size:0.75rem;color:var(--gray-500);">' + Utils.timeAgo(msg.sentAt) + '</span>';
+        html += '</div>';
+        html += '<div style="font-size:0.88rem;margin-bottom:0.35rem;">' + Utils.escapeHtml(msg.text) + '</div>';
+        html += '<div style="font-size:0.75rem;color:var(--gray-500);">By ' + Utils.escapeHtml(msg.sentBy || 'Unknown');
+        if (tagNames.length > 0) {
+          html += ' &middot; Tags: ' + Utils.escapeHtml(tagNames.join(', '));
+        } else {
+          html += ' &middot; All patients';
+        }
+        html += '</div></div>';
+      }
+    }
+    html += '</div></div>';
+    html += '</div>';
+
+    html += '</div>'; // end messaging-grid
+    return html;
+  }
+
+  function loadCampaignHistory(container) {
+    if (!window.FirebaseSync || !FirebaseSync.getDb()) {
+      state.campaignHistoryLoaded = true;
+      return;
+    }
+    var db = FirebaseSync.getDb();
+    var clinicId = FirebaseSync.getClinicId();
+    db.collection('clinics').doc(clinicId).collection('patient_messages')
+      .orderBy('sentAt', 'desc').limit(20).get()
+      .then(function(snapshot) {
+        state.campaignHistory = [];
+        snapshot.forEach(function(doc) {
+          state.campaignHistory.push(doc.data());
+        });
+        state.campaignHistoryLoaded = true;
+        renderView(container);
+      }).catch(function(e) {
+        console.error('[Messaging] Failed to load campaigns:', e);
+        state.campaignHistoryLoaded = true;
+        renderView(container);
+      });
+  }
+
   // ==================== HISTORY TAB ====================
   function renderHistory() {
     var log = Store.getMessageLog();
@@ -319,6 +471,11 @@ window.MessagingView = (function() {
         state.templateSubView = 'list';
         state.templateEditId = null;
         state.historyPage = 1;
+        if (state.tab === 'campaigns' && !state.campaignHistoryLoaded) {
+          renderView(container);
+          loadCampaignHistory(container);
+          return;
+        }
         renderView(container);
         return;
       }
@@ -331,8 +488,28 @@ window.MessagingView = (function() {
         return;
       }
 
-      // Tag chip toggle
-      var tagChip = e.target.closest('.tag-chip');
+      // Campaign tag chip toggle
+      var campaignTagChip = e.target.closest('.campaign-tag-chip');
+      if (campaignTagChip) {
+        var cTagId = campaignTagChip.getAttribute('data-tag-id');
+        var cIdx = state.campaignTags.indexOf(cTagId);
+        if (cIdx !== -1) {
+          state.campaignTags.splice(cIdx, 1);
+        } else {
+          state.campaignTags.push(cTagId);
+        }
+        renderView(container);
+        return;
+      }
+
+      // Send campaign
+      if (e.target.closest('#send-campaign-btn')) {
+        sendCampaign(container);
+        return;
+      }
+
+      // Tag chip toggle (compose tab)
+      var tagChip = e.target.closest('.tag-chip:not(.campaign-tag-chip)');
       if (tagChip) {
         var tagId = tagChip.getAttribute('data-tag-id');
         var idx = state.selectedTags.indexOf(tagId);
@@ -362,9 +539,9 @@ window.MessagingView = (function() {
         return;
       }
 
-      // Send WhatsApp
-      if (e.target.closest('#send-whatsapp-btn')) {
-        sendWhatsApp(container);
+      // Send message (compose)
+      if (e.target.closest('#send-compose-btn')) {
+        sendCompose(container);
         return;
       }
 
@@ -480,6 +657,40 @@ window.MessagingView = (function() {
       });
     }
 
+    // Campaign type selector
+    var campaignType = document.getElementById('campaign-type');
+    if (campaignType) {
+      campaignType.addEventListener('change', function() {
+        state.campaignType = this.value;
+      });
+    }
+
+    // Campaign textarea
+    var campaignText = document.getElementById('campaign-text');
+    if (campaignText) {
+      campaignText.addEventListener('input', function() {
+        state.campaignText = this.value;
+      });
+    }
+
+    // Channel checkboxes
+    var chWA = document.getElementById('channel-whatsapp');
+    if (chWA) {
+      chWA.addEventListener('change', function() {
+        state.sendViaWhatsApp = this.checked;
+        if (!state.sendViaWhatsApp && !state.sendViaApp) state.sendViaApp = true;
+        renderView(container);
+      });
+    }
+    var chApp = document.getElementById('channel-app');
+    if (chApp) {
+      chApp.addEventListener('change', function() {
+        state.sendViaApp = this.checked;
+        if (!state.sendViaWhatsApp && !state.sendViaApp) state.sendViaWhatsApp = true;
+        renderView(container);
+      });
+    }
+
     // Message textarea
     var msgText = document.getElementById('message-text');
     if (msgText) {
@@ -516,7 +727,7 @@ window.MessagingView = (function() {
     return phone.length >= 7;
   }
 
-  function sendWhatsApp(container) {
+  function sendCompose(container) {
     if (state.selectedPatients.length === 0) {
       Utils.toast('Please select at least one patient', 'error');
       return;
@@ -526,65 +737,128 @@ window.MessagingView = (function() {
       return;
     }
 
-    var patients = [];
-    var skipped = [];
+    // Collect all selected patients
+    var allPatients = [];
     for (var i = 0; i < state.selectedPatients.length; i++) {
       var p = Store.getPatient(state.selectedPatients[i]);
-      if (p) {
-        if (hasValidPhone(p)) {
-          patients.push(p);
-        } else {
-          skipped.push(p.name);
-        }
-      }
+      if (p) allPatients.push(p);
     }
 
-    if (skipped.length > 0) {
-      Utils.toast(skipped.length + ' patient(s) skipped (no valid phone): ' + skipped.slice(0, 3).join(', ') + (skipped.length > 3 ? '...' : ''), 'warning');
-    }
-
-    if (patients.length === 0) {
-      Utils.toast('No patients with valid phone numbers', 'error');
-      return;
-    }
-
-    if (patients.length === 1) {
-      // Single patient - open directly
-      var pt = patients[0];
-      var msg = resolveVariables(state.messageText, pt);
-      var phone = cleanPhone(pt.phone);
-      var pCode = (pt.phoneCode || Utils.getPhoneCode()).replace('+', '');
-      var url = 'https://wa.me/' + pCode + phone + '?text=' + encodeURIComponent(msg);
-      window.open(url, '_blank');
-
-      Store.createMessageLog({
-        patientId: pt.id,
-        patientName: pt.name,
-        phone: pt.phone,
-        message: msg
-      });
-      Store.logActivity('WhatsApp message sent to ' + pt.name);
-      Utils.toast('Opening WhatsApp for ' + pt.name, 'success');
-    } else {
-      // Multiple patients - show links inline
-      var links = [];
-      for (var j = 0; j < patients.length; j++) {
-        var p2 = patients[j];
-        var msg2 = resolveVariables(state.messageText, p2);
-        var phone2 = cleanPhone(p2.phone);
-        var pCode2 = (p2.phoneCode || Utils.getPhoneCode()).replace('+', '');
-        var url2 = 'https://wa.me/' + pCode2 + phone2 + '?text=' + encodeURIComponent(msg2);
-        links.push({
-          id: p2.id,
-          name: p2.name,
-          phone: p2.phone || '',
-          url: url2,
-          message: msg2
+    // Send via Mobile App
+    if (state.sendViaApp) {
+      if (!window.FirebaseSync || !FirebaseSync.saveCampaignMessage) {
+        Utils.toast('Firebase not available - app message not sent', 'error');
+      } else {
+        var currentUser = null;
+        try { currentUser = JSON.parse(sessionStorage.getItem('physio_user')); } catch(e) {}
+        var appMsg = {
+          id: 'msg_' + Date.now(),
+          text: state.messageText.trim(),
+          targetPatients: state.selectedPatients.slice(),
+          targetTags: [],
+          sentBy: (currentUser && currentUser.name) || 'Unknown',
+          sentAt: new Date().toISOString(),
+          type: 'message'
+        };
+        FirebaseSync.saveCampaignMessage(null, appMsg).then(function() {
+          Utils.toast('Message sent to app (' + allPatients.length + ' patients)', 'success');
+          Store.logActivity('App message sent to ' + allPatients.length + ' patient(s)');
+        }).catch(function() {
+          Utils.toast('Failed to send app message', 'error');
         });
       }
-      state.waLinks = links;
-      renderView(container);
     }
+
+    // Send via WhatsApp
+    if (state.sendViaWhatsApp) {
+      var patients = [];
+      var skipped = [];
+      for (var wi = 0; wi < allPatients.length; wi++) {
+        if (hasValidPhone(allPatients[wi])) {
+          patients.push(allPatients[wi]);
+        } else {
+          skipped.push(allPatients[wi].name);
+        }
+      }
+
+      if (skipped.length > 0) {
+        Utils.toast(skipped.length + ' patient(s) skipped for WhatsApp (no valid phone): ' + skipped.slice(0, 3).join(', ') + (skipped.length > 3 ? '...' : ''), 'warning');
+      }
+
+      if (patients.length === 0 && state.sendViaWhatsApp) {
+        if (!state.sendViaApp) {
+          Utils.toast('No patients with valid phone numbers', 'error');
+        }
+        return;
+      }
+
+      if (patients.length === 1) {
+        var pt = patients[0];
+        var msg = resolveVariables(state.messageText, pt);
+        var phone = cleanPhone(pt.phone);
+        var pCode = (pt.phoneCode || Utils.getPhoneCode()).replace('+', '');
+        var url = 'https://wa.me/' + pCode + phone + '?text=' + encodeURIComponent(msg);
+        window.open(url, '_blank');
+
+        Store.createMessageLog({
+          patientId: pt.id,
+          patientName: pt.name,
+          phone: pt.phone,
+          message: msg
+        });
+        Store.logActivity('WhatsApp message sent to ' + pt.name);
+        Utils.toast('Opening WhatsApp for ' + pt.name, 'success');
+      } else if (patients.length > 1) {
+        var links = [];
+        for (var j = 0; j < patients.length; j++) {
+          var p2 = patients[j];
+          var msg2 = resolveVariables(state.messageText, p2);
+          var phone2 = cleanPhone(p2.phone);
+          var pCode2 = (p2.phoneCode || Utils.getPhoneCode()).replace('+', '');
+          var url2 = 'https://wa.me/' + pCode2 + phone2 + '?text=' + encodeURIComponent(msg2);
+          links.push({
+            id: p2.id,
+            name: p2.name,
+            phone: p2.phone || '',
+            url: url2,
+            message: msg2
+          });
+        }
+        state.waLinks = links;
+        renderView(container);
+      }
+    }
+  }
+
+  function sendCampaign(container) {
+    if (!state.campaignText.trim()) {
+      Utils.toast('Please enter a message', 'error');
+      return;
+    }
+    if (!window.FirebaseSync || !FirebaseSync.saveCampaignMessage) {
+      Utils.toast('Firebase not available', 'error');
+      return;
+    }
+    var currentUser = null;
+    try { currentUser = JSON.parse(sessionStorage.getItem('physio_user')); } catch(e) {}
+    var message = {
+      id: 'msg_' + Date.now(),
+      text: state.campaignText.trim(),
+      targetTags: state.campaignTags.slice(),
+      sentBy: (currentUser && currentUser.name) || 'Unknown',
+      sentAt: new Date().toISOString(),
+      type: state.campaignType
+    };
+    FirebaseSync.saveCampaignMessage(null, message).then(function() {
+      Utils.toast('Campaign message sent!', 'success');
+      Store.logActivity('Campaign message sent to ' + (state.campaignTags.length > 0 ? state.campaignTags.length + ' tag groups' : 'all patients'));
+      state.campaignText = '';
+      state.campaignTags = [];
+      state.campaignHistoryLoaded = false;
+      loadCampaignHistory(container);
+    }).catch(function() {
+      Utils.toast('Failed to send campaign', 'error');
+    });
   }
 
   function saveTemplate(container) {

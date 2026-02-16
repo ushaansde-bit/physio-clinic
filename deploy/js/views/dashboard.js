@@ -72,6 +72,41 @@ window.DashboardView = (function() {
       '<polyline points="20 6 9 17 4 12"/>', 'stat-completed-week');
     html += '</div>';
 
+    // Tomorrow's reminders
+    var tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    var tomorrowStr = tomorrow.getFullYear() + '-' + ('0' + (tomorrow.getMonth()+1)).slice(-2) + '-' + ('0' + tomorrow.getDate()).slice(-2);
+    var allAppts = appointments;
+    var tomorrowAppts = [];
+    for (var ta = 0; ta < allAppts.length; ta++) {
+      if (allAppts[ta].date === tomorrowStr && allAppts[ta].status === 'scheduled') {
+        tomorrowAppts.push(allAppts[ta]);
+      }
+    }
+
+    if (tomorrowAppts.length > 0) {
+      var reminderLog = JSON.parse(localStorage.getItem(Store.KEY('reminders_sent')) || '[]');
+      var alreadySent = false;
+      for (var rl = 0; rl < reminderLog.length; rl++) {
+        if (reminderLog[rl].date === tomorrowStr) { alreadySent = true; break; }
+      }
+
+      html += '<div class="card mb-2" style="border-left:4px solid var(--success);">';
+      html += '<div class="card-body">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;">';
+      html += '<div>';
+      html += '<div style="font-weight:700;font-size:0.95em;">Tomorrow\'s Reminders</div>';
+      html += '<div style="font-size:0.82em;color:var(--text-secondary);">' + tomorrowAppts.length + ' appointment' + (tomorrowAppts.length !== 1 ? 's' : '') + ' scheduled</div>';
+      html += '</div>';
+      if (alreadySent) {
+        html += '<span class="badge badge-success">Reminders Sent \u2713</span>';
+      } else {
+        html += '<button class="btn btn-sm btn-primary" id="send-reminders-btn">Send Reminders</button>';
+      }
+      html += '</div>';
+      html += '</div></div>';
+    }
+
     // Main grid
     html += '<div class="dashboard-grid">';
 
@@ -147,6 +182,54 @@ window.DashboardView = (function() {
     // Fix: remove old handler before adding new one
     if (_clickHandler) container.removeEventListener('click', _clickHandler);
     _clickHandler = function(e) {
+      // Send reminders button
+      if (e.target.id === 'send-reminders-btn') {
+        var clinicName = (Store.getClinicSettings().name) || 'our clinic';
+        var reminderAppts = tomorrowAppts;
+        var sentCount = 0;
+        var links = [];
+
+        for (var s = 0; s < reminderAppts.length; s++) {
+          var ra = reminderAppts[s];
+          var patient = Store.getPatient(ra.patientId);
+          if (!patient || !patient.phone) continue;
+          var phone = patient.phone.replace(/[^\d]/g, '');
+          if (phone.length < 7) continue;
+          var pCode = (patient.phoneCode || Utils.getPhoneCode()).replace('+', '');
+          var timeStr = Utils.formatTime(ra.time);
+          var msg = 'Hi ' + patient.name + ', this is a reminder of your appointment tomorrow at ' + timeStr + ' at ' + clinicName + '. See you there!';
+          var url = 'https://wa.me/' + pCode + phone + '?text=' + encodeURIComponent(msg);
+          links.push(url);
+          sentCount++;
+        }
+
+        if (sentCount === 0) {
+          Utils.toast('No patients with valid phone numbers', 'warning');
+          return;
+        }
+
+        // Open WhatsApp links with staggered timing
+        for (var w = 0; w < links.length; w++) {
+          (function(link, delay) {
+            setTimeout(function() {
+              window.open(link, '_blank');
+            }, delay);
+          })(links[w], w * 600);
+        }
+
+        Utils.toast('Sending ' + sentCount + ' reminder' + (sentCount !== 1 ? 's' : '') + '...', 'success');
+
+        // Log sent reminders
+        var logKey = Store.KEY('reminders_sent');
+        var log = JSON.parse(localStorage.getItem(logKey) || '[]');
+        log.push({ date: tomorrowStr, sentAt: new Date().toISOString(), count: sentCount });
+        localStorage.setItem(logKey, JSON.stringify(log));
+
+        // Update button to show sent state
+        e.target.outerHTML = '<span class="badge badge-success">Reminders Sent \u2713</span>';
+        return;
+      }
+
       var card = e.target.closest('.stat-card.clickable');
       if (!card) return;
       var id = card.id;

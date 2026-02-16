@@ -5,6 +5,16 @@ window.AppointmentsView = (function() {
 
   var _clickHandler = null;
 
+  // Date helpers for recurring appointments
+  function addDaysStr(dateStr, days) {
+    var d = new Date(dateStr + 'T00:00:00');
+    d.setDate(d.getDate() + days);
+    return d.getFullYear() + '-' + ('0' + (d.getMonth()+1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  }
+  function getDayOfWeek(dateStr) {
+    return new Date(dateStr + 'T00:00:00').getDay(); // 0=Sun, 1=Mon, ...
+  }
+
   var state = {
     view: 'list',       // list | month | week
     subView: 'list',    // list | form | detail
@@ -95,6 +105,7 @@ window.AppointmentsView = (function() {
       html += '<option value="Follow-up"' + (state.typeFilter === 'Follow-up' ? ' selected' : '') + '>Follow-up</option>';
       html += '</select>';
     }
+    html += '<button class="btn btn-sm btn-secondary" id="export-appts-btn"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export</button>';
     html += '<button class="btn btn-primary" id="add-appt-btn">';
     html += '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
     html += 'New Appointment</button>';
@@ -429,6 +440,24 @@ window.AppointmentsView = (function() {
     }
     html += '</select></div>';
     html += '</div>';
+    if (!appt) {
+      html += '<div class="form-row">';
+      html += '<div class="form-group"><label>Repeat</label>';
+      html += '<select id="appt-repeat" style="width:100%;">';
+      html += '<option value="none">No repeat</option>';
+      html += '<option value="weekly">Weekly</option>';
+      html += '<option value="2x">2x per week (Mon, Thu)</option>';
+      html += '<option value="3x">3x per week (Mon, Wed, Fri)</option>';
+      html += '</select></div>';
+      html += '<div class="form-group" id="repeat-weeks-group" style="display:none;">';
+      html += '<label>For how many weeks?</label>';
+      html += '<select id="appt-repeat-weeks" style="width:100%;">';
+      for (var w = 2; w <= 12; w++) {
+        html += '<option value="' + w + '">' + w + ' weeks</option>';
+      }
+      html += '</select></div>';
+      html += '</div>';
+    }
     html += '<div class="form-group"><label>Notes ' + Utils.micHtml('af-notes') + '</label>';
     html += '<textarea name="notes" id="af-notes" rows="3">' + Utils.escapeHtml(defaultNotes || '') + '</textarea></div>';
     html += '<div id="conflict-warning" style="display:none;" class="login-error"></div>';
@@ -474,6 +503,17 @@ window.AppointmentsView = (function() {
     if (timeInput) timeInput.addEventListener('change', _resetWarnings);
     if (patientInput) patientInput.addEventListener('change', _resetWarnings);
     if (durationInput) durationInput.addEventListener('change', _resetWarnings);
+
+    // Show/hide repeat weeks dropdown
+    var repeatSelect = document.getElementById('appt-repeat');
+    if (repeatSelect) {
+      repeatSelect.addEventListener('change', function() {
+        var weeksGroup = document.getElementById('repeat-weeks-group');
+        if (weeksGroup) {
+          weeksGroup.style.display = this.value !== 'none' ? '' : 'none';
+        }
+      });
+    }
 
     document.getElementById('appt-form-save').onclick = function() {
       var form = document.getElementById('appt-form');
@@ -557,8 +597,67 @@ window.AppointmentsView = (function() {
         Store.updateAppointment(appt.id, data);
         Utils.toast('Appointment updated', 'success');
       } else {
-        Store.createAppointment(data);
-        Utils.toast('Appointment booked', 'success');
+        // Check for recurring appointments
+        var repeatSel = document.getElementById('appt-repeat');
+        var repeatVal = repeatSel ? repeatSel.value : 'none';
+        var repeatWeeksSel = document.getElementById('appt-repeat-weeks');
+        var repeatWeeks = repeatWeeksSel ? parseInt(repeatWeeksSel.value, 10) : 2;
+
+        if (repeatVal !== 'none') {
+          var dates = [];
+          var baseDate = data.date;
+          if (repeatVal === 'weekly') {
+            for (var rw = 0; rw < repeatWeeks; rw++) {
+              dates.push(addDaysStr(baseDate, rw * 7));
+            }
+          } else if (repeatVal === '2x') {
+            // Mon=1, Thu=4
+            var baseDow2 = getDayOfWeek(baseDate);
+            // Find next Monday from base date
+            var daysToMon = (1 - baseDow2 + 7) % 7;
+            if (daysToMon === 0 && baseDow2 !== 1) daysToMon = 7;
+            var firstMon = baseDow2 === 1 ? baseDate : addDaysStr(baseDate, daysToMon);
+            for (var rw2 = 0; rw2 < repeatWeeks; rw2++) {
+              var mon = addDaysStr(firstMon, rw2 * 7);
+              var thu = addDaysStr(mon, 3); // Mon + 3 = Thu
+              dates.push(mon);
+              dates.push(thu);
+            }
+          } else if (repeatVal === '3x') {
+            // Mon=1, Wed=3, Fri=5
+            var baseDow3 = getDayOfWeek(baseDate);
+            var daysToMon3 = (1 - baseDow3 + 7) % 7;
+            if (daysToMon3 === 0 && baseDow3 !== 1) daysToMon3 = 7;
+            var firstMon3 = baseDow3 === 1 ? baseDate : addDaysStr(baseDate, daysToMon3);
+            for (var rw3 = 0; rw3 < repeatWeeks; rw3++) {
+              var mon3 = addDaysStr(firstMon3, rw3 * 7);
+              var wed3 = addDaysStr(mon3, 2); // Mon + 2 = Wed
+              var fri3 = addDaysStr(mon3, 4); // Mon + 4 = Fri
+              dates.push(mon3);
+              dates.push(wed3);
+              dates.push(fri3);
+            }
+          }
+          // Sort dates and create appointments
+          dates.sort();
+          for (var ri = 0; ri < dates.length; ri++) {
+            var recurData = {
+              patientId: data.patientId,
+              patientName: data.patientName,
+              date: dates[ri],
+              time: data.time,
+              type: data.type,
+              duration: data.duration,
+              status: 'scheduled',
+              notes: data.notes || ''
+            };
+            Store.createAppointment(recurData);
+          }
+          Utils.toast('Created ' + dates.length + ' appointments', 'success');
+        } else {
+          Store.createAppointment(data);
+          Utils.toast('Appointment booked', 'success');
+        }
       }
       _duplicateConfirmed = false;
       goBackToList(container);
@@ -657,6 +756,28 @@ window.AppointmentsView = (function() {
     };
   }
 
+  // ==================== EXPORT ====================
+  function exportAppointments() {
+    var appts = Store.getAppointments();
+    var headers = ['Date', 'Time', 'Patient', 'Type', 'Duration', 'Status'];
+    var data = [];
+    for (var i = 0; i < appts.length; i++) {
+      var a = appts[i];
+      data.push([
+        a.date || '',
+        a.time || '',
+        a.patientName || '',
+        a.type || '',
+        (a.duration || '') + ' min',
+        a.status || ''
+      ]);
+    }
+    var ws = XLSX.utils.aoa_to_sheet([headers].concat(data));
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+    XLSX.writeFile(wb, 'appointments.xlsx');
+  }
+
   // ==================== HELPERS ====================
   function goBackToList(container) {
     state.subView = 'list';
@@ -739,6 +860,12 @@ window.AppointmentsView = (function() {
         state.prefillTime = '';
         state.rescheduleFrom = null;
         renderView(container);
+        return;
+      }
+
+      // Export appointments
+      if (e.target.closest('#export-appts-btn')) {
+        exportAppointments();
         return;
       }
 

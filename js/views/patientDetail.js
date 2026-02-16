@@ -7,12 +7,23 @@ window.PatientDetailView = (function() {
   var _clickHandler = null;
   var _sessionDateParam = null; // set via query param from "Start Session Note"
 
+  // Date helpers for recurring appointments
+  function addDaysStr(dateStr, days) {
+    var d = new Date(dateStr + 'T00:00:00');
+    d.setDate(d.getDate() + days);
+    return d.getFullYear() + '-' + ('0' + (d.getMonth()+1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  }
+  function getDayOfWeek(dateStr) {
+    return new Date(dateStr + 'T00:00:00').getDay(); // 0=Sun, 1=Mon, ...
+  }
+
   // Sub-view state for inline forms
   var sub = {
     sessionsView: 'list',    // list | form
     sessionsEditId: null,
-    exercisesView: 'list',   // list | form
+    exercisesView: 'list',   // list | form | library
     exercisesEditId: null,
+    exerciseLibraryFilter: 'all',
     rxView: 'list',          // list | form
     rxEditId: null,
     billingView: 'list',     // list | form | detail
@@ -31,6 +42,7 @@ window.PatientDetailView = (function() {
     sub.sessionsEditId = null;
     sub.exercisesView = 'list';
     sub.exercisesEditId = null;
+    sub.exerciseLibraryFilter = 'all';
     sub.rxView = 'list';
     sub.rxEditId = null;
     sub.billingView = 'list';
@@ -158,6 +170,12 @@ window.PatientDetailView = (function() {
     container.innerHTML = html;
     bindEvents(container, patient);
     bindInlineForms(container, patient);
+
+    // Start exercise animations if on HEP tab
+    if (typeof ExerciseLibrary !== 'undefined' && (activeTab === 'exercises' || sub.exercisesView === 'library')) {
+      ExerciseLibrary.setGender(patient.gender || 'neutral');
+      setTimeout(function() { ExerciseLibrary.startAnimations(); }, 50);
+    }
   }
 
   function tabBtn(id, label) {
@@ -338,6 +356,24 @@ window.PatientDetailView = (function() {
     }
     html += '</select></div>';
     html += '</div>';
+    if (!appt) {
+      html += '<div class="form-row">';
+      html += '<div class="form-group"><label>Repeat</label>';
+      html += '<select id="appt-repeat" style="width:100%;">';
+      html += '<option value="none">No repeat</option>';
+      html += '<option value="weekly">Weekly</option>';
+      html += '<option value="2x">2x per week (Mon, Thu)</option>';
+      html += '<option value="3x">3x per week (Mon, Wed, Fri)</option>';
+      html += '</select></div>';
+      html += '<div class="form-group" id="repeat-weeks-group" style="display:none;">';
+      html += '<label>For how many weeks?</label>';
+      html += '<select id="appt-repeat-weeks" style="width:100%;">';
+      for (var rw = 2; rw <= 12; rw++) {
+        html += '<option value="' + rw + '">' + rw + ' weeks</option>';
+      }
+      html += '</select></div>';
+      html += '</div>';
+    }
     html += '<div class="form-group"><label>Notes</label>';
     html += '<textarea name="notes" rows="2">' + Utils.escapeHtml(defaultNotes || '') + '</textarea></div>';
     html += '<div id="appt-warning" style="display:none;" class="login-error"></div>';
@@ -505,6 +541,58 @@ window.PatientDetailView = (function() {
     html += '<button class="btn btn-primary btn-sm" id="add-session-btn">Add Diagnosis & Treatment</button>';
     html += '</div>';
 
+    // Progress chart (show if 2+ sessions with scores)
+    var chartSessions = sessions.slice().reverse(); // chronological order
+    var hasScores = false;
+    for (var cs = 0; cs < chartSessions.length; cs++) {
+      if (chartSessions[cs].painScore !== undefined || chartSessions[cs].functionScore !== undefined) { hasScores = true; break; }
+    }
+    if (hasScores && chartSessions.length >= 2) {
+      html += '<div class="card mb-2"><div class="card-body">';
+      html += '<div style="font-weight:700;font-size:0.88em;margin-bottom:8px;">Progress Chart</div>';
+      html += '<div style="display:flex;gap:16px;margin-bottom:6px;font-size:0.72em;">';
+      html += '<span><span style="display:inline-block;width:10px;height:10px;background:var(--danger);border-radius:50%;vertical-align:-1px;margin-right:3px;"></span>Pain</span>';
+      html += '<span><span style="display:inline-block;width:10px;height:10px;background:var(--success);border-radius:50%;vertical-align:-1px;margin-right:3px;"></span>Function</span>';
+      html += '</div>';
+      // SVG line chart
+      var cw = 100; // viewbox percentage width
+      var ch = 80;
+      var maxPts = Math.min(chartSessions.length, 20);
+      var pts = chartSessions.slice(-maxPts);
+      var stepX = pts.length > 1 ? cw / (pts.length - 1) : cw;
+      var painPts = '';
+      var funcPts = '';
+      for (var cp = 0; cp < pts.length; cp++) {
+        var px = Math.round(cp * stepX);
+        var painY = Math.round(ch - ((pts[cp].painScore || 0) / 10) * ch);
+        var funcY = Math.round(ch - ((pts[cp].functionScore || 0) / 10) * ch);
+        painPts += px + ',' + painY + ' ';
+        funcPts += px + ',' + funcY + ' ';
+      }
+      html += '<svg viewBox="-2 -5 104 90" style="width:100%;height:120px;" preserveAspectRatio="none">';
+      // Grid lines
+      for (var gl = 0; gl <= 10; gl += 5) {
+        var gy = Math.round(ch - (gl / 10) * ch);
+        html += '<line x1="0" y1="' + gy + '" x2="100" y2="' + gy + '" stroke="#e5e7eb" stroke-width="0.5" stroke-dasharray="2,2"/>';
+        html += '<text x="-1" y="' + (gy + 2) + '" font-size="4" fill="#9ca3af" text-anchor="end">' + gl + '</text>';
+      }
+      html += '<polyline points="' + painPts.trim() + '" fill="none" stroke="#ef4444" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>';
+      html += '<polyline points="' + funcPts.trim() + '" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>';
+      // Dots
+      for (var dp = 0; dp < pts.length; dp++) {
+        var dx = Math.round(dp * stepX);
+        html += '<circle cx="' + dx + '" cy="' + Math.round(ch - ((pts[dp].painScore || 0) / 10) * ch) + '" r="2" fill="#ef4444"/>';
+        html += '<circle cx="' + dx + '" cy="' + Math.round(ch - ((pts[dp].functionScore || 0) / 10) * ch) + '" r="2" fill="#22c55e"/>';
+      }
+      html += '</svg>';
+      // Date labels
+      html += '<div style="display:flex;justify-content:space-between;font-size:0.65em;color:var(--text-secondary);">';
+      html += '<span>' + Utils.formatDate(pts[0].date) + '</span>';
+      html += '<span>' + Utils.formatDate(pts[pts.length - 1].date) + '</span>';
+      html += '</div>';
+      html += '</div></div>';
+    }
+
     if (sessions.length === 0) {
       html += '<div class="empty-state"><p>No records yet</p><p class="empty-sub">Click "Add Diagnosis & Treatment" to create the first record.</p></div>';
     } else {
@@ -596,6 +684,9 @@ window.PatientDetailView = (function() {
     if (sub.exercisesView === 'form') {
       return renderExerciseForm(patient);
     }
+    if (sub.exercisesView === 'library') {
+      return renderExerciseLibrary(patient);
+    }
 
     var exercises = Store.getExercisesByPatient(patient.id);
 
@@ -605,6 +696,9 @@ window.PatientDetailView = (function() {
     html += '<button class="btn btn-secondary btn-sm" id="print-exercises-btn">';
     html += '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>';
     html += ' Print</button>';
+    html += '<button class="btn btn-secondary btn-sm" id="assign-library-btn">';
+    html += '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>';
+    html += ' Assign from Library</button>';
     html += '<button class="btn btn-primary btn-sm" id="add-exercise-btn">Add Exercise</button>';
     html += '</div></div>';
 
@@ -662,6 +756,12 @@ window.PatientDetailView = (function() {
     html += '</div>';
     html += '<div class="form-group"><label>Instructions ' + Utils.micHtml('ef-instructions') + '</label>';
     html += '<textarea id="ef-instructions" name="instructions" rows="4" placeholder="Step-by-step instructions for the patient...">' + Utils.escapeHtml(exercise ? exercise.instructions || '' : '') + '</textarea></div>';
+    html += '<div class="form-row">';
+    html += '<div class="form-group"><label>Photo URL (optional)</label>';
+    html += '<input type="text" name="imageUrl" value="' + Utils.escapeHtml(exercise ? exercise.imageUrl || '' : '') + '" placeholder="https://example.com/photo.jpg"></div>';
+    html += '<div class="form-group"><label>Video URL (optional)</label>';
+    html += '<input type="text" name="videoUrl" value="' + Utils.escapeHtml(exercise ? exercise.videoUrl || '' : '') + '" placeholder="https://youtube.com/watch?v=..."></div>';
+    html += '</div>';
     html += '</form>';
     html += '</div>';
     html += '<div class="inline-form-actions">';
@@ -671,10 +771,113 @@ window.PatientDetailView = (function() {
     return html;
   }
 
+  function renderExerciseLibrary(patient) {
+    var bodyParts = typeof ExerciseLibrary !== 'undefined' ? ExerciseLibrary.getBodyParts() : [];
+    var filter = sub.exerciseLibraryFilter || 'all';
+    var libExercises = [];
+    if (typeof ExerciseLibrary !== 'undefined') {
+      libExercises = filter === 'all' ? ExerciseLibrary.getAll() : ExerciseLibrary.getByBodyPart(filter);
+    }
+
+    // Check which library exercises are already assigned
+    var existingExercises = Store.getExercisesByPatient(patient.id);
+    var assignedLibIds = {};
+    for (var a = 0; a < existingExercises.length; a++) {
+      if (existingExercises[a].libraryId) {
+        assignedLibIds[existingExercises[a].libraryId] = true;
+      }
+    }
+
+    var html = '<div class="inline-form-card">';
+    html += '<div class="inline-form-header">';
+    html += '<button class="back-btn" id="library-picker-back">';
+    html += '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>';
+    html += '</button>';
+    html += '<h3>Assign from Library</h3>';
+    html += '</div>';
+    html += '<div class="inline-form-body">';
+
+    // Filter buttons
+    html += '<div style="margin-bottom:0.75rem;display:flex;flex-wrap:wrap;gap:0.35rem;">';
+    html += '<button class="btn btn-sm library-filter-btn' + (filter === 'all' ? ' btn-primary' : ' btn-secondary') + '" data-filter="all">All</button>';
+    for (var bp = 0; bp < bodyParts.length; bp++) {
+      var active = filter === bodyParts[bp].id;
+      html += '<button class="btn btn-sm library-filter-btn' + (active ? ' btn-primary' : ' btn-secondary') + '" data-filter="' + bodyParts[bp].id + '">' + bodyParts[bp].name + '</button>';
+    }
+    html += '</div>';
+
+    // Exercise list with checkboxes
+    if (libExercises.length === 0) {
+      html += '<div class="empty-state"><p>No exercises found</p></div>';
+    } else {
+      html += '<div style="max-height:500px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;">';
+      for (var le = 0; le < libExercises.length; le++) {
+        var lex = libExercises[le];
+        var alreadyAssigned = assignedLibIds[lex.id] || false;
+        var details = lex.defaultSets + 'x' + lex.defaultReps;
+        if (lex.holdSeconds) details += ', ' + lex.holdSeconds + 's hold';
+        html += '<label style="display:flex;align-items:center;padding:0.5rem 0.75rem;border-bottom:1px solid var(--border);cursor:pointer;gap:0.5rem;' + (alreadyAssigned ? 'opacity:0.5;' : '') + '">';
+        html += '<input type="checkbox" class="library-exercise-cb" data-ex-id="' + lex.id + '"' + (alreadyAssigned ? ' disabled checked' : '') + ' style="width:18px;height:18px;flex-shrink:0;">';
+        // Animated SVG preview
+        html += '<div style="flex-shrink:0;width:50px;height:50px;background:var(--gray-50);border-radius:6px;display:flex;align-items:center;justify-content:center;overflow:hidden;">';
+        html += ExerciseLibrary.renderExerciseSVG(lex.id, 45);
+        html += '</div>';
+        html += '<div style="flex:1;min-width:0;">';
+        html += '<div style="font-size:0.9rem;font-weight:500;">' + Utils.escapeHtml(lex.name);
+        if (alreadyAssigned) html += ' <span style="font-size:0.75rem;color:var(--text-muted);">(assigned)</span>';
+        html += '</div>';
+        html += '<div style="font-size:0.8rem;color:var(--text-muted);">' + details + '</div>';
+        html += '</div>';
+        html += '</label>';
+      }
+      html += '</div>';
+    }
+
+    html += '</div>';
+    html += '<div class="inline-form-actions">';
+    html += '<button class="btn btn-secondary" id="library-picker-cancel">Cancel</button>';
+    html += '<button class="btn btn-primary" id="library-picker-assign">Assign Selected</button>';
+    html += '</div></div>';
+    return html;
+  }
+
   function exerciseCard(ex) {
-    var html = '<div class="exercise-card">';
-    html += '<div class="exercise-info">';
-    html += '<div class="exercise-name">' + Utils.escapeHtml(ex.name) + '</div>';
+    var html = '<div class="exercise-card" style="display:flex;align-items:center;gap:0.75rem;">';
+    // Find matching library exercise: by libraryId first, then by name
+    var matchedLibId = null;
+    if (typeof ExerciseLibrary !== 'undefined') {
+      if (ex.libraryId && ExerciseLibrary.getById(ex.libraryId)) {
+        matchedLibId = ex.libraryId;
+      } else {
+        // Try matching by name
+        var allLib = ExerciseLibrary.getAll();
+        var exNameLower = (ex.name || '').toLowerCase().trim();
+        for (var li = 0; li < allLib.length; li++) {
+          if (allLib[li].name.toLowerCase() === exNameLower) {
+            matchedLibId = allLib[li].id;
+            break;
+          }
+        }
+      }
+    }
+    // Custom image takes priority over SVG preview
+    if (ex.imageUrl) {
+      html += '<div style="flex-shrink:0;width:64px;height:64px;background:var(--gray-50);border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;">';
+      html += '<img src="' + Utils.escapeHtml(ex.imageUrl) + '" alt="' + Utils.escapeHtml(ex.name) + '" style="max-width:64px;max-height:64px;object-fit:cover;border-radius:8px;" onerror="this.style.display=\'none\'">';
+      html += '</div>';
+    } else if (matchedLibId) {
+      html += '<div style="flex-shrink:0;width:64px;height:64px;background:var(--gray-50);border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;">';
+      html += ExerciseLibrary.renderExerciseSVG(matchedLibId, 56);
+      html += '</div>';
+    }
+    html += '<div class="exercise-info" style="flex:1;min-width:0;">';
+    html += '<div class="exercise-name">' + Utils.escapeHtml(ex.name);
+    if (ex.videoUrl) {
+      html += ' <a href="' + Utils.escapeHtml(ex.videoUrl) + '" target="_blank" rel="noopener noreferrer" title="Watch video" style="display:inline-flex;align-items:center;vertical-align:middle;margin-left:0.35rem;color:var(--primary);text-decoration:none;">';
+      html += '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+      html += '</a>';
+    }
+    html += '</div>';
     html += '<div class="exercise-details">' + ex.sets + ' sets x ' + ex.reps + ' reps';
     if (ex.hold && ex.hold !== '-') html += ' | Hold: ' + ex.hold;
     if (ex.frequency) html += ' | ' + ex.frequency;
@@ -683,7 +886,7 @@ window.PatientDetailView = (function() {
       html += '<div class="exercise-instructions">' + Utils.escapeHtml(ex.instructions) + '</div>';
     }
     html += '</div>';
-    html += '<div class="exercise-actions">';
+    html += '<div class="exercise-actions" style="flex-shrink:0;">';
     html += '<button class="btn btn-sm btn-ghost edit-exercise-btn" data-id="' + ex.id + '">Edit</button>';
     html += '<button class="btn btn-sm btn-ghost delete-exercise-btn" data-id="' + ex.id + '" style="color:var(--danger);">Delete</button>';
     html += '</div></div>';
@@ -1422,6 +1625,18 @@ window.PatientDetailView = (function() {
         renderDetail(container, patient);
         return;
       }
+      if (e.target.closest('#assign-library-btn')) {
+        sub.exercisesView = 'library';
+        sub.exerciseLibraryFilter = 'all';
+        renderDetail(container, patient);
+        return;
+      }
+      var libFilterBtn = e.target.closest('.library-filter-btn');
+      if (libFilterBtn) {
+        sub.exerciseLibraryFilter = libFilterBtn.getAttribute('data-filter');
+        renderDetail(container, patient);
+        return;
+      }
       var editExBtn = e.target.closest('.edit-exercise-btn');
       if (editExBtn) {
         sub.exercisesView = 'form';
@@ -1585,6 +1800,45 @@ window.PatientDetailView = (function() {
       Utils.bindMicButtons(container);
     }
 
+    // Library picker
+    var libBack = document.getElementById('library-picker-back');
+    var libCancel = document.getElementById('library-picker-cancel');
+    var libAssign = document.getElementById('library-picker-assign');
+    if (libBack) libBack.onclick = function() { sub.exercisesView = 'list'; sub.exerciseLibraryFilter = 'all'; renderDetail(container, patient); };
+    if (libCancel) libCancel.onclick = function() { sub.exercisesView = 'list'; sub.exerciseLibraryFilter = 'all'; renderDetail(container, patient); };
+    if (libAssign) {
+      libAssign.onclick = function() {
+        var checkboxes = container.querySelectorAll('.library-exercise-cb:checked:not(:disabled)');
+        if (checkboxes.length === 0) {
+          Utils.toast('Select at least one exercise', 'error');
+          return;
+        }
+        var count = 0;
+        for (var ci = 0; ci < checkboxes.length; ci++) {
+          var exId = checkboxes[ci].getAttribute('data-ex-id');
+          var libEx = ExerciseLibrary.getById(exId);
+          if (libEx) {
+            Store.createExercise({
+              patientId: patient.id,
+              name: libEx.name,
+              sets: libEx.defaultSets + '',
+              reps: libEx.defaultReps + '',
+              hold: libEx.holdSeconds ? libEx.holdSeconds + ' sec' : '',
+              frequency: '1x daily',
+              instructions: '',
+              libraryId: libEx.id,
+              status: 'active'
+            });
+            count++;
+          }
+        }
+        Utils.toast(count + ' exercise' + (count !== 1 ? 's' : '') + ' assigned', 'success');
+        sub.exercisesView = 'list';
+        sub.exerciseLibraryFilter = 'all';
+        renderDetail(container, Store.getPatient(patient.id));
+      };
+    }
+
     // Prescription form
     var rxBack = document.getElementById('rx-form-back');
     var rxCancel = document.getElementById('rx-form-cancel');
@@ -1738,6 +1992,17 @@ window.PatientDetailView = (function() {
     var apptSave = document.getElementById('appt-form-save');
     if (apptBack) apptBack.onclick = function() { sub.appointmentsView = 'list'; sub.appointmentsEditId = null; renderDetail(container, patient); };
     if (apptCancel) apptCancel.onclick = function() { sub.appointmentsView = 'list'; sub.appointmentsEditId = null; renderDetail(container, patient); };
+    // Show/hide repeat weeks dropdown
+    var repeatSelect = document.getElementById('appt-repeat');
+    if (repeatSelect) {
+      repeatSelect.addEventListener('change', function() {
+        var weeksGroup = document.getElementById('repeat-weeks-group');
+        if (weeksGroup) {
+          weeksGroup.style.display = this.value !== 'none' ? '' : 'none';
+        }
+      });
+    }
+
     if (apptSave) {
       var _pastDateOk = false;
       var _conflictOk = false;
@@ -1796,8 +2061,63 @@ window.PatientDetailView = (function() {
           Store.updateAppointment(existing.id, data);
           Utils.toast('Appointment updated', 'success');
         } else {
-          Store.createAppointment(data);
-          Utils.toast('Appointment booked', 'success');
+          // Check for recurring appointments
+          var repeatSel = document.getElementById('appt-repeat');
+          var repeatVal = repeatSel ? repeatSel.value : 'none';
+          var repeatWeeksSel = document.getElementById('appt-repeat-weeks');
+          var repeatWeeks = repeatWeeksSel ? parseInt(repeatWeeksSel.value, 10) : 2;
+
+          if (repeatVal !== 'none') {
+            var dates = [];
+            var baseDate = data.date;
+            if (repeatVal === 'weekly') {
+              for (var rw = 0; rw < repeatWeeks; rw++) {
+                dates.push(addDaysStr(baseDate, rw * 7));
+              }
+            } else if (repeatVal === '2x') {
+              var baseDow2 = getDayOfWeek(baseDate);
+              var daysToMon = (1 - baseDow2 + 7) % 7;
+              if (daysToMon === 0 && baseDow2 !== 1) daysToMon = 7;
+              var firstMon = baseDow2 === 1 ? baseDate : addDaysStr(baseDate, daysToMon);
+              for (var rw2 = 0; rw2 < repeatWeeks; rw2++) {
+                var mon = addDaysStr(firstMon, rw2 * 7);
+                var thu = addDaysStr(mon, 3);
+                dates.push(mon);
+                dates.push(thu);
+              }
+            } else if (repeatVal === '3x') {
+              var baseDow3 = getDayOfWeek(baseDate);
+              var daysToMon3 = (1 - baseDow3 + 7) % 7;
+              if (daysToMon3 === 0 && baseDow3 !== 1) daysToMon3 = 7;
+              var firstMon3 = baseDow3 === 1 ? baseDate : addDaysStr(baseDate, daysToMon3);
+              for (var rw3 = 0; rw3 < repeatWeeks; rw3++) {
+                var mon3 = addDaysStr(firstMon3, rw3 * 7);
+                var wed3 = addDaysStr(mon3, 2);
+                var fri3 = addDaysStr(mon3, 4);
+                dates.push(mon3);
+                dates.push(wed3);
+                dates.push(fri3);
+              }
+            }
+            dates.sort();
+            for (var ri = 0; ri < dates.length; ri++) {
+              var recurData = {
+                patientId: data.patientId,
+                patientName: data.patientName,
+                date: dates[ri],
+                time: data.time,
+                type: data.type,
+                duration: data.duration,
+                status: 'scheduled',
+                notes: data.notes || ''
+              };
+              Store.createAppointment(recurData);
+            }
+            Utils.toast('Created ' + dates.length + ' appointments', 'success');
+          } else {
+            Store.createAppointment(data);
+            Utils.toast('Appointment booked', 'success');
+          }
         }
         sub.appointmentsView = 'list';
         sub.appointmentsEditId = null;

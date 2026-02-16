@@ -38,6 +38,10 @@ window.BillingView = (function() {
       renderForm(container);
       return;
     }
+    if (state.subView === 'analytics') {
+      renderAnalytics(container);
+      return;
+    }
     renderList(container);
   }
 
@@ -103,6 +107,9 @@ window.BillingView = (function() {
       html += '<div class="billing-stat paid"><h4>Paid This Month</h4><div class="amount">' + Utils.formatCurrency(paidThisMonth) + '</div></div>';
       html += '<div class="billing-stat total"><h4>Revenue This Month</h4><div class="amount">' + Utils.formatCurrency(revenueThisMonth) + '</div></div>';
       html += '</div>';
+      html += '<div style="margin-bottom:0.75rem;text-align:right;">';
+      html += '<button class="btn btn-sm btn-secondary" id="toggle-analytics-btn"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px;"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Analytics</button>';
+      html += '</div>';
     }
 
     // Toolbar
@@ -120,6 +127,7 @@ window.BillingView = (function() {
     html += '</select>';
     html += '<input type="date" class="filter-select" id="billing-date-from" value="' + state.dateFrom + '">';
     html += '<input type="date" class="filter-select" id="billing-date-to" value="' + state.dateTo + '">';
+    html += '<button class="btn btn-sm btn-secondary" id="export-billing-btn"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export</button>';
     if (hasBillingPerm('billing_create')) {
       html += '<button class="btn btn-primary" id="create-invoice-btn">';
       html += '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
@@ -245,6 +253,30 @@ window.BillingView = (function() {
     };
   }
 
+  function exportBilling() {
+    var bills = Store.getBilling();
+    var headers = ['Date', 'Patient', 'Description', 'Amount', 'Status', 'Payment Date'];
+    var data = [];
+    for (var i = 0; i < bills.length; i++) {
+      var b = bills[i];
+      var patient = Store.getPatient(b.patientId);
+      var patientName = patient ? patient.name : 'Unknown';
+      var statusLabel = b.status === 'gpay' ? 'GPay' : b.status === 'cash' ? 'Cash' : b.status === 'card' ? 'Card' : b.status === 'paid' ? 'Paid' : 'Pending';
+      data.push([
+        b.date || '',
+        patientName,
+        b.description || '',
+        parseFloat(b.amount) || 0,
+        statusLabel,
+        b.paidDate || ''
+      ]);
+    }
+    var ws = XLSX.utils.aoa_to_sheet([headers].concat(data));
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+    XLSX.writeFile(wb, 'billing.xlsx');
+  }
+
   function bindListEvents(container) {
     var searchInput = document.getElementById('billing-search');
     var searchTimeout;
@@ -322,8 +354,160 @@ window.BillingView = (function() {
         renderView(container);
         return;
       }
+
+      // Export billing
+      if (e.target.closest('#export-billing-btn')) {
+        exportBilling();
+        return;
+      }
+
+      // Analytics toggle
+      if (e.target.closest('#toggle-analytics-btn')) {
+        state.subView = 'analytics';
+        renderView(container);
+        return;
+      }
     };
     container.addEventListener('click', _clickHandler);
+  }
+
+  // ==================== ANALYTICS ====================
+  function renderAnalytics(container) {
+    var allBilling = Store.getBilling();
+    var now = new Date();
+
+    // Build monthly data for last 6 months
+    var months = [];
+    for (var m = 5; m >= 0; m--) {
+      var d = new Date(now.getFullYear(), now.getMonth() - m, 1);
+      var key = d.getFullYear() + '-' + ('0' + (d.getMonth()+1)).slice(-2);
+      var labels = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      months.push({ key: key, label: labels[d.getMonth()] + ' ' + d.getFullYear(), revenue: 0, collected: 0, outstanding: 0, count: 0 });
+    }
+
+    // Payment method breakdown
+    var methods = { pending: 0, gpay: 0, cash: 0, card: 0, paid: 0 };
+
+    for (var b = 0; b < allBilling.length; b++) {
+      var bill = allBilling[b];
+      var amt = parseFloat(bill.amount) || 0;
+      var bMonth = (bill.date || '').substring(0, 7);
+
+      // Count by payment method
+      var st = bill.status || 'pending';
+      if (methods.hasOwnProperty(st)) methods[st] += amt;
+      else methods.pending += amt;
+
+      for (var mi = 0; mi < months.length; mi++) {
+        if (months[mi].key === bMonth) {
+          months[mi].revenue += amt;
+          months[mi].count++;
+          if (st !== 'pending') months[mi].collected += amt;
+          else months[mi].outstanding += amt;
+        }
+      }
+    }
+
+    // Find max revenue for bar scaling
+    var maxRev = 1;
+    for (var mx = 0; mx < months.length; mx++) {
+      if (months[mx].revenue > maxRev) maxRev = months[mx].revenue;
+    }
+
+    var html = '';
+    html += '<div style="margin-bottom:0.75rem;"><button class="btn btn-sm btn-secondary" id="back-to-list-btn">&larr; Back to List</button></div>';
+
+    // Monthly Revenue Chart
+    html += '<div class="card mb-2"><div class="card-header"><h3>Monthly Revenue (Last 6 Months)</h3></div><div class="card-body">';
+    html += '<div style="display:flex;align-items:flex-end;gap:8px;height:200px;padding-top:10px;">';
+    for (var ci = 0; ci < months.length; ci++) {
+      var pct = Math.max(4, Math.round((months[ci].revenue / maxRev) * 100));
+      var barColor = ci === months.length - 1 ? 'var(--primary)' : 'var(--primary-light, #5eead4)';
+      html += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;">';
+      html += '<div style="font-size:0.72em;font-weight:700;margin-bottom:4px;">' + Utils.formatCurrency(months[ci].revenue) + '</div>';
+      html += '<div style="width:100%;max-width:48px;height:' + pct + '%;background:' + barColor + ';border-radius:6px 6px 0 0;min-height:4px;transition:height 0.3s;"></div>';
+      html += '<div style="font-size:0.7em;color:var(--text-secondary);margin-top:4px;text-align:center;">' + months[ci].label.split(' ')[0] + '</div>';
+      html += '</div>';
+    }
+    html += '</div>';
+    html += '</div></div>';
+
+    // Collected vs Outstanding
+    html += '<div class="card mb-2"><div class="card-header"><h3>Collected vs Outstanding</h3></div><div class="card-body">';
+    html += '<div style="display:flex;flex-direction:column;gap:6px;">';
+    for (var si = 0; si < months.length; si++) {
+      var total = months[si].revenue || 1;
+      var collPct = Math.round((months[si].collected / total) * 100);
+      var outPct = 100 - collPct;
+      html += '<div style="display:flex;align-items:center;gap:8px;font-size:0.82em;">';
+      html += '<div style="width:40px;flex-shrink:0;font-weight:600;color:var(--text-secondary);">' + months[si].label.split(' ')[0] + '</div>';
+      html += '<div style="flex:1;height:20px;background:var(--bg-secondary);border-radius:4px;overflow:hidden;display:flex;">';
+      if (months[si].collected > 0) html += '<div style="width:' + collPct + '%;background:var(--success);height:100%;"></div>';
+      if (months[si].outstanding > 0) html += '<div style="width:' + outPct + '%;background:var(--warning);height:100%;"></div>';
+      html += '</div>';
+      html += '<div style="width:60px;flex-shrink:0;text-align:right;font-size:0.78em;">' + Utils.formatCurrency(months[si].revenue) + '</div>';
+      html += '</div>';
+    }
+    html += '</div>';
+    html += '<div style="display:flex;gap:16px;margin-top:10px;font-size:0.78em;">';
+    html += '<span><span style="display:inline-block;width:12px;height:12px;background:var(--success);border-radius:2px;vertical-align:-1px;margin-right:4px;"></span>Collected</span>';
+    html += '<span><span style="display:inline-block;width:12px;height:12px;background:var(--warning);border-radius:2px;vertical-align:-1px;margin-right:4px;"></span>Outstanding</span>';
+    html += '</div>';
+    html += '</div></div>';
+
+    // Payment Method Breakdown
+    var totalPaid = methods.gpay + methods.cash + methods.card + methods.paid;
+    html += '<div class="card mb-2"><div class="card-header"><h3>Payment Method Breakdown</h3></div><div class="card-body">';
+    if (totalPaid > 0) {
+      var methodList = [
+        { label: 'GPay', amount: methods.gpay, color: '#4285F4' },
+        { label: 'Cash', amount: methods.cash, color: '#22c55e' },
+        { label: 'Card', amount: methods.card, color: '#8b5cf6' },
+        { label: 'Other (Paid)', amount: methods.paid, color: '#6b7280' }
+      ];
+      // Horizontal stacked bar
+      html += '<div style="height:28px;background:var(--bg-secondary);border-radius:6px;overflow:hidden;display:flex;margin-bottom:12px;">';
+      for (var pi = 0; pi < methodList.length; pi++) {
+        if (methodList[pi].amount > 0) {
+          var mPct = Math.max(2, Math.round((methodList[pi].amount / totalPaid) * 100));
+          html += '<div style="width:' + mPct + '%;background:' + methodList[pi].color + ';height:100%;" title="' + methodList[pi].label + ': ' + Utils.formatCurrency(methodList[pi].amount) + '"></div>';
+        }
+      }
+      html += '</div>';
+      html += '<div style="display:flex;flex-wrap:wrap;gap:12px;">';
+      for (var li = 0; li < methodList.length; li++) {
+        if (methodList[li].amount > 0) {
+          html += '<div style="font-size:0.82em;display:flex;align-items:center;gap:4px;">';
+          html += '<span style="display:inline-block;width:12px;height:12px;background:' + methodList[li].color + ';border-radius:2px;"></span>';
+          html += methodList[li].label + ': <strong>' + Utils.formatCurrency(methodList[li].amount) + '</strong>';
+          html += '</div>';
+        }
+      }
+      html += '</div>';
+    } else {
+      html += '<div style="text-align:center;color:var(--text-secondary);padding:16px;">No paid records yet</div>';
+    }
+    html += '</div></div>';
+
+    // Outstanding amount
+    if (methods.pending > 0) {
+      html += '<div class="card mb-2" style="border-left:4px solid var(--warning);"><div class="card-body">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;">';
+      html += '<div><div style="font-weight:700;">Total Outstanding</div><div style="font-size:0.82em;color:var(--text-secondary);">Unpaid invoices</div></div>';
+      html += '<div style="font-size:1.5em;font-weight:800;color:var(--warning);">' + Utils.formatCurrency(methods.pending) + '</div>';
+      html += '</div></div></div>';
+    }
+
+    container.innerHTML = html;
+
+    // Back button
+    var backBtn = container.querySelector('#back-to-list-btn');
+    if (backBtn) {
+      backBtn.addEventListener('click', function() {
+        state.subView = 'list';
+        renderView(container);
+      });
+    }
   }
 
   // Register cleanup so router can remove stale handlers

@@ -130,6 +130,7 @@ window.PatientsView = (function() {
     html += '<option value="next-appt"' + (state.sortBy === 'next-appt' ? ' selected' : '') + '>Next Appointment</option>';
     html += '<option value="last-visit"' + (state.sortBy === 'last-visit' ? ' selected' : '') + '>Last Visited</option>';
     html += '</select>';
+    html += '<button class="btn btn-sm btn-secondary" id="export-patients-btn"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export</button>';
     html += '<button class="btn btn-primary" id="add-patient-btn">';
     html += '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
     html += 'Add Patient</button>';
@@ -350,6 +351,42 @@ window.PatientsView = (function() {
     };
   }
 
+  function exportPatients() {
+    var patients = Store.getPatients();
+    var tags = Store.getTags();
+    var tagMap = {};
+    for (var t = 0; t < tags.length; t++) {
+      tagMap[tags[t].id] = tags[t].name;
+    }
+    var headers = ['Name', 'Phone', 'Email', 'Gender', 'Age', 'DOB', 'Tags', 'Date Added'];
+    var data = [];
+    for (var i = 0; i < patients.length; i++) {
+      var p = patients[i];
+      var tagNames = '';
+      if (p.tags && p.tags.length > 0) {
+        var names = [];
+        for (var j = 0; j < p.tags.length; j++) {
+          if (tagMap[p.tags[j]]) names.push(tagMap[p.tags[j]]);
+        }
+        tagNames = names.join(', ');
+      }
+      data.push([
+        p.name || '',
+        (p.phoneCode || '') + ' ' + (p.phone || ''),
+        p.email || '',
+        p.gender || '',
+        p.dob ? Utils.calculateAge(p.dob) : '',
+        p.dob || '',
+        tagNames,
+        p.createdAt ? p.createdAt.substring(0, 10) : ''
+      ]);
+    }
+    var ws = XLSX.utils.aoa_to_sheet([headers].concat(data));
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+    XLSX.writeFile(wb, 'patients.xlsx');
+  }
+
   function bindListEvents(container) {
     // Search
     var searchInput = document.getElementById('patient-search');
@@ -407,6 +444,12 @@ window.PatientsView = (function() {
       if (e.target.closest('#add-patient-btn')) {
         state.subView = 'form'; state.editId = null;
         renderView(container);
+        return;
+      }
+
+      // Export patients
+      if (e.target.closest('#export-patients-btn')) {
+        exportPatients();
         return;
       }
 

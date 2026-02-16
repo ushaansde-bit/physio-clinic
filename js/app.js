@@ -141,6 +141,24 @@
           console.log('[App] Pushed local seed data to cloud');
         });
       }
+    }).then(function() {
+      // Phone index backfill — runs after Firebase is confirmed ready
+      var cid = Store.getClinicId();
+      var phoneFlag = 'physio_' + cid + '__phone_index_done';
+      if (!localStorage.getItem(phoneFlag) && FirebaseSync.getDb()) {
+        var patients = Store.getPatients();
+        var count = 0;
+        for (var pi = 0; pi < patients.length; pi++) {
+          if (patients[pi].phone) {
+            FirebaseSync.updatePatientPhoneIndex(null, patients[pi]);
+            count++;
+          }
+        }
+        if (count > 0) {
+          localStorage.setItem(phoneFlag, '1');
+          console.log('[App] Phone index backfill: indexed ' + count + ' patients');
+        }
+      }
     }).catch(function(e) {
       console.warn('[App] Firebase sync failed, using local data:', e);
     });
@@ -350,6 +368,9 @@
     } else if (parts[0] === 'messaging') {
       pageTitle.textContent = 'Messaging';
       window.MessagingView.render(content);
+    } else if (parts[0] === 'exercises') {
+      pageTitle.textContent = 'Exercise Library';
+      window.ExerciseLibraryView.render(content);
     } else if (parts[0] === 'settings') {
       pageTitle.textContent = 'Settings';
       window.SettingsView.render(content);

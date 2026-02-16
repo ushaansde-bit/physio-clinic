@@ -311,6 +311,77 @@ window.FirebaseSync = (function() {
     return Promise.all(promises);
   }
 
+  // ---- Phone Normalization ----
+  // Strips non-digits; 10-digit Indian numbers get '91' prefix
+  function normalizePhone(phone, phoneCode) {
+    if (!phone) return '';
+    var digits = phone.replace(/\D/g, '');
+    if (!digits) return '';
+    // If phoneCode provided, strip leading '+' and use it
+    var code = (phoneCode || '+91').replace('+', '');
+    // If already starts with country code, return as-is
+    if (digits.length > 10 && digits.indexOf(code) === 0) return digits;
+    // 10-digit Indian number
+    if (digits.length === 10) return code + digits;
+    return digits;
+  }
+
+  // ---- Patient Phone Index ----
+  // Upserts an entry in patient_phones/{normalizedPhone} for cross-clinic lookup
+  function updatePatientPhoneIndex(clinicId, patient) {
+    if (!db || !patient || !patient.phone) return Promise.resolve();
+    var norm = normalizePhone(patient.phone, patient.phoneCode);
+    if (!norm) return Promise.resolve();
+
+    var clinicSettings = {};
+    try {
+      var cid = clinicId || getClinicId();
+      clinicSettings = JSON.parse(localStorage.getItem('physio_clinic_' + cid)) || {};
+    } catch(e) {}
+
+    var entry = {
+      clinicId: clinicId || getClinicId(),
+      clinicName: clinicSettings.name || clinicSettings.clinicName || 'PhysioClinic',
+      patientId: patient.id,
+      patientName: patient.name || ''
+    };
+
+    var docRef = db.collection('patient_phones').doc(norm);
+    return docRef.get().then(function(doc) {
+      var data = doc.exists ? doc.data() : { clinics: [] };
+      var clinics = data.clinics || [];
+      // Update existing entry or add new
+      var found = false;
+      for (var i = 0; i < clinics.length; i++) {
+        if (clinics[i].clinicId === entry.clinicId && clinics[i].patientId === entry.patientId) {
+          clinics[i] = entry;
+          found = true;
+          break;
+        }
+      }
+      if (!found) clinics.push(entry);
+      return docRef.set({ clinics: clinics, updatedAt: new Date().toISOString() });
+    }).then(function() {
+      console.log('[FirebaseSync] Updated patient phone index for ' + norm);
+    }).catch(function(e) {
+      console.error('[FirebaseSync] Phone index update failed:', e);
+    });
+  }
+
+  // ---- Campaign Messages (patient_messages subcollection) ----
+  function saveCampaignMessage(clinicId, message) {
+    if (!db) return Promise.resolve();
+    var cid = clinicId || getClinicId();
+    var ref = db.collection('clinics').doc(cid).collection('patient_messages');
+    var docId = message.id || ('msg_' + Date.now());
+    message.id = docId;
+    return ref.doc(docId).set(JSON.parse(JSON.stringify(message))).then(function() {
+      console.log('[FirebaseSync] Saved campaign message ' + docId);
+    }).catch(function(e) {
+      console.error('[FirebaseSync] Campaign message save failed:', e);
+    });
+  }
+
   // ---- Query users by username in a clinic ----
   function queryUserByUsername(clinicId, username) {
     if (!db) return Promise.resolve(null);
@@ -344,7 +415,10 @@ window.FirebaseSync = (function() {
     createSlug: createSlug,
     checkSlugAvailable: checkSlugAvailable,
     queryUserByUsername: queryUserByUsername,
-    getCollectionRef: getCollectionRef
+    getCollectionRef: getCollectionRef,
+    normalizePhone: normalizePhone,
+    updatePatientPhoneIndex: updatePatientPhoneIndex,
+    saveCampaignMessage: saveCampaignMessage
   };
 
 })();

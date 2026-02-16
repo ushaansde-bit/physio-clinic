@@ -938,32 +938,90 @@ window.SettingsView = (function() {
   function renderClinicInfo() {
     var settings = Store.getClinicSettings();
     var clinicName = settings.name || settings.clinicName || 'PhysioClinic';
-    var ownerName = settings.ownerName || '-';
-    var ownerEmail = settings.ownerEmail || '-';
-    var ownerPhone = settings.ownerPhone || '-';
+    var ownerName = settings.ownerName || '';
+    var ownerEmail = settings.ownerEmail || '';
+    var ownerPhone = settings.ownerPhone || '';
     var slug = settings.bookingSlug || '';
-    var bookingUrl = slug ? (window.location.origin + window.location.pathname.replace('index.html', '') + 'book1/index.html?c=' + slug) : '';
+    var googlePlaceId = settings.googlePlaceId || '';
+    var basePath = window.location.origin + window.location.pathname.replace('index.html', '').replace(/\/$/, '');
+    var bookingUrl = slug ? (basePath + '/book1/index.html?c=' + slug) : '';
+    var patientAppUrl = slug ? (basePath + '/mobi/index.html?c=' + slug) : '';
 
     var html = '';
+
+    // Clinic Info (editable form)
     html += '<div class="card mb-2">';
     html += '<div class="card-header"><h3>Clinic Information</h3></div>';
     html += '<div class="card-body">';
-    html += '<div class="info-grid">';
-    html += infoItem('Clinic Name', clinicName);
-    html += infoItem('Owner', ownerName);
-    html += infoItem('Email', ownerEmail);
-    html += infoItem('Phone', ownerPhone);
-    html += infoItem('Booking Slug', slug || 'Not configured');
+    html += '<form id="clinic-info-form">';
+    html += '<div class="form-row">';
+    html += '<div class="form-group"><label>Clinic Name</label><input type="text" name="clinicName" value="' + Utils.escapeHtml(clinicName) + '"></div>';
+    html += '<div class="form-group"><label>Owner Name</label><input type="text" name="ownerName" value="' + Utils.escapeHtml(ownerName) + '"></div>';
     html += '</div>';
+    html += '<div class="form-row">';
+    html += '<div class="form-group"><label>Email</label><input type="email" name="ownerEmail" value="' + Utils.escapeHtml(ownerEmail) + '"></div>';
+    html += '<div class="form-group"><label>Phone</label><input type="text" name="ownerPhone" value="' + Utils.escapeHtml(ownerPhone) + '"></div>';
+    html += '</div>';
+    html += '<div class="form-group"><label>Booking Slug</label><input type="text" name="bookingSlug" value="' + Utils.escapeHtml(slug) + '" readonly style="background:var(--bg-secondary);cursor:not-allowed;" title="Set during registration"></div>';
+    html += '</form>';
+    html += '</div></div>';
 
-    if (bookingUrl) {
-      html += '<div style="margin-top:1rem;padding:0.75rem;background:var(--bg-secondary);border-radius:var(--radius);font-size:0.85em;">';
-      html += '<strong>Online Booking URL</strong><br>';
-      html += '<a href="' + Utils.escapeHtml(bookingUrl) + '" target="_blank" style="word-break:break-all;color:var(--primary);">' + Utils.escapeHtml(bookingUrl) + '</a>';
+    // Google Reviews Setup
+    html += '<div class="card mb-2">';
+    html += '<div class="card-header"><h3>Google Reviews</h3></div>';
+    html += '<div class="card-body">';
+    html += '<form id="google-review-form">';
+    html += '<div class="form-group"><label>Google Place ID</label>';
+    html += '<input type="text" name="googlePlaceId" value="' + Utils.escapeHtml(googlePlaceId) + '" placeholder="e.g. ChIJN1t_tDeuEmsRUsoyG83frY4">';
+    html += '<div class="form-hint">Find your Place ID at Google\'s Place ID Finder. Used for the patient app review feature.</div>';
+    html += '<div class="form-hint" style="margin-top:0.5rem;color:var(--gray-500);">Review suggestions are auto-generated in the patient app based on each patient\'s treatment data.</div>';
+    html += '</div>';
+    html += '</form>';
+    html += '<button type="button" class="btn btn-primary btn-sm" id="save-clinic-info-btn">Save Clinic Settings</button>';
+    html += '</div></div>';
+
+    // Links & QR Code
+    if (slug) {
+      html += '<div class="card mb-2">';
+      html += '<div class="card-header"><h3>Links & QR Codes</h3></div>';
+      html += '<div class="card-body">';
+
+      // Booking URL
+      html += '<div style="margin-bottom:1.25rem;">';
+      html += '<div style="font-weight:600;font-size:0.9em;margin-bottom:0.35rem;">Online Booking URL</div>';
+      html += '<div style="display:flex;gap:0.5rem;align-items:center;">';
+      html += '<input type="text" value="' + Utils.escapeHtml(bookingUrl) + '" readonly style="flex:1;font-size:0.82em;background:var(--bg-secondary);" id="booking-url-input">';
+      html += '<button class="btn btn-sm btn-secondary copy-url-btn" data-url="' + Utils.escapeHtml(bookingUrl) + '">Copy</button>';
+      html += '</div></div>';
+
+      // Patient App URL
+      html += '<div style="margin-bottom:1.25rem;">';
+      html += '<div style="font-weight:600;font-size:0.9em;margin-bottom:0.35rem;">Patient App URL (MobiPhysio)</div>';
+      html += '<div style="display:flex;gap:0.5rem;align-items:center;">';
+      html += '<input type="text" value="' + Utils.escapeHtml(patientAppUrl) + '" readonly style="flex:1;font-size:0.82em;background:var(--bg-secondary);" id="patient-app-url-input">';
+      html += '<button class="btn btn-sm btn-secondary copy-url-btn" data-url="' + Utils.escapeHtml(patientAppUrl) + '">Copy</button>';
+      html += '<button class="btn btn-sm btn-primary" id="share-patient-app-btn" title="Share via WhatsApp"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align:-2px;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.832-1.438A9.955 9.955 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18a8 8 0 01-4.243-1.214l-.252-.149-2.868.852.852-2.868-.149-.252A8 8 0 1112 20z"/></svg> Share</button>';
+      html += '</div></div>';
+
+      // QR Codes
+      html += '<div style="display:flex;gap:2rem;flex-wrap:wrap;">';
+      html += '<div style="text-align:center;"><div style="font-weight:600;font-size:0.85em;margin-bottom:0.5rem;">Booking QR</div><div id="qr-booking" style="display:inline-block;"></div></div>';
+      html += '<div style="text-align:center;"><div style="font-weight:600;font-size:0.85em;margin-bottom:0.5rem;">Patient App QR</div><div id="qr-patient-app" style="display:inline-block;"></div></div>';
       html += '</div>';
+
+      // Print section with radio selector
+      html += '<div style="margin-top:1rem;padding:0.75rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-secondary);">';
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;">';
+      html += '<div style="display:flex;gap:1.25rem;">';
+      html += '<label style="display:flex;align-items:center;gap:0.35rem;cursor:pointer;font-size:0.85em;font-weight:500;"><input type="radio" name="print-qr-choice" value="booking" checked> Booking QR</label>';
+      html += '<label style="display:flex;align-items:center;gap:0.35rem;cursor:pointer;font-size:0.85em;font-weight:500;"><input type="radio" name="print-qr-choice" value="patient"> Patient App QR</label>';
+      html += '</div>';
+      html += '<button class="btn btn-sm btn-secondary" id="print-qr-btn"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px;"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Print</button>';
+      html += '</div></div>';
+
+      html += '</div></div>';
     }
 
-    html += '</div></div>';
     return html;
   }
 
@@ -1133,6 +1191,123 @@ window.SettingsView = (function() {
         };
         Store.saveClinicSettings(settings);
         Utils.toast('Booking settings saved', 'success');
+      });
+    }
+
+    // Save clinic info + Google review settings
+    var saveClinicBtn = container.querySelector('#save-clinic-info-btn');
+    if (saveClinicBtn) {
+      saveClinicBtn.addEventListener('click', function() {
+        var clinicForm = document.getElementById('clinic-info-form');
+        var reviewForm = document.getElementById('google-review-form');
+        var clinicData = Utils.getFormData(clinicForm);
+        var reviewData = Utils.getFormData(reviewForm);
+        var settings = Store.getClinicSettings();
+        settings.name = clinicData.clinicName || settings.name;
+        settings.clinicName = clinicData.clinicName || settings.clinicName;
+        settings.ownerName = clinicData.ownerName || '';
+        settings.ownerEmail = clinicData.ownerEmail || '';
+        settings.ownerPhone = clinicData.ownerPhone || '';
+        settings.googlePlaceId = reviewData.googlePlaceId || '';
+        Store.saveClinicSettings(settings);
+        Utils.toast('Clinic settings saved', 'success');
+      });
+    }
+
+    // Copy URL buttons
+    var copyBtns = container.querySelectorAll('.copy-url-btn');
+    for (var cb = 0; cb < copyBtns.length; cb++) {
+      (function(btn) {
+        btn.addEventListener('click', function() {
+          var url = btn.getAttribute('data-url');
+          if (navigator.clipboard) {
+            navigator.clipboard.writeText(url).then(function() {
+              Utils.toast('URL copied to clipboard', 'success');
+            });
+          } else {
+            // Fallback
+            var tmp = document.createElement('textarea');
+            tmp.value = url;
+            document.body.appendChild(tmp);
+            tmp.select();
+            document.execCommand('copy');
+            document.body.removeChild(tmp);
+            Utils.toast('URL copied to clipboard', 'success');
+          }
+        });
+      })(copyBtns[cb]);
+    }
+
+    // Share Patient App via WhatsApp
+    var shareBtn = container.querySelector('#share-patient-app-btn');
+    if (shareBtn) {
+      shareBtn.addEventListener('click', function() {
+        var settings = Store.getClinicSettings();
+        var slug = settings.bookingSlug || '';
+        if (!slug) { Utils.toast('No booking slug configured', 'warning'); return; }
+        var basePath = window.location.origin + window.location.pathname.replace('index.html', '').replace(/\/$/, '');
+        var appUrl = basePath + '/mobi/index.html?c=' + slug;
+        var clinicName = settings.name || settings.clinicName || 'our clinic';
+        var msg = 'Open MobiPhysio to view your appointments, bills & prescriptions from ' + clinicName + ': ' + appUrl;
+        window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+      });
+    }
+
+    // Generate QR codes if qrcode library is available
+    if (typeof qrcode !== 'undefined') {
+      var qrBooking = container.querySelector('#qr-booking');
+      var qrPatient = container.querySelector('#qr-patient-app');
+      var settings = Store.getClinicSettings();
+      var slug = settings.bookingSlug || '';
+      if (slug) {
+        var basePath = window.location.origin + window.location.pathname.replace('index.html', '').replace(/\/$/, '');
+        if (qrBooking) {
+          var qr1 = qrcode(0, 'M');
+          qr1.addData(basePath + '/book1/index.html?c=' + slug);
+          qr1.make();
+          qrBooking.innerHTML = qr1.createImgTag(4, 8);
+        }
+        if (qrPatient) {
+          var qr2 = qrcode(0, 'M');
+          qr2.addData(basePath + '/mobi/index.html?c=' + slug);
+          qr2.make();
+          qrPatient.innerHTML = qr2.createImgTag(4, 8);
+        }
+      }
+    }
+
+    // Print QR code based on radio selection
+    var printQrBtn = container.querySelector('#print-qr-btn');
+    if (printQrBtn) {
+      printQrBtn.addEventListener('click', function() {
+        var selected = container.querySelector('input[name="print-qr-choice"]:checked');
+        if (!selected) return;
+        var isBooking = selected.value === 'booking';
+        var qrImg = container.querySelector(isBooking ? '#qr-booking img' : '#qr-patient-app img');
+        if (!qrImg) { Utils.toast('QR code not generated yet', 'error'); return; }
+        var settings = Store.getClinicSettings();
+        var clinicName = settings.name || settings.clinicName || 'PhysioClinic';
+        var title = isBooking ? 'Book Appointment' : 'Patient App';
+        var hint = isBooking ? 'Scan to book an appointment online' : 'Scan to access your bills, prescriptions & messages';
+        var printWin = window.open('', '_blank', 'width=600,height=700');
+        var ph = '<!DOCTYPE html><html><head><title>' + title + ' - ' + clinicName + '</title>';
+        ph += '<style>';
+        ph += 'body { font-family: Arial, sans-serif; text-align: center; margin: 0; padding: 60px 20px; }';
+        ph += 'h1 { font-size: 32px; margin-bottom: 6px; }';
+        ph += '.title { font-size: 22px; font-weight: 700; margin-bottom: 24px; color: #333; }';
+        ph += '.qr-img { width: 280px; height: 280px; }';
+        ph += '.hint { font-size: 15px; color: #666; margin-top: 20px; }';
+        ph += '.scan-text { font-size: 13px; color: #999; margin-top: 32px; }';
+        ph += '</style></head><body>';
+        ph += '<h1>' + clinicName + '</h1>';
+        ph += '<div class="title">' + title + '</div>';
+        ph += '<img class="qr-img" src="' + qrImg.src + '">';
+        ph += '<div class="hint">' + hint + '</div>';
+        ph += '<div class="scan-text">Scan with your phone camera</div>';
+        ph += '</body></html>';
+        printWin.document.write(ph);
+        printWin.document.close();
+        printWin.onload = function() { printWin.print(); };
       });
     }
 
