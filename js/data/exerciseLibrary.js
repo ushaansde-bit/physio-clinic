@@ -44,34 +44,61 @@ window.ExerciseLibrary = (function() {
     var isMale = _gender === 'male';
     var bodyFill = isFemale ? '#475569' : (isMale ? '#334155' : '#64748b');
     var bodyFillLight = isFemale ? '#64748b' : (isMale ? '#475569' : '#94a3b8');
-    var hlFill = '#10b981';
+    var hlFill = '#059669';
     var hlFillLight = '#34d399';
+    var mid = markerId || 'arrowhead';
+    var gradId = mid + '_g';
+    var hlGradId = mid + '_hg';
+    var bgGradId = mid + '_bg';
+    var shadowGradId = mid + '_sg';
 
     function isHl(part) {
       for (var i = 0; i < hl.length; i++) { if (hl[i] === part) return true; }
       return false;
     }
-    function fc(part) { return isHl(part) ? hlFill : bodyFill; }
-    function fcL(part) { return isHl(part) ? hlFillLight : bodyFillLight; }
+    function fc(part) { return isHl(part) ? 'url(#' + hlGradId + ')' : 'url(#' + gradId + ')'; }
 
     var neckX = pose.headX, neckY = pose.headY + 6;
     var svg = '';
 
+    // Gradient defs
+    svg += '<defs>';
+    svg += '<linearGradient id="' + gradId + '" x1="0" y1="0" x2="0" y2="1">';
+    svg += '<stop offset="0%" stop-color="' + bodyFillLight + '"/>';
+    svg += '<stop offset="100%" stop-color="' + bodyFill + '"/>';
+    svg += '</linearGradient>';
+    svg += '<linearGradient id="' + hlGradId + '" x1="0" y1="0" x2="0" y2="1">';
+    svg += '<stop offset="0%" stop-color="#34d399"/>';
+    svg += '<stop offset="100%" stop-color="#059669"/>';
+    svg += '</linearGradient>';
+    svg += '<radialGradient id="' + bgGradId + '">';
+    svg += '<stop offset="0%" stop-color="#ccfbf1" stop-opacity="0.5"/>';
+    svg += '<stop offset="100%" stop-color="#ccfbf1" stop-opacity="0"/>';
+    svg += '</radialGradient>';
+    svg += '<radialGradient id="' + shadowGradId + '">';
+    svg += '<stop offset="0%" stop-color="rgba(0,0,0,0.12)"/>';
+    svg += '<stop offset="100%" stop-color="rgba(0,0,0,0)"/>';
+    svg += '</radialGradient>';
+    svg += '</defs>';
+
     // Gender-based proportions
-    // Male: broad shoulders, thick build, crew cut
-    // Female (Style D): slim, bob cut, elegant
-    // Neutral: in between
-    var shoulderW = isFemale ? 4 : (isMale ? 7 : 5.5);
-    var hipW = isFemale ? 4.8 : (isMale ? 3.5 : 4);
-    var headRx = isFemale ? 5 : (isMale ? 6 : 5.5);
-    var headRy = isFemale ? 5.8 : (isMale ? 5.2 : 5.5);
-    var armW1 = isFemale ? 1.8 : (isMale ? 3.5 : 2.8);
-    var armW2 = isFemale ? 1.2 : (isMale ? 2.5 : 2);
-    var legW1 = isFemale ? 2.8 : (isMale ? 4 : 3.2);
-    var legW2 = isFemale ? 1.8 : (isMale ? 2.8 : 2.2);
-    var calfW1 = isFemale ? 2 : (isMale ? 3.2 : 2.5);
-    var calfW2 = isFemale ? 1.3 : (isMale ? 2.2 : 1.8);
-    var neckW = isFemale ? 1.5 : (isMale ? 3 : 2);
+    var shoulderW = isFemale ? 4.2 : (isMale ? 7.2 : 5.8);
+    var hipW = isFemale ? 5 : (isMale ? 3.8 : 4.2);
+    var headRx = isFemale ? 5.2 : (isMale ? 6.2 : 5.7);
+    var headRy = isFemale ? 6 : (isMale ? 5.4 : 5.7);
+    var armW1 = isFemale ? 2 : (isMale ? 3.8 : 3);
+    var armW2 = isFemale ? 1.4 : (isMale ? 2.8 : 2.2);
+    var legW1 = isFemale ? 3 : (isMale ? 4.2 : 3.5);
+    var legW2 = isFemale ? 2 : (isMale ? 3 : 2.4);
+    var calfW1 = isFemale ? 2.2 : (isMale ? 3.4 : 2.7);
+    var calfW2 = isFemale ? 1.5 : (isMale ? 2.4 : 2);
+    var neckW = isFemale ? 1.6 : (isMale ? 3.2 : 2.2);
+    var jointR = isFemale ? 1.2 : (isMale ? 2 : 1.6);
+
+    // Background glow
+    var cx = r((pose.headX + pose.hipX) / 2);
+    var cy = r((pose.headY + pose.hipY) / 2);
+    svg += '<circle cx="' + cx + '" cy="' + cy + '" r="45" fill="url(#' + bgGradId + ')"/>';
 
     // Props first (behind body)
     if (p.mat) {
@@ -87,27 +114,31 @@ window.ExerciseLibrary = (function() {
       svg += '<polyline points="' + p.chair + '" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
     }
 
-    // Shadow under figure
+    // Shadow under figure (radial gradient)
     var shadowY = p.surface ? p.surface[1] : (p.mat ? p.mat[1] : 115);
-    svg += '<ellipse cx="' + r((pose.headX + pose.hipX) / 2) + '" cy="' + r(shadowY) + '" rx="18" ry="2" fill="rgba(0,0,0,0.08)"/>';
+    svg += '<ellipse cx="' + r((pose.headX + pose.hipX) / 2) + '" cy="' + r(shadowY) + '" rx="20" ry="3" fill="url(#' + shadowGradId + ')"/>';
 
     // === BODY PARTS (back to front layering) ===
 
-    // Left leg (thigh + calf)
+    // Left leg
     svg += drawLimb(pose.hipX - 1, pose.hipY, pose.lKnee[0], pose.lKnee[1], legW1, calfW1, fc('lLeg'));
     svg += drawLimb(pose.lKnee[0], pose.lKnee[1], pose.lFoot[0], pose.lFoot[1], calfW1, calfW2, fc('lLeg'));
-    // Left foot
     svg += '<ellipse cx="' + r(pose.lFoot[0]) + '" cy="' + r(pose.lFoot[1]) + '" rx="' + (calfW2 + 0.5) + '" ry="' + (calfW2) + '" fill="' + fc('lLeg') + '"/>';
+    // Left knee joint
+    svg += '<circle cx="' + r(pose.lKnee[0]) + '" cy="' + r(pose.lKnee[1]) + '" r="' + jointR + '" fill="' + fc('lLeg') + '" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>';
 
     // Right leg
     svg += drawLimb(pose.hipX + 1, pose.hipY, pose.rKnee[0], pose.rKnee[1], legW1, calfW1, fc('rLeg'));
     svg += drawLimb(pose.rKnee[0], pose.rKnee[1], pose.rFoot[0], pose.rFoot[1], calfW1, calfW2, fc('rLeg'));
     svg += '<ellipse cx="' + r(pose.rFoot[0]) + '" cy="' + r(pose.rFoot[1]) + '" rx="' + (calfW2 + 0.5) + '" ry="' + (calfW2) + '" fill="' + fc('rLeg') + '"/>';
+    svg += '<circle cx="' + r(pose.rKnee[0]) + '" cy="' + r(pose.rKnee[1]) + '" r="' + jointR + '" fill="' + fc('rLeg') + '" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>';
 
     // Left arm (behind torso)
     svg += drawLimb(neckX - 2, neckY + 2, pose.lElbow[0], pose.lElbow[1], armW1, armW2, fc('lArm'));
     svg += drawLimb(pose.lElbow[0], pose.lElbow[1], pose.lHand[0], pose.lHand[1], armW2, armW2 * 0.7, fc('lArm'));
     svg += '<circle cx="' + r(pose.lHand[0]) + '" cy="' + r(pose.lHand[1]) + '" r="' + (armW2 * 0.8) + '" fill="' + fc('lArm') + '"/>';
+    // Left elbow joint
+    svg += '<circle cx="' + r(pose.lElbow[0]) + '" cy="' + r(pose.lElbow[1]) + '" r="' + (jointR * 0.8) + '" fill="' + fc('lArm') + '" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>';
 
     // Torso
     var tDx = pose.hipX - neckX, tDy = pose.hipY - neckY;
@@ -120,18 +151,24 @@ window.ExerciseLibrary = (function() {
       ' ' + r(pose.hipX - tNx * hipW) + ',' + r(pose.hipY - tNy * hipW) +
       ' Q' + r(neckX - tNx * (shoulderW + 1)) + ',' + r(neckY + (pose.hipY - neckY) * 0.3) +
       ' ' + r(neckX - tNx * shoulderW) + ',' + r(neckY - tNy * shoulderW) +
-      'Z" fill="' + bodyFill + '"/>';
+      'Z" fill="url(#' + gradId + ')"/>';
 
     // Right arm (in front of torso)
     svg += drawLimb(neckX + 2, neckY + 2, pose.rElbow[0], pose.rElbow[1], armW1, armW2, fc('rArm'));
     svg += drawLimb(pose.rElbow[0], pose.rElbow[1], pose.rHand[0], pose.rHand[1], armW2, armW2 * 0.7, fc('rArm'));
     svg += '<circle cx="' + r(pose.rHand[0]) + '" cy="' + r(pose.rHand[1]) + '" r="' + (armW2 * 0.8) + '" fill="' + fc('rArm') + '"/>';
+    svg += '<circle cx="' + r(pose.rElbow[0]) + '" cy="' + r(pose.rElbow[1]) + '" r="' + (jointR * 0.8) + '" fill="' + fc('rArm') + '" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>';
 
     // Neck
-    svg += '<rect x="' + r(neckX - neckW) + '" y="' + r(neckY - 1) + '" width="' + r(neckW * 2) + '" height="4" rx="' + r(neckW) + '" fill="' + bodyFill + '"/>';
+    svg += '<rect x="' + r(neckX - neckW) + '" y="' + r(neckY - 1) + '" width="' + r(neckW * 2) + '" height="4" rx="' + r(neckW) + '" fill="url(#' + gradId + ')"/>';
 
     // Head
-    svg += '<ellipse cx="' + pose.headX + '" cy="' + pose.headY + '" rx="' + headRx + '" ry="' + headRy + '" fill="' + bodyFill + '"/>';
+    svg += '<ellipse cx="' + pose.headX + '" cy="' + pose.headY + '" rx="' + headRx + '" ry="' + headRy + '" fill="url(#' + gradId + ')"/>';
+    // Eyes (two small dots)
+    svg += '<circle cx="' + r(pose.headX - 2) + '" cy="' + r(pose.headY - 0.5) + '" r="0.7" fill="rgba(255,255,255,0.6)"/>';
+    svg += '<circle cx="' + r(pose.headX + 2) + '" cy="' + r(pose.headY - 0.5) + '" r="0.7" fill="rgba(255,255,255,0.6)"/>';
+    // Slight smile
+    svg += '<path d="M' + r(pose.headX - 1.5) + ',' + r(pose.headY + 1.5) + ' Q' + r(pose.headX) + ',' + r(pose.headY + 2.8) + ' ' + r(pose.headX + 1.5) + ',' + r(pose.headY + 1.5) + '" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="0.5" stroke-linecap="round"/>';
     // Male: side part hair
     if (isMale) {
       var _ht = pose.headY - headRy;
@@ -146,7 +183,6 @@ window.ExerciseLibrary = (function() {
 
     // Direction arrow
     if (p.arrow) {
-      var mid = markerId || 'arrowhead';
       svg += '<polyline points="' + p.arrow + '" fill="none" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#' + mid + ')"/>';
     }
 
