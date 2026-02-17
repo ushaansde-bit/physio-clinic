@@ -1007,8 +1007,10 @@ function isMobileFeatureOn(key) {
   if (!doc.features && !doc.mobileFeatures) {
     var cid = state.clinicId || localStorage.getItem('mobi_clinicId') || 'default';
     try {
-      var stored = JSON.parse(localStorage.getItem('physio_clinic_' + cid) || '{}');
-      doc = stored;
+      var raw = localStorage.getItem('physio_clinic_' + cid);
+      // If clinic-specific key not found, try 'default'
+      if (!raw && cid !== 'default') raw = localStorage.getItem('physio_clinic_default');
+      doc = JSON.parse(raw || '{}');
     } catch(e) {}
   }
   var mobile = doc.mobileFeatures || {};
