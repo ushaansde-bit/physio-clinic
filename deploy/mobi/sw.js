@@ -1,4 +1,4 @@
-var CACHE_NAME = 'mobiphysio-v1';
+var CACHE_NAME = 'mobiphysio-v2';
 var PRECACHE_URLS = [
   'index.html',
   'icon.svg'

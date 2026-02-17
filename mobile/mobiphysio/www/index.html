@@ -559,6 +559,217 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
   padding: 4px;
   line-height: 1;
 }
+
+/* ===== Exercise Progress Bar ===== */
+.ex-progress {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow);
+}
+.ex-progress-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--gray-700);
+}
+.ex-progress-count {
+  color: var(--wa-dark);
+  font-weight: 800;
+}
+.ex-progress-bar {
+  width: 100%;
+  height: 8px;
+  background: var(--gray-200);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.ex-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--wa-teal), var(--wa-green));
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+/* ===== Expandable Exercise Card ===== */
+.ex-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-bottom: 8px;
+  overflow: hidden;
+  transition: border-color 0.3s, background 0.3s;
+  border: 2px solid transparent;
+}
+.ex-card.ex-done {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+.ex-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.ex-card-thumb {
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  background: var(--gray-100);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.ex-card-info {
+  flex: 1;
+  min-width: 0;
+}
+.ex-card-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--gray-800);
+}
+.ex-done .ex-card-name {
+  color: var(--gray-400);
+  text-decoration: line-through;
+}
+.ex-card-sets {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--wa-dark);
+  margin-top: 2px;
+}
+.ex-done .ex-card-sets { color: var(--gray-400); }
+.ex-card-right {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ex-card-check {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--success);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--white);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+.ex-card-chevron {
+  width: 20px;
+  height: 20px;
+  color: var(--gray-400);
+  transition: transform 0.2s;
+}
+.ex-card-chevron.open { transform: rotate(180deg); }
+.ex-card-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+.ex-card-body.expanded {
+  max-height: 600px;
+}
+.ex-card-body-inner {
+  padding: 0 14px 14px;
+  border-top: 1px solid var(--gray-100);
+}
+.ex-card-instructions {
+  font-size: 0.85rem;
+  color: var(--gray-600);
+  line-height: 1.5;
+  margin-top: 10px;
+}
+.ex-card-freq {
+  font-size: 0.78rem;
+  color: var(--gray-500);
+  margin-top: 6px;
+  font-weight: 500;
+}
+.ex-card-video {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.82rem;
+  color: var(--wa-teal);
+  font-weight: 600;
+  margin-top: 8px;
+  text-decoration: none;
+}
+.ex-complete-btn {
+  width: 100%;
+  padding: 12px;
+  margin-top: 12px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--wa-dark);
+  color: var(--white);
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: background 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.ex-complete-btn:active { background: var(--wa-teal); }
+
+/* Completion pulse animation */
+@keyframes exDonePulse {
+  0% { box-shadow: 0 0 0 0 rgba(34,197,94,0.5); }
+  70% { box-shadow: 0 0 0 12px rgba(34,197,94,0); }
+  100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+}
+.ex-card.ex-just-done {
+  animation: exDonePulse 0.6s ease-out;
+}
+
+/* ===== Mic Button ===== */
+.mic-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px;
+  margin-top: 8px;
+  border: 2px dashed var(--gray-300);
+  border-radius: var(--radius-sm);
+  background: var(--gray-50);
+  color: var(--gray-600);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.mic-btn:active { background: var(--gray-100); }
+.mic-btn.mic-active {
+  border-color: var(--danger);
+  background: #fef2f2;
+  color: var(--danger);
+}
+.mic-btn svg { width: 20px; height: 20px; }
+@keyframes micPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.15); opacity: 0.7; }
+}
+.mic-btn.mic-active svg {
+  animation: micPulse 1s ease-in-out infinite;
+}
 </style>
 </head>
 <body>
@@ -584,6 +795,10 @@ var firebaseConfig = {
 };
 if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 var db = firebase.firestore();
+
+// ===== Speech API Detection =====
+var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+var _speechSupported = !!SpeechRecognition;
 
 // ===== State =====
 var state = {
@@ -612,7 +827,13 @@ var state = {
   detailItem: null,
   detailType: null,
   lastReadTimestamp: localStorage.getItem('mobi_lastRead') || '',
-  dataLoaded: false
+  dataLoaded: false,
+  _unsubClinic: null,
+  _unsubExercises: null,
+  _unsubExerciseLog: null,
+  _expandedExIdx: null,
+  _micListening: false,
+  _micSupported: false
 };
 
 // ===== Helpers =====
@@ -1258,8 +1479,8 @@ function loadData() {
   var pid = state.patientId;
   var today = todayStr();
 
-  // Load clinic doc
-  db.collection('clinics').doc(cid).get().then(function(doc) {
+  // Load clinic doc (real-time for feature toggles)
+  state._unsubClinic = db.collection('clinics').doc(cid).onSnapshot(function(doc) {
     state.clinicDoc = doc.exists ? doc.data() : {};
     if (state.clinicDoc.name || state.clinicDoc.clinicName) {
       state.clinicName = state.clinicDoc.name || state.clinicDoc.clinicName;
@@ -1343,20 +1564,37 @@ function loadData() {
         });
     });
 
-  // Load exercises for this patient
-  db.collection('clinics').doc(cid).collection('exercises')
-    .where('patientId', '==', pid)
-    .get().then(function(snap) {
-      state.exercises = [];
-      snap.forEach(function(doc) { var d = doc.data(); d._id = doc.id; state.exercises.push(d); });
-      render();
-    }).catch(function(e) { console.log('[MobiPhysio] Exercises load error:', e); });
+  // Cleanup previous listeners
+  cleanupListeners();
 
-  // Load exercise completion log
-  db.collection('clinics').doc(cid).collection('exercise_log').doc(pid).get().then(function(doc) {
-    state.exerciseLog = doc.exists ? doc.data() : {};
-    render();
-  }).catch(function(e) { console.log('[MobiPhysio] Exercise log load error:', e); });
+  // Load exercises for this patient (real-time)
+  state._unsubExercises = db.collection('clinics').doc(cid).collection('exercises')
+    .where('patientId', '==', pid)
+    .onSnapshot(function(snap) {
+      state.exercises = [];
+      snap.forEach(function(doc) {
+        var d = doc.data();
+        if (d._deleted) return; // Skip soft-deleted exercises
+        d._id = doc.id;
+        state.exercises.push(d);
+      });
+      // Sort by _id for stable ordering
+      state.exercises.sort(function(a, b) { return (a._id || '').localeCompare(b._id || ''); });
+      render();
+    }, function(e) { console.log('[MobiPhysio] Exercises listener error:', e); });
+
+  // Load exercise completion log (real-time)
+  state._unsubExerciseLog = db.collection('clinics').doc(cid).collection('exercise_log').doc(pid)
+    .onSnapshot(function(doc) {
+      state.exerciseLog = doc.exists ? doc.data() : {};
+      render();
+    }, function(e) { console.log('[MobiPhysio] Exercise log listener error:', e); });
+}
+
+function cleanupListeners() {
+  if (state._unsubClinic) { state._unsubClinic(); state._unsubClinic = null; }
+  if (state._unsubExercises) { state._unsubExercises(); state._unsubExercises = null; }
+  if (state._unsubExerciseLog) { state._unsubExerciseLog(); state._unsubExerciseLog = null; }
 }
 
 // ===== MAIN APP =====
@@ -1367,17 +1605,20 @@ function renderApp(app) {
   var html = '';
 
   // Header
-  html += '<div class="header">';
+  html += '<div class="header" style="display:flex;align-items:center;justify-content:space-between;">';
+  html += '<div>';
   html += '<div class="header-title">' + escapeHtml(state.clinicName) + '</div>';
   html += '<div class="header-subtitle">Hello, ' + escapeHtml(state.patientName) + '</div>';
   html += '</div>';
+  html += '<button id="logout-btn" style="background:none;border:1px solid rgba(255,255,255,0.3);color:rgba(255,255,255,0.85);font-size:0.72rem;padding:5px 10px;border-radius:16px;cursor:pointer;font-weight:600;-webkit-tap-highlight-color:transparent;">Logout</button>';
+  html += '</div>';
 
-  // Feature checks from clinic settings
-  var features = (state.clinicDoc || {}).features || {};
-  var showBilling = features.billing !== false;
-  var showRx = features.prescriptions !== false;
-  var showMessaging = features.messaging !== false;
-  var showExercises = features.exercises !== false;
+  // Feature checks from clinic mobile settings (independent of web app)
+  var mobileFeatures = (state.clinicDoc || {}).mobileFeatures || {};
+  var showBilling = mobileFeatures.billing !== false;
+  var showRx = mobileFeatures.prescriptions !== false;
+  var showMessaging = mobileFeatures.messaging !== false;
+  var showExercises = mobileFeatures.exercises !== false;
 
   // Content
   html += '<div class="content" id="content">';
@@ -1446,22 +1687,36 @@ function getUnreadCount() {
 // ===== HOME TAB =====
 function renderHome() {
   var html = '';
+  var mobFeats = (state.clinicDoc || {}).mobileFeatures || {};
+  var homeBilling = mobFeats.billing !== false;
+  var homeRx = mobFeats.prescriptions !== false;
+  var homeMessaging = mobFeats.messaging !== false;
 
   // Quick stats
-  var pendingBills = 0;
-  for (var b = 0; b < state.bills.length; b++) {
-    if (state.bills[b].status === 'pending') pendingBills++;
+  var stats = [];
+  if (homeBilling) {
+    var pendingBills = 0;
+    for (var b = 0; b < state.bills.length; b++) {
+      if (state.bills[b].status === 'pending') pendingBills++;
+    }
+    stats.push('<div class="stat-card"><div class="stat-num">' + pendingBills + '</div><div class="stat-label">Pending Bills</div></div>');
   }
-  var activeRx = 0;
-  for (var r = 0; r < state.prescriptions.length; r++) {
-    if (state.prescriptions[r].status === 'active') activeRx++;
+  if (homeRx) {
+    var activeRx = 0;
+    for (var r = 0; r < state.prescriptions.length; r++) {
+      if (state.prescriptions[r].status === 'active') activeRx++;
+    }
+    stats.push('<div class="stat-card"><div class="stat-num">' + activeRx + '</div><div class="stat-label">Active Rx</div></div>');
   }
-  var unread = getUnreadCount();
+  if (homeMessaging) {
+    var unread = getUnreadCount();
+    stats.push('<div class="stat-card"><div class="stat-num">' + unread + '</div><div class="stat-label">Messages</div></div>');
+  }
+  // Always show upcoming appointments count
+  stats.push('<div class="stat-card"><div class="stat-num">' + state.appointments.length + '</div><div class="stat-label">Appointments</div></div>');
 
   html += '<div class="stats-row">';
-  html += '<div class="stat-card"><div class="stat-num">' + pendingBills + '</div><div class="stat-label">Pending Bills</div></div>';
-  html += '<div class="stat-card"><div class="stat-num">' + activeRx + '</div><div class="stat-label">Active Rx</div></div>';
-  html += '<div class="stat-card"><div class="stat-num">' + unread + '</div><div class="stat-label">Messages</div></div>';
+  html += stats.join('');
   html += '</div>';
 
   // Progress chart (pain & function scores over sessions)
@@ -1524,20 +1779,22 @@ function renderHome() {
     }
   }
 
-  // Recent bills summary
-  html += '<div class="section-title">Recent Activity</div>';
-  var recentBills = state.bills.slice(0, 3);
-  if (recentBills.length === 0) {
-    html += '<div class="card"><div class="card-body"><div class="empty-state"><p>No billing history yet</p></div></div></div>';
-  } else {
-    for (var rb = 0; rb < recentBills.length; rb++) {
-      var bill = recentBills[rb];
-      var statusClass = bill.status === 'paid' ? 'badge-paid' : 'badge-pending';
-      html += '<div class="card bill-card"><div class="card-body">';
-      html += '<div class="bill-top"><span class="bill-amount">' + formatCurrency(bill.amount) + '</span><span class="badge ' + statusClass + '">' + escapeHtml(bill.status) + '</span></div>';
-      html += '<div class="bill-desc">' + escapeHtml(bill.description) + '</div>';
-      html += '<div class="bill-date">' + formatDate(bill.date) + '</div>';
-      html += '</div></div>';
+  // Recent bills summary (only if billing enabled for patient app)
+  if (homeBilling) {
+    html += '<div class="section-title">Recent Activity</div>';
+    var recentBills = state.bills.slice(0, 3);
+    if (recentBills.length === 0) {
+      html += '<div class="card"><div class="card-body"><div class="empty-state"><p>No billing history yet</p></div></div></div>';
+    } else {
+      for (var rb = 0; rb < recentBills.length; rb++) {
+        var bill = recentBills[rb];
+        var statusClass = bill.status === 'paid' ? 'badge-paid' : 'badge-pending';
+        html += '<div class="card bill-card"><div class="card-body">';
+        html += '<div class="bill-top"><span class="bill-amount">' + formatCurrency(bill.amount) + '</span><span class="badge ' + statusClass + '">' + escapeHtml(bill.status) + '</span></div>';
+        html += '<div class="bill-desc">' + escapeHtml(bill.description) + '</div>';
+        html += '<div class="bill-date">' + formatDate(bill.date) + '</div>';
+        html += '</div></div>';
+      }
     }
   }
 
@@ -1567,20 +1824,39 @@ function renderExercises() {
   var today = todayStr();
   var doneToday = (state.exerciseLog || {})[today] || [];
   var streak = getExerciseStreak();
+  var totalEx = state.exercises.length;
+  var doneCount = 0;
+  // Count unique done exercises for today
+  for (var dc = 0; dc < doneToday.length; dc++) {
+    if (doneToday[dc] < totalEx) doneCount++;
+  }
+  if (doneCount > totalEx) doneCount = totalEx;
+
+  // Progress bar
+  if (totalEx > 0) {
+    var pct = Math.round((doneCount / totalEx) * 100);
+    html += '<div class="ex-progress">';
+    html += '<div class="ex-progress-label">';
+    html += '<span>Today\'s Progress</span>';
+    html += '<span class="ex-progress-count">' + doneCount + '/' + totalEx + ' done</span>';
+    html += '</div>';
+    html += '<div class="ex-progress-bar"><div class="ex-progress-fill" style="width:' + pct + '%;"></div></div>';
+    html += '</div>';
+  }
 
   // Streak banner
-  html += '<div style="text-align:center;padding:16px 12px;background:linear-gradient(135deg,#f0fdfa 0%,#ecfdf5 100%);border-radius:12px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,0.1);">';
+  html += '<div style="text-align:center;padding:14px 12px;background:linear-gradient(135deg,#f0fdfa 0%,#ecfdf5 100%);border-radius:12px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,0.1);">';
   if (streak > 0) {
-    html += '<div style="font-size:2rem;font-weight:800;color:var(--wa-dark);">Day ' + streak + ' \uD83D\uDD25</div>';
+    html += '<div style="font-size:1.8rem;font-weight:800;color:var(--wa-dark);">Day ' + streak + ' \uD83D\uDD25</div>';
     html += '<div style="font-size:0.82rem;color:var(--gray-500);margin-top:2px;">Keep up the great work!</div>';
   } else {
-    html += '<div style="font-size:1.3rem;font-weight:700;color:var(--wa-dark);">Start your streak!</div>';
+    html += '<div style="font-size:1.2rem;font-weight:700;color:var(--wa-dark);">Start your streak!</div>';
     html += '<div style="font-size:0.82rem;color:var(--gray-500);margin-top:2px;">Complete an exercise to begin</div>';
   }
   html += '</div>';
 
   // All done congratulations
-  if (state.exercises.length > 0 && doneToday.length >= state.exercises.length) {
+  if (totalEx > 0 && doneCount >= totalEx) {
     html += '<div style="text-align:center;padding:14px;background:#dcfce7;border-radius:12px;margin-bottom:12px;">';
     html += '<div style="font-size:1.1rem;font-weight:700;color:#16a34a;">\u2705 All exercises done today!</div>';
     html += '<div style="font-size:0.82rem;color:#15803d;margin-top:2px;">Great job! See you tomorrow.</div>';
@@ -1589,7 +1865,7 @@ function renderExercises() {
 
   html += '<div class="section-title">Your Exercises</div>';
 
-  if (state.exercises.length === 0) {
+  if (totalEx === 0) {
     html += '<div class="card"><div class="card-body"><div class="empty-state">';
     html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:48px;height:48px;margin-bottom:8px;opacity:0.4;"><path d="M18 8h1a4 4 0 010 8h-1M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>';
     html += '<p>No exercises assigned yet</p>';
@@ -1603,25 +1879,23 @@ function renderExercises() {
     for (var di = 0; di < doneToday.length; di++) {
       if (doneToday[di] === i) { isDone = true; break; }
     }
+    var isExpanded = (state._expandedExIdx === i) && !isDone;
 
-    // Build exercise detail text
-    var detailParts = [];
-    if (ex.sets && ex.reps) detailParts.push(ex.sets + ' \u00D7 ' + ex.reps);
-    else if (ex.reps) detailParts.push(ex.reps + ' reps');
-    else if (ex.sets) detailParts.push(ex.sets + ' sets');
-    if (ex.hold) detailParts.push('Hold: ' + ex.hold + 's');
-    if (ex.frequency) detailParts.push(ex.frequency);
-    var detailText = detailParts.join(' | ');
+    // Sets/reps text (prominent)
+    var setsRepsText = '';
+    if (ex.sets && ex.reps) setsRepsText = ex.sets + ' sets \u00D7 ' + ex.reps + ' reps';
+    else if (ex.reps) setsRepsText = ex.reps + ' reps';
+    else if (ex.sets) setsRepsText = ex.sets + ' sets';
+    if (ex.hold) setsRepsText += (setsRepsText ? ' \u00B7 ' : '') + 'Hold ' + ex.hold + 's';
 
-    // Get visual for the exercise (imageUrl > videoUrl > SVG > placeholder)
+    // Get visual for the exercise
     var svgHtml = '';
     if (ex.imageUrl) {
-      svgHtml = '<img src="' + escapeHtml(ex.imageUrl) + '" alt="' + escapeHtml(ex.name) + '" style="width:70px;height:70px;object-fit:cover;border-radius:6px;"/>';
+      svgHtml = '<img src="' + escapeHtml(ex.imageUrl) + '" alt="' + escapeHtml(ex.name) + '" style="width:48px;height:48px;object-fit:cover;border-radius:6px;"/>';
     } else if (ex.libraryId && ExLib.getById(ex.libraryId)) {
-      svgHtml = ExLib.renderExerciseSVG(ex.libraryId, 70);
+      svgHtml = ExLib.renderExerciseSVG(ex.libraryId, 48);
     } else {
-      // Generic placeholder silhouette
-      svgHtml = '<svg viewBox="0 0 100 120" width="70" height="70" xmlns="http://www.w3.org/2000/svg">';
+      svgHtml = '<svg viewBox="0 0 100 120" width="48" height="48" xmlns="http://www.w3.org/2000/svg">';
       svgHtml += '<ellipse cx="50" cy="18" rx="5.5" ry="5.5" fill="#94a3b8"/>';
       svgHtml += '<rect x="48" y="23" width="4" height="4" rx="2" fill="#94a3b8"/>';
       svgHtml += '<path d="M44.5,28 Q43.5,41 46,55 Q50,57.5 54,55 Q56.5,41 55.5,28Z" fill="#64748b"/>';
@@ -1629,33 +1903,36 @@ function renderExercises() {
       svgHtml += '<path d="M51,55 Q58,72 62,95" fill="none" stroke="#64748b" stroke-width="5" stroke-linecap="round"/>';
       svgHtml += '<path d="M44,30 Q35,45 28,40" fill="none" stroke="#64748b" stroke-width="4" stroke-linecap="round"/>';
       svgHtml += '<path d="M56,30 Q65,45 72,40" fill="none" stroke="#64748b" stroke-width="4" stroke-linecap="round"/>';
-      svgHtml += '<rect x="15" y="99" width="70" height="3" rx="1.5" fill="#e2e8f0"/>';
       svgHtml += '</svg>';
     }
 
-    var cardBg = isDone ? '#f0fdf4' : 'white';
-    var cardBorder = isDone ? '2px solid #bbf7d0' : '1px solid transparent';
+    html += '<div class="ex-card' + (isDone ? ' ex-done' : '') + '" data-ex-idx="' + i + '">';
 
-    html += '<div class="exercise-card" style="display:flex;gap:12px;padding:12px;background:' + cardBg + ';border:' + cardBorder + ';border-radius:12px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);align-items:center;">';
-
-    // SVG container
-    html += '<div style="flex-shrink:0;width:80px;height:80px;background:#f3f4f6;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;">';
-    html += svgHtml;
+    // Header (always visible, clickable to expand)
+    html += '<div class="ex-card-header" data-ex-toggle="' + i + '">';
+    html += '<div class="ex-card-thumb">' + svgHtml + '</div>';
+    html += '<div class="ex-card-info">';
+    html += '<div class="ex-card-name">' + escapeHtml(ex.name) + '</div>';
+    if (setsRepsText) html += '<div class="ex-card-sets">' + escapeHtml(setsRepsText) + '</div>';
     html += '</div>';
-
-    // Text
-    html += '<div style="flex:1;display:flex;flex-direction:column;justify-content:center;min-width:0;">';
-    html += '<div style="font-weight:600;font-size:0.95rem;' + (isDone ? 'color:var(--gray-400);text-decoration:line-through;' : '') + '">' + escapeHtml(ex.name) + '</div>';
-    if (detailText) html += '<div style="font-size:0.8rem;color:#6b7280;margin-top:2px;">' + escapeHtml(detailText) + '</div>';
-    if (ex.instructions) html += '<div style="font-size:0.75rem;color:var(--gray-400);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(ex.instructions) + '</div>';
-    if (ex.videoUrl) html += '<a href="' + escapeHtml(ex.videoUrl) + '" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;font-size:0.75rem;color:var(--wa-teal);margin-top:4px;text-decoration:none;font-weight:600;"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Watch video</a>';
-    html += '</div>';
-
-    // Done button
+    html += '<div class="ex-card-right">';
     if (isDone) {
-      html += '<div style="flex-shrink:0;width:40px;height:40px;border-radius:50%;background:#22c55e;display:flex;align-items:center;justify-content:center;color:white;font-size:1.2rem;font-weight:700;">\u2713</div>';
+      html += '<div class="ex-card-check">\u2713</div>';
     } else {
-      html += '<button class="ex-done-btn" data-idx="' + i + '" style="flex-shrink:0;width:40px;height:40px;border-radius:50%;border:2px solid var(--gray-300);background:white;display:flex;align-items:center;justify-content:center;color:var(--gray-400);font-size:1.2rem;font-weight:700;cursor:pointer;transition:all 0.2s;-webkit-tap-highlight-color:transparent;">\u2713</button>';
+      html += '<svg class="ex-card-chevron' + (isExpanded ? ' open' : '') + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
+    }
+    html += '</div>';
+    html += '</div>';
+
+    // Expandable body (hidden for done items)
+    if (!isDone) {
+      html += '<div class="ex-card-body' + (isExpanded ? ' expanded' : '') + '">';
+      html += '<div class="ex-card-body-inner">';
+      if (ex.instructions) html += '<div class="ex-card-instructions">' + escapeHtml(ex.instructions) + '</div>';
+      if (ex.frequency) html += '<div class="ex-card-freq">Frequency: ' + escapeHtml(ex.frequency) + '</div>';
+      if (ex.videoUrl) html += '<a class="ex-card-video" href="' + escapeHtml(ex.videoUrl) + '" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Watch Video</a>';
+      html += '<button class="ex-complete-btn" data-complete-idx="' + i + '"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Mark as Complete</button>';
+      html += '</div></div>';
     }
 
     html += '</div>';
@@ -2044,6 +2321,13 @@ function renderReview() {
     html += escapeHtml(state._customReviewText);
   }
   html += '</textarea>';
+  // Voice-to-text mic button
+  if (_speechSupported) {
+    html += '<button class="mic-btn' + (state._micListening ? ' mic-active' : '') + '" id="mic-btn">';
+    html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="1" width="6" height="11" rx="3"/><path d="M19 10v1a7 7 0 01-14 0v-1"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
+    html += state._micListening ? ' Listening...' : ' Tap to Speak';
+    html += '</button>';
+  }
   html += '</div></div>';
 
   // Copy & Post button
@@ -2112,6 +2396,30 @@ function detailRow(label, value) {
 
 // ===== APP EVENT BINDING =====
 function bindAppEvents() {
+  // Logout
+  var logoutBtn = document.getElementById('logout-btn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', function() {
+      cleanupListeners();
+      localStorage.removeItem('mobi_phone');
+      localStorage.removeItem('mobi_phoneCode');
+      localStorage.removeItem('mobi_clinicId');
+      localStorage.removeItem('mobi_patientId');
+      localStorage.removeItem('mobi_patientName');
+      localStorage.removeItem('mobi_clinicName');
+      localStorage.removeItem('mobi_lastRead');
+      state.phone = '';
+      state.clinicId = '';
+      state.patientId = '';
+      state.patientName = '';
+      state.clinicName = '';
+      state.screen = 'login';
+      state.tab = 'home';
+      state.dataLoaded = false;
+      render();
+    });
+  }
+
   // Tab navigation
   var tabs = document.querySelectorAll('.tab-item');
   for (var i = 0; i < tabs.length; i++) {
@@ -2121,11 +2429,28 @@ function bindAppEvents() {
     });
   }
 
-  // Exercise done buttons
-  var exBtns = document.querySelectorAll('.ex-done-btn');
-  for (var ei = 0; ei < exBtns.length; ei++) {
-    exBtns[ei].addEventListener('click', function() {
-      var idx = parseInt(this.getAttribute('data-idx'), 10);
+  // Exercise card toggle (expand/collapse)
+  var exToggles = document.querySelectorAll('[data-ex-toggle]');
+  for (var et = 0; et < exToggles.length; et++) {
+    exToggles[et].addEventListener('click', function() {
+      var idx = parseInt(this.getAttribute('data-ex-toggle'), 10);
+      // Check if this exercise is already done — don't expand
+      var today = todayStr();
+      var doneToday = (state.exerciseLog || {})[today] || [];
+      for (var chk = 0; chk < doneToday.length; chk++) {
+        if (doneToday[chk] === idx) return;
+      }
+      state._expandedExIdx = (state._expandedExIdx === idx) ? null : idx;
+      render();
+    });
+  }
+
+  // Exercise complete buttons
+  var exCompBtns = document.querySelectorAll('[data-complete-idx]');
+  for (var ei = 0; ei < exCompBtns.length; ei++) {
+    exCompBtns[ei].addEventListener('click', function(e) {
+      e.stopPropagation();
+      var idx = parseInt(this.getAttribute('data-complete-idx'), 10);
       var today = todayStr();
       if (!state.exerciseLog[today]) state.exerciseLog[today] = [];
       // Check if already done
@@ -2135,6 +2460,7 @@ function bindAppEvents() {
       }
       if (alreadyDone) return;
       state.exerciseLog[today].push(idx);
+      state._expandedExIdx = null;
       // Save to Firestore
       if (state.clinicId && state.patientId) {
         db.collection('clinics').doc(state.clinicId).collection('exercise_log').doc(state.patientId).set(state.exerciseLog).catch(function(e) {
@@ -2143,11 +2469,16 @@ function bindAppEvents() {
       }
       // Check if all done
       if (state.exerciseLog[today].length >= state.exercises.length) {
-        showToast('All exercises done! Great work!');
+        showToast('All exercises done! Great work! \uD83C\uDF89');
       } else {
-        showToast('Exercise marked as done!');
+        showToast('Exercise completed!');
       }
       render();
+      // Add pulse animation to the card
+      setTimeout(function() {
+        var card = document.querySelector('.ex-card[data-ex-idx="' + idx + '"]');
+        if (card) card.classList.add('ex-just-done');
+      }, 50);
     });
   }
 
@@ -2194,6 +2525,63 @@ function bindAppEvents() {
   if (reviewText) {
     reviewText.addEventListener('input', function() {
       state._customReviewText = this.value;
+    });
+  }
+
+  // Mic button for voice-to-text
+  var micBtn = document.getElementById('mic-btn');
+  if (micBtn && _speechSupported) {
+    micBtn.addEventListener('click', function() {
+      if (state._micListening) {
+        // Stop listening
+        if (state._recognition) { state._recognition.stop(); state._recognition = null; }
+        state._micListening = false;
+        render();
+        return;
+      }
+      var recognition = new SpeechRecognition();
+      recognition.lang = 'en-IN';
+      recognition.interimResults = false;
+      recognition.continuous = false;
+      recognition.maxAlternatives = 1;
+      state._recognition = recognition;
+      state._micListening = true;
+      render();
+
+      recognition.onresult = function(event) {
+        var transcript = event.results[0][0].transcript;
+        var ta = document.getElementById('review-text');
+        if (ta) {
+          var existing = ta.value;
+          ta.value = existing ? existing + ' ' + transcript : transcript;
+          state._customReviewText = ta.value;
+          state._selectedReviewIdx = undefined;
+        }
+        state._micListening = false;
+        state._recognition = null;
+        render();
+        showToast('Text added from speech');
+      };
+      recognition.onerror = function(event) {
+        state._micListening = false;
+        state._recognition = null;
+        render();
+        if (event.error === 'not-allowed') {
+          showToast('Microphone permission denied');
+        } else if (event.error === 'no-speech') {
+          showToast('No speech detected. Try again.');
+        } else {
+          showToast('Speech error: ' + event.error);
+        }
+      };
+      recognition.onend = function() {
+        if (state._micListening) {
+          state._micListening = false;
+          state._recognition = null;
+          render();
+        }
+      };
+      recognition.start();
     });
   }
 

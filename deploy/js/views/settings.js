@@ -773,9 +773,12 @@ window.SettingsView = (function() {
     }
 
     var html = '';
+
+    // ---- Clinic App (Web) ----
     html += '<div class="card mb-2">';
-    html += '<div class="card-header"><h3>Feature Toggles</h3><span class="badge badge-teal">' + enabledCount + '/' + featureList.length + ' enabled</span></div>';
+    html += '<div class="card-header"><h3>Clinic App (Web)</h3><span class="badge badge-teal">' + enabledCount + '/' + featureList.length + ' enabled</span></div>';
     html += '<div class="card-body">';
+    html += '<p style="font-size:0.82em;color:var(--text-muted);margin-bottom:0.75rem;">These settings control what staff members see in the clinic web application.</p>';
 
     for (var i = 0; i < featureList.length; i++) {
       var f = featureList[i];
@@ -790,6 +793,51 @@ window.SettingsView = (function() {
       html += '</div>';
       html += '<label class="toggle-switch">';
       html += '<input type="checkbox" class="feature-toggle" data-feature="' + f.key + '"' + (isOn ? ' checked' : '') + '>';
+      html += '<span class="toggle-slider"></span>';
+      html += '<span class="toggle-knob"></span>';
+      html += '</label>';
+      html += '</div>';
+    }
+
+    html += '</div></div>';
+
+    // ---- Patient App (MobiPhysio) ----
+    var mobileDefaults = { billing: true, exercises: true, prescriptions: true, messaging: true };
+    var mobileFeatures = settings.mobileFeatures || mobileDefaults;
+    for (var mk in mobileDefaults) {
+      if (mobileDefaults.hasOwnProperty(mk) && !mobileFeatures.hasOwnProperty(mk)) {
+        mobileFeatures[mk] = mobileDefaults[mk];
+      }
+    }
+
+    var mobileFeatureList = [
+      { key: 'billing', label: 'Billing', description: 'Show bills and payment history to patients' },
+      { key: 'exercises', label: 'Exercises', description: 'Show exercise programs (HEP) to patients' },
+      { key: 'prescriptions', label: 'Prescriptions', description: 'Show prescriptions to patients' },
+      { key: 'messaging', label: 'Messages', description: 'Show clinic messages to patients' }
+    ];
+
+    var mobileEnabledCount = 0;
+    for (var mc = 0; mc < mobileFeatureList.length; mc++) {
+      if (mobileFeatures[mobileFeatureList[mc].key] !== false) mobileEnabledCount++;
+    }
+
+    html += '<div class="card mb-2">';
+    html += '<div class="card-header"><h3>Patient App (MobiPhysio)</h3><span class="badge badge-teal">' + mobileEnabledCount + '/' + mobileFeatureList.length + ' enabled</span></div>';
+    html += '<div class="card-body">';
+    html += '<p style="font-size:0.82em;color:var(--text-muted);margin-bottom:0.75rem;">These settings control what patients see in the MobiPhysio mobile app. These are independent of the clinic app settings above.</p>';
+
+    for (var mi = 0; mi < mobileFeatureList.length; mi++) {
+      var mf = mobileFeatureList[mi];
+      var mIsOn = mobileFeatures[mf.key] !== false;
+
+      html += '<div class="settings-toggle-row">';
+      html += '<div>';
+      html += '<div style="font-weight:500;">' + Utils.escapeHtml(mf.label) + '</div>';
+      html += '<div class="text-muted" style="font-size:0.85em;">' + Utils.escapeHtml(mf.description) + '</div>';
+      html += '</div>';
+      html += '<label class="toggle-switch">';
+      html += '<input type="checkbox" class="mobile-feature-toggle" data-feature="' + mf.key + '"' + (mIsOn ? ' checked' : '') + '>';
       html += '<span class="toggle-slider"></span>';
       html += '<span class="toggle-knob"></span>';
       html += '</label>';
@@ -1139,6 +1187,37 @@ window.SettingsView = (function() {
           }
         });
       })(toggles[f]);
+    }
+
+    // Mobile feature toggle change events
+    var mobileToggles = container.querySelectorAll('.mobile-feature-toggle');
+    for (var mf = 0; mf < mobileToggles.length; mf++) {
+      (function(toggle) {
+        toggle.addEventListener('change', function() {
+          var featureKey = toggle.getAttribute('data-feature');
+          var settings = Store.getClinicSettings();
+          if (!settings.mobileFeatures) {
+            settings.mobileFeatures = { billing: true, exercises: true, prescriptions: true, messaging: true };
+          }
+          settings.mobileFeatures[featureKey] = toggle.checked;
+          Store.saveClinicSettings(settings);
+
+          var label = featureKey.charAt(0).toUpperCase() + featureKey.slice(1);
+          Utils.toast('Patient App: ' + label + (toggle.checked ? ' enabled' : ' disabled'), 'success');
+
+          // Update the mobile enabled count badge
+          var mobileCard = toggle.closest('.card');
+          var badge = mobileCard ? mobileCard.querySelector('.badge-teal') : null;
+          if (badge) {
+            var allMToggles = container.querySelectorAll('.mobile-feature-toggle');
+            var mCount = 0;
+            for (var mt = 0; mt < allMToggles.length; mt++) {
+              if (allMToggles[mt].checked) mCount++;
+            }
+            badge.textContent = mCount + '/' + allMToggles.length + ' enabled';
+          }
+        });
+      })(mobileToggles[mf]);
     }
 
     // Session toggle interactivity
