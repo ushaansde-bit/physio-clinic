@@ -3066,7 +3066,17 @@ function bindAppEvents() {
         showToast('Please select or write a review first');
         return;
       }
-      var placeId = (state.clinicDoc || {}).googlePlaceId || '';
+      var _doc = state.clinicDoc || {};
+      if (!_doc.googlePlaceId) {
+        var _cid = state.clinicId || localStorage.getItem('mobi_clinicId') || 'default';
+        try {
+          var _raw = localStorage.getItem('physio_clinic_' + _cid);
+          if (!_raw && _cid !== 'default') _raw = localStorage.getItem('physio_clinic_default');
+          var _stored = JSON.parse(_raw || '{}');
+          if (_stored.googlePlaceId) _doc = _stored;
+        } catch(e) {}
+      }
+      var placeId = _doc.googlePlaceId || '';
       if (navigator.clipboard) {
         navigator.clipboard.writeText(text).then(function() {
           showToast('Review copied! Opening Google...');
