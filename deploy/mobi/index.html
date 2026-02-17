@@ -2576,6 +2576,15 @@ function generateReviewSuggestions() {
   var sessionCount = state.sessions.length;
   var patientDoc = state.patientDoc || {};
   var clinicDoc = state.clinicDoc || {};
+  if (!clinicDoc.address && !clinicDoc.city) {
+    var _cid = state.clinicId || localStorage.getItem('mobi_clinicId') || 'default';
+    try {
+      var _raw = localStorage.getItem('physio_clinic_' + _cid);
+      if (!_raw && _cid !== 'default') _raw = localStorage.getItem('physio_clinic_default');
+      var _stored = JSON.parse(_raw || '{}');
+      if (_stored.address || _stored.city) clinicDoc = _stored;
+    } catch(e) {}
+  }
   var patientName = state.patientName || '';
   var firstName = patientName.split(' ')[0] || '';
 
