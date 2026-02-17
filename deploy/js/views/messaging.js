@@ -372,13 +372,17 @@ window.MessagingView = (function() {
         html += '<span style="font-size:0.75rem;color:var(--gray-500);">' + Utils.timeAgo(msg.sentAt) + '</span>';
         html += '</div>';
         html += '<div style="font-size:0.88rem;margin-bottom:0.35rem;">' + Utils.escapeHtml(msg.text) + '</div>';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;">';
         html += '<div style="font-size:0.75rem;color:var(--gray-500);">By ' + Utils.escapeHtml(msg.sentBy || 'Unknown');
         if (tagNames.length > 0) {
           html += ' &middot; Tags: ' + Utils.escapeHtml(tagNames.join(', '));
         } else {
           html += ' &middot; All patients';
         }
-        html += '</div></div>';
+        html += '</div>';
+        html += '<button class="btn btn-sm btn-ghost delete-campaign-btn" data-msg-id="' + Utils.escapeHtml(msg.id) + '" style="color:var(--danger);padding:2px 6px;" title="Delete message">';
+        html += '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>';
+        html += '</button></div></div>';
       }
     }
     html += '</div></div>';
@@ -429,7 +433,7 @@ window.MessagingView = (function() {
     } else {
       html += '<div class="card"><div class="table-wrapper">';
       html += '<table class="data-table"><thead><tr>';
-      html += '<th>Date</th><th>Patient</th><th>Message</th>';
+      html += '<th>Date</th><th>Patient</th><th>Message</th><th style="width:50px;"></th>';
       html += '</tr></thead><tbody>';
       for (var i = 0; i < pageItems.length; i++) {
         var entry = pageItems[i];
@@ -438,6 +442,9 @@ window.MessagingView = (function() {
         html += '<td>' + Utils.timeAgo(entry.createdAt) + '</td>';
         html += '<td style="font-weight:500;">' + Utils.escapeHtml(entry.patientName || 'Unknown') + '</td>';
         html += '<td style="font-size:0.82rem;color:var(--gray-600);">' + Utils.escapeHtml(truncMsg) + '</td>';
+        html += '<td><button class="btn btn-sm btn-ghost delete-history-btn" data-id="' + entry.id + '" style="color:var(--danger);padding:2px 6px;" title="Delete">';
+        html += '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>';
+        html += '</button></td>';
         html += '</tr>';
       }
       html += '</tbody></table></div>';
@@ -485,6 +492,34 @@ window.MessagingView = (function() {
       if (historyPageBtn && !historyPageBtn.disabled) {
         state.historyPage = parseInt(historyPageBtn.getAttribute('data-page'), 10);
         renderView(container);
+        return;
+      }
+
+      // Delete campaign message (Firestore)
+      var delCampaignBtn = e.target.closest('.delete-campaign-btn');
+      if (delCampaignBtn) {
+        var msgId = delCampaignBtn.getAttribute('data-msg-id');
+        Utils.inlineConfirm(container, 'Delete this message? It will be removed from all patients\u0027 MobiPhysio app.', function() {
+          if (window.FirebaseSync && FirebaseSync.deleteCampaignMessage) {
+            FirebaseSync.deleteCampaignMessage(msgId).then(function() {
+              state.campaignHistory = state.campaignHistory.filter(function(m) { return m.id !== msgId; });
+              Utils.toast('Message deleted', 'success');
+              renderView(container);
+            });
+          }
+        }, { danger: true });
+        return;
+      }
+
+      // Delete message log entry (localStorage)
+      var delHistoryBtn = e.target.closest('.delete-history-btn');
+      if (delHistoryBtn) {
+        var logId = delHistoryBtn.getAttribute('data-id');
+        Utils.inlineConfirm(container, 'Delete this log entry?', function() {
+          Store.deleteMessageLog(logId);
+          Utils.toast('Log entry deleted', 'success');
+          renderView(container);
+        }, { danger: true });
         return;
       }
 

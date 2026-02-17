@@ -484,6 +484,7 @@ window.Store = (function() {
     // Message Log
     getMessageLog: function() { return getAll(KEYS.messageLog); },
     createMessageLog: function(entry) { return create(KEYS.messageLog, entry); },
+    deleteMessageLog: function(id) { return remove(KEYS.messageLog, id); },
 
     // Activity
     getActivity: function() { return getAll(KEYS.activity); },

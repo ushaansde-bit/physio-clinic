@@ -382,6 +382,16 @@ window.FirebaseSync = (function() {
     });
   }
 
+  function deleteCampaignMessage(messageId) {
+    if (!db) return Promise.resolve();
+    var cid = getClinicId();
+    return db.collection('clinics').doc(cid).collection('patient_messages').doc(messageId).delete().then(function() {
+      console.log('[FirebaseSync] Deleted campaign message ' + messageId);
+    }).catch(function(e) {
+      console.error('[FirebaseSync] Campaign message delete failed:', e);
+    });
+  }
+
   // ---- Query users by username in a clinic ----
   function queryUserByUsername(clinicId, username) {
     if (!db) return Promise.resolve(null);
@@ -418,7 +428,8 @@ window.FirebaseSync = (function() {
     getCollectionRef: getCollectionRef,
     normalizePhone: normalizePhone,
     updatePatientPhoneIndex: updatePatientPhoneIndex,
-    saveCampaignMessage: saveCampaignMessage
+    saveCampaignMessage: saveCampaignMessage,
+    deleteCampaignMessage: deleteCampaignMessage
   };
 
 })();
