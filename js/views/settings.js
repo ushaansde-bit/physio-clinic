@@ -10,7 +10,8 @@ window.SettingsView = (function() {
     staffSubView: 'list',
     staffEditId: null,
     roleSubView: 'list',
-    roleEditValue: null
+    roleEditValue: null,
+    trashPage: 1
   };
 
   // All navigable pages in the app
@@ -1081,24 +1082,30 @@ window.SettingsView = (function() {
   function renderTrash() {
     var trashed = Store.getAllTrash();
     var html = '';
+    var perPage = 10;
+    var total = trashed.length;
+    var totalPages = Math.max(1, Math.ceil(total / perPage));
+    if (state.trashPage > totalPages) state.trashPage = totalPages;
+    var start = (state.trashPage - 1) * perPage;
+    var pageItems = trashed.slice(start, start + perPage);
 
     html += '<div class="card mb-2">';
-    html += '<div class="card-header"><h3>Trash (' + trashed.length + ')</h3>';
-    if (trashed.length > 0) {
+    html += '<div class="card-header"><h3>Trash (' + total + ')</h3>';
+    if (total > 0) {
       html += '<button class="btn btn-sm btn-ghost" id="empty-trash-btn" style="color:var(--danger);">Empty Trash</button>';
     }
     html += '</div>';
     html += '<div class="card-body">';
 
-    if (trashed.length === 0) {
+    if (total === 0) {
       html += '<div class="empty-state"><p>Trash is empty. Deleted items appear here for recovery.</p></div>';
     } else {
       html += '<div class="table-wrapper"><table class="data-table"><thead><tr>';
       html += '<th>Type</th><th>Name</th><th>Deleted</th><th>Actions</th>';
       html += '</tr></thead><tbody>';
 
-      for (var i = 0; i < trashed.length; i++) {
-        var item = trashed[i];
+      for (var i = 0; i < pageItems.length; i++) {
+        var item = pageItems[i];
         var name = item.name || item.patientName || item.medication || item.description || item.text || item.id;
         var deletedDate = item._deletedAt ? Utils.formatDate(item._deletedAt.split('T')[0]) : '-';
         var isCascade = !!item._deletedBy;
@@ -1119,6 +1126,19 @@ window.SettingsView = (function() {
       }
 
       html += '</tbody></table></div>';
+
+      // Pagination
+      if (total > perPage) {
+        html += '<div class="card-footer"><div class="pagination">';
+        html += '<span>Showing ' + (start + 1) + '-' + Math.min(start + perPage, total) + ' of ' + total + '</span>';
+        html += '<div class="pagination-buttons">';
+        html += '<button class="page-btn trash-page-btn" data-page="' + (state.trashPage - 1) + '"' + (state.trashPage <= 1 ? ' disabled' : '') + '>&laquo;</button>';
+        for (var pg = 1; pg <= totalPages; pg++) {
+          html += '<button class="page-btn trash-page-btn' + (pg === state.trashPage ? ' active' : '') + '" data-page="' + pg + '">' + pg + '</button>';
+        }
+        html += '<button class="page-btn trash-page-btn" data-page="' + (state.trashPage + 1) + '"' + (state.trashPage >= totalPages ? ' disabled' : '') + '>&raquo;</button>';
+        html += '</div></div></div>';
+      }
     }
 
     html += '</div></div>';
@@ -1454,6 +1474,14 @@ window.SettingsView = (function() {
       var deleteRoleBtn = e.target.closest('.delete-role-btn');
       if (deleteRoleBtn) {
         deleteCustomRole(container, deleteRoleBtn.getAttribute('data-role'), deleteRoleBtn.getAttribute('data-label'));
+        return;
+      }
+
+      // Trash pagination
+      var trashPageBtn = e.target.closest('.trash-page-btn');
+      if (trashPageBtn && !trashPageBtn.disabled) {
+        state.trashPage = parseInt(trashPageBtn.getAttribute('data-page'), 10);
+        renderView(container);
         return;
       }
 
