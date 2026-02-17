@@ -1000,8 +1000,17 @@ var state = {
 
 // ===== Feature Toggle Helper =====
 // Checks mobileFeatures first, falls back to web features, defaults to true
+// Also falls back to localStorage clinic settings (for local/offline use)
 function isMobileFeatureOn(key) {
   var doc = state.clinicDoc || {};
+  // If clinicDoc is empty (no Firestore), try localStorage
+  if (!doc.features && !doc.mobileFeatures) {
+    var cid = state.clinicId || localStorage.getItem('mobi_clinicId') || 'default';
+    try {
+      var stored = JSON.parse(localStorage.getItem('physio_clinic_' + cid) || '{}');
+      doc = stored;
+    } catch(e) {}
+  }
   var mobile = doc.mobileFeatures || {};
   if (mobile[key] !== undefined) return mobile[key] !== false;
   var web = doc.features || {};
