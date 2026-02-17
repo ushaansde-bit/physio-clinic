@@ -2722,6 +2722,15 @@ function getDailyTip() {
 function renderReview() {
   var html = '';
   var clinicDoc = state.clinicDoc || {};
+  if (!clinicDoc.googlePlaceId) {
+    var cid = state.clinicId || localStorage.getItem('mobi_clinicId') || 'default';
+    try {
+      var raw = localStorage.getItem('physio_clinic_' + cid);
+      if (!raw && cid !== 'default') raw = localStorage.getItem('physio_clinic_default');
+      var stored = JSON.parse(raw || '{}');
+      if (stored.googlePlaceId) clinicDoc = stored;
+    } catch(e) {}
+  }
   var placeId = clinicDoc.googlePlaceId || '';
   var suggestions = generateReviewSuggestions();
 
