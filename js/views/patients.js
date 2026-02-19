@@ -328,8 +328,15 @@ window.PatientsView = (function() {
         return;
       }
       var data = Utils.getFormData(form);
-      // Phone uniqueness check
+      // Phone digit count validation
       if (data.phone && data.phone.trim()) {
+        var phoneDigits = data.phone.replace(/\D/g, '');
+        if (phoneDigits.length !== 10) {
+          Utils.toast('Phone number must be exactly 10 digits', 'error');
+          return;
+        }
+        data.phone = phoneDigits;
+        // Phone uniqueness check
         var existing = Store.getPatientByPhone(data.phone);
         if (existing) {
           Utils.toast('Phone number already exists for ' + existing.name, 'error');

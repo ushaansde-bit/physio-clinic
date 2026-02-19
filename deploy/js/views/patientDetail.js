@@ -2412,8 +2412,15 @@ window.PatientDetailView = (function() {
           data.tags.push(activePills[tc].getAttribute('data-tag-id'));
         }
 
-        // Phone uniqueness check (skip if same patient)
+        // Phone digit count validation
         if (data.phone && data.phone.trim()) {
+          var phoneDigits = data.phone.replace(/\D/g, '');
+          if (phoneDigits.length !== 10) {
+            Utils.toast('Phone number must be exactly 10 digits', 'error');
+            return;
+          }
+          data.phone = phoneDigits;
+          // Phone uniqueness check (skip if same patient)
           var existingByPhone = Store.getPatientByPhone(data.phone);
           if (existingByPhone && existingByPhone.id !== patient.id) {
             Utils.toast('Phone number already exists for ' + existingByPhone.name, 'error');

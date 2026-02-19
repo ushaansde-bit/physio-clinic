@@ -162,11 +162,11 @@ window.Utils = (function() {
   }
 
   function getPhoneDigits() {
-    return 11;
+    return 10;
   }
 
   function getDigitsByPhoneCode(phoneCode) {
-    return 11;
+    return 10;
   }
 
   // Format currency (INR with Indian comma formatting)
