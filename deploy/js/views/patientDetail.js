@@ -1008,6 +1008,9 @@ window.PatientDetailView = (function() {
           html += '</div>';
           html += '<div style="font-size:0.8rem;color:var(--text-muted);">' + details + '</div>';
           html += '</div>';
+          if (lex.holdSeconds > 0 || lex.defaultSets > 1) {
+            html += '<button type="button" class="lib-preview-timer-btn" data-lib-preview="' + lex.id + '" title="Preview Timer" style="flex-shrink:0;width:30px;height:30px;border-radius:50%;border:1px solid var(--border);background:var(--gray-50);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:0.85rem;color:var(--primary);">&#9654;</button>';
+          }
           html += '</label>';
         }
         html += '</div>';
@@ -1233,6 +1236,7 @@ window.PatientDetailView = (function() {
     }
     // If no hold, stays in 'reps' phase waiting for "Done with Set"
   }
+  window.showTimerPreview = showTimerPreview;
 
   function exerciseCard(ex) {
     var html = '<div class="exercise-card" style="display:flex;align-items:center;gap:0.75rem;">';
@@ -2031,6 +2035,22 @@ window.PatientDetailView = (function() {
       if (libFilterBtn) {
         sub.exerciseLibraryFilter = libFilterBtn.getAttribute('data-filter');
         renderDetail(container, patient);
+        return;
+      }
+      var libPreviewBtn = e.target.closest('.lib-preview-timer-btn');
+      if (libPreviewBtn) {
+        e.stopPropagation();
+        e.preventDefault();
+        var libPreviewId = libPreviewBtn.getAttribute('data-lib-preview');
+        var libPreviewEx = ExerciseLibrary.getById(libPreviewId);
+        if (libPreviewEx) {
+          showTimerPreview({
+            name: libPreviewEx.name,
+            sets: libPreviewEx.defaultSets + '',
+            reps: libPreviewEx.defaultReps + '',
+            hold: libPreviewEx.holdSeconds ? libPreviewEx.holdSeconds + ' sec' : ''
+          });
+        }
         return;
       }
       var timerBtn = e.target.closest('.preview-timer-btn');

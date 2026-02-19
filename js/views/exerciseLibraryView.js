@@ -48,6 +48,9 @@ window.ExerciseLibraryView = (function() {
       if (ex.holdSeconds) html += ' &bull; ' + ex.holdSeconds + 's hold';
       html += '</div>';
       html += '<span class="ex-lib-tag">' + ex.bodyPart.charAt(0).toUpperCase() + ex.bodyPart.slice(1) + '</span>';
+      if (ex.holdSeconds > 0 || ex.defaultSets > 1) {
+        html += '<button class="ex-lib-preview-btn" data-ex-id="' + ex.id + '" title="Preview Timer">&#9654; Preview</button>';
+      }
       html += '</div>';
     }
     html += '</div>';
@@ -68,7 +71,9 @@ window.ExerciseLibraryView = (function() {
         '.ex-lib-anim { width:130px; height:130px; margin:0 auto 8px; }',
         '.ex-lib-name { font-weight:700; font-size:0.85rem; color:var(--gray-800); margin-bottom:2px; }',
         '.ex-lib-info { font-size:0.75rem; color:var(--gray-500); }',
-        '.ex-lib-tag { display:inline-block; font-size:0.65rem; font-weight:600; color:var(--primary); background:var(--green-50,#ecfdf5); padding:2px 8px; border-radius:10px; margin-top:4px; }'
+        '.ex-lib-tag { display:inline-block; font-size:0.65rem; font-weight:600; color:var(--primary); background:var(--green-50,#ecfdf5); padding:2px 8px; border-radius:10px; margin-top:4px; }',
+        '.ex-lib-preview-btn { display:inline-block; margin-top:6px; padding:4px 12px; border:1px solid var(--primary); background:white; color:var(--primary); border-radius:14px; font-size:0.72rem; font-weight:600; cursor:pointer; transition:all 0.2s; }',
+        '.ex-lib-preview-btn:hover { background:var(--primary); color:white; }'
       ].join('\n');
       document.head.appendChild(style);
     }
@@ -90,6 +95,24 @@ window.ExerciseLibraryView = (function() {
       filterBtns[f].addEventListener('click', function() {
         currentFilter = this.getAttribute('data-bp');
         render(container);
+      });
+    }
+
+    // Preview timer buttons
+    var previewBtns = container.querySelectorAll('.ex-lib-preview-btn');
+    for (var p = 0; p < previewBtns.length; p++) {
+      previewBtns[p].addEventListener('click', function(e) {
+        e.stopPropagation();
+        var exId = this.getAttribute('data-ex-id');
+        var ex = ExerciseLibrary.getById(exId);
+        if (ex && window.showTimerPreview) {
+          window.showTimerPreview({
+            name: ex.name,
+            sets: ex.defaultSets + '',
+            reps: ex.defaultReps + '',
+            hold: ex.holdSeconds ? ex.holdSeconds + ' sec' : ''
+          });
+        }
       });
     }
 
